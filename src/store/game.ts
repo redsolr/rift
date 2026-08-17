@@ -158,7 +158,6 @@ export const useGame = create<GameState>((set, get) => {
   const afterCatchUp = () => {
     const s = get();
     if (!s.battle || s.battle.state.ended) return;
-    if (s.followCam && (s.mode !== "manual" || s.battle.state.activeTeam === s.playerTeam)) get().overview();
     if (s.mode === "manual" && s.battle.state.activeTeam !== s.playerTeam) {
       s.battle.runPhaseAI();
       sync();

@@ -17,7 +17,6 @@ export default function BattleBar() {
   const battle = useGame((s) => s.battle);
   const selected = useGame((s) => s.selected);
   const hoverUnit = useGame((s) => s.hoverUnit);
-  const hover = useGame((s) => s.hover);
   const pendingMove = useGame((s) => s.pendingMove);
   const targets = useGame((s) => s.targets);
   const caughtUp = useGame(selectCaughtUp);
@@ -25,14 +24,14 @@ export default function BattleBar() {
   const units = useGame((s) => s.config.units);
   const map = useGame((s) => s.config.map);
   const mode = useGame((s) => s.mode);
-  const playerTeam = useGame((s) => s.playerTeam);
 
   const byId = (id: string | null) => (id ? units.find((u) => u.id === id) ?? null : null);
   const hov = byId(hoverUnit);
   const sel = byId(selected);
-  // left = my unit: selected, else a hovered friendly; right = hovered enemy, else the only target
-  const left = sel ?? (hov && hov.team === playerTeam ? hov : null);
-  const right = hov && hov.team !== playerTeam && (!left || hov.id !== left.id) ? hov : left && targets.length === 1 ? byId(targets[0]) : null;
+  // Only a SELECTED unit opens the bar (hover alone would flicker). Right = the enemy under the
+  // pointer while a unit is selected, else the only target in range.
+  const left = sel;
+  const right = left ? (hov && hov.team !== left.team ? hov : targets.length === 1 ? byId(targets[0]) : null) : null;
 
   const fc = useMemo(() => {
     if (!battle || !caughtUp || !left || !right) return null;
@@ -42,12 +41,12 @@ export default function BattleBar() {
   }, [battle, caughtUp, left, right, pendingMove, view.units]);
 
   const terrainOf = (x: number, y: number): TerrainDef | null => (x >= 0 && y >= 0 && x < map.width && y < map.height ? TERRAIN[map.tiles[y * map.width + x]] : null);
-  const leftPos = left ? (pendingMove ?? { x: view.units[left.id]?.x ?? left.x, y: view.units[left.id]?.y ?? left.y }) : hover;
+  const leftPos = left ? (pendingMove ?? { x: view.units[left.id]?.x ?? left.x, y: view.units[left.id]?.y ?? left.y }) : null;
   const rightPos = right ? { x: view.units[right.id]?.x ?? right.x, y: view.units[right.id]?.y ?? right.y } : null;
   const leftTerr = leftPos ? terrainOf(leftPos.x, leftPos.y) : null;
   const rightTerr = rightPos ? terrainOf(rightPos.x, rightPos.y) : null;
 
-  if (mode === "editor" || (!left && !right)) return null;
+  if (mode === "editor" || !left) return null;
   const lv = left ? view.units[left.id] : null;
   const rv = right ? view.units[right.id] : null;
   const duel = !!(fc && left && right && lv && rv);
@@ -56,8 +55,7 @@ export default function BattleBar() {
 
   return (
     <div className={`battle-bar ${duel ? "duel" : "solo"}`} aria-label="Battle forecast">
-      {left && lv && <Side u={left} hp={lv.hp} terrain={leftTerr} side="left" />}
-      {!left && right && rv && <Side u={right} hp={rv.hp} terrain={rightTerr} side="left" />}
+      {lv && <Side u={left} hp={lv.hp} terrain={leftTerr} side="left" />}
 
       {duel && (
         <div className="bb-center">
@@ -93,9 +91,9 @@ export default function BattleBar() {
           </div>
         </div>
       )}
-      {!duel && left && <div className="bb-center solo-hint">{sel ? "Hover an enemy to forecast" : ""}</div>}
+      {!duel && <div className="bb-center solo-hint">Hover an enemy to forecast</div>}
 
-      {right && rv && left && <Side u={right} hp={rv.hp} terrain={rightTerr} side="right" />}
+      {right && rv && <Side u={right} hp={rv.hp} terrain={rightTerr} side="right" />}
     </div>
   );
 }

@@ -1454,8 +1454,29 @@ button.danger {
   box-shadow: 0 0 12px rgba(255, 213, 79, 0.6);
   border-color: #ffd54f;
 }
+.tb-chip.done {
+  filter: grayscale(1) brightness(0.55);
+  opacity: 0.75;
+}
+.tb-chip.done .tb-hpnum,
+.tb-chip.done .tb-hp {
+  filter: none;
+}
 .tb-chip.sel {
   outline: 2px solid #fff;
+}
+.tb-hpnum {
+  position: absolute;
+  right: 2px;
+  bottom: 4px;
+  font-size: 10px;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 1px 2px #000, 0 0 3px #000;
+  line-height: 1;
+}
+.tb-hp.low {
+  background: #ff5c5c;
 }
 .tb-card {
   width: 100%;
@@ -1467,7 +1488,7 @@ button.danger {
   position: absolute;
   left: 0;
   bottom: 0;
-  height: 3px;
+  height: 4px;
   background: #6cf58a;
 }
 .tb-next {

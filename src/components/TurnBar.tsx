@@ -20,12 +20,10 @@ export default function TurnBar() {
   const mode = useGame((s) => s.mode);
 
   const order = useMemo(() => {
-    const bySpeed = (team: string, onlyPending: boolean) =>
-      units
-        .filter((u) => u.team === team && view.units[u.id]?.alive && (!onlyPending || !view.units[u.id]?.acted))
-        .sort((a, b) => b.stats.spd - a.stats.spd || (a.id < b.id ? -1 : 1));
+    const bySpeed = (team: string) =>
+      units.filter((u) => u.team === team && view.units[u.id]?.alive).sort((a, b) => b.stats.spd - a.stats.spd || (a.id < b.id ? -1 : 1));
     const active = view.activeTeam;
-    return [...bySpeed(active, true), ...bySpeed(otherTeam(active), false)];
+    return [...bySpeed(active), ...bySpeed(otherTeam(active))];
   }, [units, view]);
 
   if (!battle || mode === "editor" || view.ended) return null;
@@ -39,17 +37,19 @@ export default function TurnBar() {
       <div className="tb-strip">
         {order.map((u, i) => {
           const v = view.units[u.id];
-          const isNext = i === 0;
+          const done = u.team === view.activeTeam && v.acted;
+          const isNext = u.team === view.activeTeam && !done && !order.slice(0, i).some((o) => o.team === view.activeTeam && !view.units[o.id].acted);
           const boundary = i > 0 && order[i - 1].team !== u.team;
           return (
             <button
               key={u.id}
-              className={`tb-chip ${u.team} ${isNext ? "next" : ""} ${selected === u.id ? "sel" : ""} ${boundary ? "boundary" : ""}`}
+              className={`tb-chip ${u.team} ${isNext ? "next" : ""} ${done ? "done" : ""} ${selected === u.id ? "sel" : ""} ${boundary ? "boundary" : ""}`}
               title={`${u.name} · ${u.team === playerTeam ? "you" : "enemy"} · HP ${v.hp}/${u.stats.hp} · SPD ${u.stats.spd}`}
               onClick={() => select(u.id)}
             >
               <CardThumb u={u} className="tb-card" scale={0.2} />
-              <span className="tb-hp" style={{ width: `${(100 * v.hp) / u.stats.hp}%` }} />
+              <span className="tb-hpnum">{v.hp}</span>
+              <span className={`tb-hp ${v.hp <= u.stats.hp * 0.3 ? "low" : ""}`} style={{ width: `${(100 * v.hp) / u.stats.hp}%` }} />
               {isNext && <span className="tb-next">▼</span>}
             </button>
           );
