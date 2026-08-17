@@ -67,27 +67,27 @@ export function makeUnit(team: Team, archetype: Archetype, x: number, y: number,
   };
 }
 
-/** 12 wide × 16 tall — a river with two crossings, forests on the flanks, a hill in the middle. */
+/**
+ * 16 wide × 12 tall (landscape). Blue holds the far bank (rows 0–1), red the near bank (rows 10–11) —
+ * the player's army is always on the NEAR side of the camera, FE-style. A river with three crossings,
+ * forests on the flanks, hills near the fords, two wall stubs.
+ */
 export function defaultMap(): MapDef {
-  const width = 12,
-    height = 16;
+  const width = 16,
+    height = 12;
   const rows: string[] = [
-    "..ff........",
-    "..ff.....f..",
-    ".........f..",
-    "....#.......",
-    "....#...hh..",
-    "........hh..",
-    ".f..........",
-    "~~~~.~~~~~.~",
-    "~~~~.~~~~~.~",
-    "..........f.",
-    "..hh........",
-    "..hh...#....",
-    ".......#....",
-    "..f.........",
-    "..f.....ff..",
-    "........ff..",
+    "..ff.......ff...",
+    ".........f......",
+    "....#.....hh....",
+    "....#.....hh..f.",
+    ".f..............",
+    "~~~.~~~~~.~~~~.~",
+    "~~~.~~~~~.~~~~.~",
+    "..............f.",
+    "..hh......#.....",
+    "..hh......#..f..",
+    ".........f......",
+    "..ff.......ff...",
   ];
   const map: Record<string, Terrain> = { ".": "ground", f: "forest", h: "hill", "~": "water", "#": "wall", o: "objective" };
   const tiles: Terrain[] = [];
@@ -96,23 +96,23 @@ export function defaultMap(): MapDef {
   return { width, height, tiles };
 }
 
-export function emptyMap(width = 12, height = 16): MapDef {
+export function emptyMap(width = 16, height = 12): MapDef {
   return { width, height, tiles: Array(width * height).fill("ground") };
 }
 
 export function defaultConfig(): BattleConfig {
   counter = 0;
   const units: UnitDef[] = [
-    makeUnit("red", "knight", 5, 1),
-    makeUnit("red", "fighter", 6, 1),
-    makeUnit("red", "archer", 4, 0),
-    makeUnit("red", "mage", 7, 0),
-    makeUnit("red", "healer", 6, 0),
-    makeUnit("blue", "knight", 6, 14),
-    makeUnit("blue", "fighter", 5, 14),
-    makeUnit("blue", "archer", 7, 15),
-    makeUnit("blue", "mage", 4, 15),
-    makeUnit("blue", "healer", 5, 15),
+    makeUnit("red", "knight", 7, 10),
+    makeUnit("red", "fighter", 8, 10),
+    makeUnit("red", "archer", 6, 11),
+    makeUnit("red", "mage", 9, 11),
+    makeUnit("red", "healer", 8, 11),
+    makeUnit("blue", "knight", 8, 1),
+    makeUnit("blue", "fighter", 7, 1),
+    makeUnit("blue", "archer", 9, 0),
+    makeUnit("blue", "mage", 6, 0),
+    makeUnit("blue", "healer", 7, 0),
   ];
   return {
     map: defaultMap(),

@@ -443,11 +443,9 @@ function CameraRig({ cx, cz, w, h }: { cx: number; cz: number; w: number; h: num
     const aspect = size.width / Math.max(1, size.height);
     const vFov = (cam.fov * Math.PI) / 180;
     const hFov = 2 * Math.atan(Math.tan(vFov / 2) * aspect);
-    // A tall map on a wide screen is viewed SIDEWAYS (red on the left, blue on the right)
-    // so the board fills the viewport; otherwise upright (red at the top).
-    const sideways = aspect > 1.15 && h > w * 1.15;
-    const spanAcross = sideways ? h : w;
-    const spanDeep = sideways ? w : h;
+    // Camera sits behind the player's side (high y = near edge) looking toward the enemy.
+    const spanAcross = w;
+    const spanDeep = h;
     const tilt = aspect < 1 ? Math.max(camTilt, 1.0) : camTilt; // radians from horizontal — the FE-style angle (user-adjustable)
     const halfA = (spanAcross / 2) * 1.1 + 0.5;
     const halfD = (spanDeep / 2) * 1.1 + 0.5;
@@ -455,7 +453,7 @@ function CameraRig({ cx, cz, w, h }: { cx: number; cz: number; w: number; h: num
     const needW = halfA / Math.tan(hFov / 2) + nearOffset;
     const needH = (halfD * Math.max(Math.sin(tilt), 0.75)) / Math.tan(vFov / 2) + nearOffset;
     fitDist.current = Math.max(needH, needW, 8);
-    dir.current = sideways ? new THREE.Vector3(-Math.cos(tilt), Math.sin(tilt), 0) : new THREE.Vector3(0, Math.sin(tilt), Math.cos(tilt));
+    dir.current = new THREE.Vector3(0, Math.sin(tilt), Math.cos(tilt));
     const target = new THREE.Vector3(cx, 0, aspect < 1 ? cz + h * 0.09 : cz);
     // snap on first fit / resize; later focus requests glide. A tilt change re-aims from the current target.
     if (initialised.current && controls) {
