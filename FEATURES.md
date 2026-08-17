@@ -26,7 +26,8 @@ What the product does **today**. Update in the same commit as any feature-visibl
 - ✅ Playback: play/pause/step, 0.5–4× speed, event cursor; Rematch = next seed; Reset = back to setup.
 - ✅ "Why did it do that?" — selected unit's last decision: ranked candidates, expandable term breakdown (Explain panel).
 - ✅ Share: copy link (`#c=code`), paste to load, load default setup.
-- 🟡 Presentation: Three.js board (r3f), archetype-shaped primitives, HP bars, name labels, hop-on-attack, shake-on-hit, floating damage/heal numbers, tile highlights (reach / target / selected / hover). No sprites yet.
+- 🟡 Presentation: Three.js board (r3f), archetype-shaped primitives, HP bars, name labels, hop-on-attack, shake-on-hit, floating damage/heal numbers, tile highlights (reach / target / selected / hover / **attack-range diamond of the selected unit**). **Effects (2026-08-17)**: archer = arcing arrow projectile + impact flash; mage = cast glow → glowing bolt with trail + point light → vertical impact flash; melee = slash arc; heal = rising green ring at healer and target. Effects are spawned from events (never from engine state). No sprites yet.
+- ✅ Battle log (panel section): human-readable turn-by-turn feed derived from the replayed events (moves, hits with damage/HP-left/KILLED, heals, waits, result); auto-scrolls; click a row to select that unit.
 - 🚫 Accounts, backend, multiplayer, ranked, campaign — not until "do people press Rematch?" is answered.
 
 ## Known balance signal (default map, seeds 1–200)

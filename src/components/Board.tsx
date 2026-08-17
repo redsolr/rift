@@ -4,6 +4,7 @@ import { Html, OrbitControls } from "@react-three/drei";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useGame } from "@/store/game";
+import Effects from "./Effects";
 import { Archetype, TERRAIN, Team, UnitDef } from "@/sim/types";
 
 const TEAM_COLOR: Record<Team, string> = { red: "#e0554a", blue: "#4a86e0" };
@@ -97,11 +98,29 @@ function Highlights() {
   }, [selected, mode, battle, cursor, events.length]);
 
   const sel = selected ? view.units[selected] : null;
+  const selDef = selected ? config.units.find((u) => u.id === selected) : null;
+  const rangeTiles = useMemo(() => {
+    if (!sel || !selDef || !sel.alive) return [];
+    const origin = pendingMove ?? { x: sel.x, y: sel.y };
+    const out: { x: number; y: number }[] = [];
+    const { rangeMin, rangeMax } = selDef.stats;
+    for (let dy = -rangeMax; dy <= rangeMax; dy++)
+      for (let dx = -rangeMax; dx <= rangeMax; dx++) {
+        const d = Math.abs(dx) + Math.abs(dy);
+        if (d < rangeMin || d > rangeMax) continue;
+        const x = origin.x + dx, y = origin.y + dy;
+        if (x >= 0 && y >= 0 && x < config.map.width && y < config.map.height) out.push({ x, y });
+      }
+    return out;
+  }, [sel, selDef, pendingMove, config.map.width, config.map.height]);
   const unitAt = (x: number, y: number) => config.units.find((u) => view.units[u.id]?.alive !== false && view.units[u.id]?.x === x && view.units[u.id]?.y === y);
   return (
     <group>
       {preview.map((p) => (
         <Highlight key={`p${p.x},${p.y}`} x={p.x} y={p.y} color="#9ad0ff" opacity={0.22} />
+      ))}
+      {rangeTiles.map((p) => (
+        <Highlight key={`r${p.x},${p.y}`} x={p.x} y={p.y} color={selDef?.archetype === "healer" ? "#6cf58a" : "#ff6a5c"} opacity={0.16} />
       ))}
       {moveTiles.map((p) => (
         <Highlight key={`m${p.x},${p.y}`} x={p.x} y={p.y} color="#4fa3ff" opacity={0.4} />
@@ -280,6 +299,7 @@ export default function Board() {
           <Tiles />
           <Highlights />
           <Units />
+          <Effects />
         </group>
         <OrbitControls target={[cx, 0, cz]} minPolarAngle={0.2} maxPolarAngle={1.25} minDistance={6} maxDistance={40} enablePan />
       </Canvas>

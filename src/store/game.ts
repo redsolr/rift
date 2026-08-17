@@ -38,6 +38,11 @@ export interface Float {
   color: string;
 }
 
+export type EffectStyle = "arrow" | "magic" | "melee" | "heal";
+export type Effect =
+  | { key: number; kind: "projectile"; style: EffectStyle; from: Pos; to: Pos; delay: number }
+  | { key: number; kind: "burst"; style: EffectStyle; at: Pos; delay: number };
+
 export interface View {
   units: Record<string, ViewUnit>;
   turn: number;
@@ -65,6 +70,7 @@ function initialView(cfg: BattleConfig): View {
 }
 
 let floatKey = 0;
+let effectKey = 0;
 let timer: ReturnType<typeof setTimeout> | null = null;
 
 interface GameState {
@@ -79,6 +85,7 @@ interface GameState {
   playing: boolean;
   speed: number; // 0.5 .. 4
   floats: Float[];
+  effects: Effect[];
   selected: string | null;
   hover: Pos | null;
   // manual
@@ -150,6 +157,11 @@ export const useGame = create<GameState>((set, get) => {
     const e = s.events[s.cursor];
     const v: View = { ...s.view, units: { ...s.view.units }, lastDecision: { ...s.view.lastDecision } };
     const floats = [...s.floats];
+    const effects = [...s.effects];
+    const styleOf = (id: string): EffectStyle => {
+      const a = s.config.units.find((u) => u.id === id)?.archetype;
+      return a === "archer" ? "arrow" : a === "mage" ? "magic" : a === "healer" ? "heal" : "melee";
+    };
     let ms = EVENT_MS[e.type];
     switch (e.type) {
       case "turn_start":
@@ -171,6 +183,16 @@ export const useGame = create<GameState>((set, get) => {
         v.units[e.attacker] = { ...a, actionSeq: a.actionSeq + 1 };
         v.units[e.target] = { ...t, hp: e.targetHp, hitSeq: t.hitSeq + 1 };
         floats.push({ key: ++floatKey, unit: e.target, text: `-${e.damage}`, color: "#ff5c5c" });
+        {
+          const style = styleOf(e.attacker);
+          const from = { x: a.x, y: a.y };
+          const to = { x: t.x, y: t.y };
+          const ranged = Math.abs(a.x - t.x) + Math.abs(a.y - t.y) > 1 || style === "magic";
+          if (style === "magic") effects.push({ key: ++effectKey, kind: "burst", style, at: from, delay: 0 });
+          if (ranged) effects.push({ key: ++effectKey, kind: "projectile", style, from, to, delay: style === "magic" ? 0.15 : 0.05 });
+          effects.push({ key: ++effectKey, kind: "burst", style, at: to, delay: ranged ? (style === "magic" ? 0.5 : 0.35) : 0.12 });
+          if (ranged) ms = style === "magic" ? 800 : 620;
+        }
         break;
       }
       case "heal": {
@@ -179,6 +201,8 @@ export const useGame = create<GameState>((set, get) => {
         v.units[e.healer] = { ...h, actionSeq: h.actionSeq + 1 };
         v.units[e.target] = { ...t, hp: e.targetHp };
         floats.push({ key: ++floatKey, unit: e.target, text: `+${e.amount}`, color: "#6cf58a" });
+        effects.push({ key: ++effectKey, kind: "burst", style: "heal", at: { x: h.x, y: h.y }, delay: 0 });
+        effects.push({ key: ++effectKey, kind: "burst", style: "heal", at: { x: t.x, y: t.y }, delay: 0.2 });
         break;
       }
       case "death":
@@ -191,7 +215,7 @@ export const useGame = create<GameState>((set, get) => {
       case "wait":
         break;
     }
-    set({ view: v, cursor: s.cursor + 1, floats: floats.slice(-12) });
+    set({ view: v, cursor: s.cursor + 1, floats: floats.slice(-12), effects: effects.slice(-16) });
     return ms;
   };
 
@@ -244,6 +268,7 @@ export const useGame = create<GameState>((set, get) => {
     playing: false,
     speed: 1,
     floats: [],
+    effects: [],
     selected: null,
     hover: null,
     moveTiles: [],
@@ -258,7 +283,7 @@ export const useGame = create<GameState>((set, get) => {
 
     setMode: (mode) => {
       stopTimer();
-      set({ mode, battle: null, events: [], cursor: 0, view: initialView(get().config), playing: false, selected: null, floats: [], tool: { kind: "select" } });
+      set({ mode, battle: null, events: [], cursor: 0, view: initialView(get().config), playing: false, selected: null, floats: [], effects: [], tool: { kind: "select" } });
       clearManual();
     },
 
@@ -267,7 +292,7 @@ export const useGame = create<GameState>((set, get) => {
       const cfg = get().config;
       const s = seed ?? get().seed;
       const battle = new Battle(cfg, s);
-      set({ battle, seed: s, events: [...battle.log], cursor: 0, view: initialView(cfg), floats: [], selected: null, simStats: null });
+      set({ battle, seed: s, events: [...battle.log], cursor: 0, view: initialView(cfg), floats: [], effects: [], selected: null, simStats: null });
       clearManual();
       startPlayback();
     },
@@ -285,7 +310,7 @@ export const useGame = create<GameState>((set, get) => {
       const cfg = get().config;
       const battle = new Battle(cfg, get().seed);
       battle.runToEnd();
-      set({ battle, events: [...battle.log], cursor: 0, view: initialView(cfg), floats: [], selected: null });
+      set({ battle, events: [...battle.log], cursor: 0, view: initialView(cfg), floats: [], effects: [], selected: null });
       clearManual();
       startPlayback();
     },

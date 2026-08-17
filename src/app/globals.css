@@ -473,3 +473,60 @@ button.danger {
     opacity: 0;
   }
 }
+
+/* ---- battle log ---- */
+.log {
+  max-height: 260px;
+  overflow-y: auto;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.log-row {
+  padding: 2px 6px;
+  border-radius: 4px;
+  border-left: 2px solid transparent;
+  color: var(--muted);
+}
+.log-row[role="button"] {
+  cursor: pointer;
+}
+.log-row[role="button"]:hover {
+  background: var(--bg-3);
+}
+.log-row.red {
+  border-left-color: var(--red);
+}
+.log-row.blue {
+  border-left-color: var(--blue);
+}
+.log-row.hit {
+  color: var(--fg);
+}
+.log-row.heal {
+  color: var(--green);
+}
+.log-row.dim {
+  opacity: 0.6;
+}
+.log-row.turn {
+  margin-top: 4px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  border-left: none;
+  text-align: center;
+}
+.log-row.turn.red {
+  color: var(--red);
+}
+.log-row.turn.blue {
+  color: var(--blue);
+}
+.log-row.end {
+  color: var(--accent);
+  font-weight: 700;
+  text-align: center;
+  border-left: none;
+}
