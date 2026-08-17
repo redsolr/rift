@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef } from "react";
 import { useGame } from "@/store/game";
+import { RUNES } from "@/sim/runes";
 
 export default function BattleLog() {
   const events = useGame((s) => s.events);
@@ -29,6 +30,15 @@ export default function BattleLog() {
           break;
         case "wait":
           out.push({ key: i, cls: `dim ${team(e.unit)}`, unit: e.unit, text: `${name(e.unit)} waits` });
+          break;
+        case "rune_spawn":
+          out.push({ key: i, cls: "rune", text: `${RUNES[e.rune].glyph} ${RUNES[e.rune].label} rune appears at ${e.at.x},${e.at.y}` });
+          break;
+        case "rune_pickup":
+          out.push({ key: i, cls: `rune ${team(e.unit)}`, unit: e.unit, text: `${name(e.unit)} picks up ${RUNES[e.rune].glyph} ${RUNES[e.rune].label} (${e.turns} turns · ${RUNES[e.rune].blurb})` });
+          break;
+        case "rune_expire":
+          out.push({ key: i, cls: `dim ${team(e.unit)}`, unit: e.unit, text: `${name(e.unit)}'s ${RUNES[e.rune].label} fades` });
           break;
         case "end":
           out.push({ key: i, cls: "end", text: e.winner === "draw" ? `Draw after ${e.turn} turns` : `${e.winner.toUpperCase()} wins on turn ${e.turn}` });

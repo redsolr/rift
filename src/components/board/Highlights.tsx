@@ -113,7 +113,7 @@ export default function Highlights() {
   const pendingRange = useMemo(() => {
     if (!attackOrigin || !selDef) return [];
     if (focusAttack) return tilesInRange(config.map, attackOrigin, ...attackRange(selDef, attackById(selDef, focusAttack)));
-    return tilesInAnyRange(config.map, { ...selDef, hp: 0, alive: true, acted: false }, attackOrigin, healing ? "heal" : "attack");
+    return tilesInAnyRange(config.map, { ...selDef, hp: 0, alive: true, acted: false, buff: null }, attackOrigin, healing ? "heal" : "attack");
   }, [attackOrigin, selDef, focusAttack, healing, config.map]);
   // movement path to the previewed tile
   const path = useMemo(() => {

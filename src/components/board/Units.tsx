@@ -6,6 +6,7 @@ import * as THREE from "three";
 import { useGame } from "@/store/game";
 import { tileHeight } from "@/sim/grid";
 import { UnitDef } from "@/sim/types";
+import { RUNES } from "@/sim/runes";
 import { TIER, cardKey, renderCard, tierOf } from "../cards";
 import { CardAura, CardFoil } from "./CardFoil";
 import SelectionRing, { HpArc } from "./SelectionRing";
@@ -25,7 +26,7 @@ function cardTexture(def: UnitDef): THREE.CanvasTexture {
   return t;
 }
 
-function CardMesh({ def, dim, selected }: { def: UnitDef; dim: boolean; selected: boolean }) {
+function CardMesh({ def, dim, selected, ghost }: { def: UnitDef; dim: boolean; selected: boolean; ghost: boolean }) {
   const texture = useMemo(() => cardTexture(def), [def]);
   const foil = TIER[tierOf(def)].foil;
   // foil sweep: tier intensity, plus a hero boost when selected (even base-tier cards get the sweep then); acted units stay flat
@@ -34,9 +35,9 @@ function CardMesh({ def, dim, selected }: { def: UnitDef; dim: boolean; selected
     <Billboard follow lockX={false} lockY={false} lockZ={false} position={[0, CARD_H3 / 2 + 0.05, 0]}>
       <mesh>
         <planeGeometry args={[CARD_W3, CARD_H3]} />
-        <meshBasicMaterial map={texture} transparent alphaTest={0.05} color={dim ? "#6a6a72" : "#ffffff"} toneMapped={false} />
+        <meshBasicMaterial map={texture} transparent alphaTest={0.05} opacity={ghost ? 0.38 : 1} color={dim ? "#6a6a72" : "#ffffff"} toneMapped={false} />
       </mesh>
-      {!dim && (foil > 0 || selected) && <CardFoil mask={texture} foil={foil} boost={boost} w={CARD_W3} h={CARD_H3} />}
+      {!dim && !ghost && (foil > 0 || selected) && <CardFoil mask={texture} foil={foil} boost={boost} w={CARD_W3} h={CARD_H3} />}
     </Billboard>
   );
 }
@@ -115,7 +116,7 @@ function Unit({ def }: { def: UnitDef }) {
           }}
           onPointerOut={() => setHoverUnit(null)}
         >
-          <CardMesh def={def} dim={!!acted} selected={selected} />
+          <CardMesh def={def} dim={!!acted} selected={selected} ghost={vu.buff?.kind === "invisibility"} />
           <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
             <circleGeometry args={[0.34, 20]} />
             <meshBasicMaterial color="#000" transparent opacity={0.35} />
@@ -123,8 +124,12 @@ function Unit({ def }: { def: UnitDef }) {
         </group>
         {/* ground selection ring (team colour): spinning + pulsing when selected, dim static on hover */}
         {selected ? <SelectionRing color={TEAM_GLOW[def.team]} strength={1} spin /> : hovered ? <SelectionRing color={TEAM_GLOW[def.team]} strength={0.4} spin={false} /> : null}
-        {/* gold-tier aura: slow motes drifting up around the card base */}
-        {!acted && tierOf(def) === "gold" && <CardAura color={TIER.gold.trim} seed={def.id.length + def.x * 7 + def.y * 13} />}
+        {/* rune buff aura (rune colour, dense) beats the gold-tier aura (slow golden motes) */}
+        {vu.buff ? (
+          <CardAura color={RUNES[vu.buff.kind].color} count={12} seed={def.id.length + def.x * 7 + def.y * 13 + 5} />
+        ) : (
+          !acted && tierOf(def) === "gold" && <CardAura color={TIER.gold.trim} seed={def.id.length + def.x * 7 + def.y * 13} />
+        )}
         {/* FE-style HP gauge: curved arc on the ground in front of the unit, always shown for both teams (the card carries the name) */}
         <HpArc pct={pct} color={TEAM_GLOW[def.team]} />
         {myFloats.map((f) => (

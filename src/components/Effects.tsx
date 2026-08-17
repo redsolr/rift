@@ -17,12 +17,14 @@ const STYLE_COLOR: Record<EffectStyle, string> = {
   magic: "#c08bff",
   melee: "#ffb347",
   heal: "#6cf58a",
+  rune: "#ffffff",
 };
 const HOT: Record<EffectStyle, string> = {
   arrow: "#ffffff",
   magic: "#ffe9ff",
   melee: "#fff1c9",
   heal: "#eafff0",
+  rune: "#ffffff",
 };
 
 function useTileY() {
@@ -356,6 +358,13 @@ function Burst({ e }: { e: Extract<Effect, { kind: "burst" }> }) {
         </>
       )}
       {e.style === "heal" && <Sparks at={e.at} seed={e.key} color={HOT.heal} count={14} kind="sparkle" delay={e.delay + 0.05} y={0.2} />}
+      {e.style === "rune" && (
+        <>
+          <Flash at={e.at} color={e.color ?? HOT.rune} delay={e.delay} size={0.9} dur={0.35} />
+          <Shockwave at={e.at} color={e.color ?? STYLE_COLOR.rune} delay={e.delay} dur={0.6} from={0.15} to={1.1} />
+          <Sparks at={e.at} seed={e.key} color={e.color ?? STYLE_COLOR.rune} count={16} kind="ember" delay={e.delay + 0.05} y={0.15} />
+        </>
+      )}
     </>
   );
 }

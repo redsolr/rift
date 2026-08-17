@@ -3,6 +3,7 @@ import { AttackDef, AttackKind, attackById, attackRange, attacksOf, attacksReach
 import { damage, healAmount } from "./combat";
 import { inRange, pathTo, posKey, reachable, standable, Reach } from "./grid";
 import { Rng } from "./rng";
+import { RESPAWN_TURNS, RUNES, RuneKind, isInvisible, pickRune } from "./runes";
 import {
   Action,
   BattleConfig,
@@ -21,6 +22,10 @@ export interface BattleState {
   units: UnitState[];
   ended: boolean;
   winner: Team | "draw" | null;
+  /** runes lying on shrine tiles, keyed by posKey */
+  runes: Map<string, RuneKind>;
+  /** shrine posKey → turn on which it spawns again (after a pickup) */
+  respawnAt: Map<string, number>;
 }
 
 /**
@@ -43,11 +48,54 @@ export class Battle {
     this.state = {
       turn: 1,
       activeTeam: first,
-      units: config.units.map((u) => ({ ...u, hp: u.stats.hp, alive: true, acted: false })),
+      units: config.units.map((u) => ({ ...u, hp: u.stats.hp, alive: true, acted: false, buff: null })),
       ended: false,
       winner: null,
+      runes: new Map(),
+      respawnAt: new Map(),
     };
     this.emit({ type: "turn_start", turn: 1, team: first });
+    for (const p of this.shrines()) this.spawnRune(p);
+  }
+
+  /** Every shrine tile on the map, row-major (deterministic order). */
+  shrines(): Pos[] {
+    const out: Pos[] = [];
+    const m = this.config.map;
+    m.tiles.forEach((t, i) => {
+      if (t === "shrine") out.push({ x: i % m.width, y: Math.floor(i / m.width) });
+    });
+    return out;
+  }
+
+  private spawnRune(p: Pos) {
+    const rune = pickRune(this.rng);
+    this.state.runes.set(posKey(p), rune);
+    this.state.respawnAt.delete(posKey(p));
+    this.emit({ type: "rune_spawn", rune, at: p });
+  }
+
+  /** Rune lying on `p`, if any. */
+  runeAt(p: Pos): RuneKind | null {
+    return this.state.runes.get(posKey(p)) ?? null;
+  }
+
+  private pickup(u: UnitState) {
+    const key = posKey(u);
+    const rune = this.state.runes.get(key);
+    if (!rune) return;
+    this.state.runes.delete(key);
+    this.state.respawnAt.set(key, this.state.turn + RESPAWN_TURNS);
+    if (u.buff) this.emit({ type: "rune_expire", unit: u.id, rune: u.buff.kind });
+    u.buff = { kind: rune, turns: RUNES[rune].turns };
+    this.emit({ type: "rune_pickup", unit: u.id, rune, at: { x: u.x, y: u.y }, turns: RUNES[rune].turns });
+  }
+
+  private expire(u: UnitState) {
+    if (!u.buff) return;
+    const kind = u.buff.kind;
+    u.buff = null;
+    this.emit({ type: "rune_expire", unit: u.id, rune: kind });
   }
 
   private emit(e: BattleEvent) {
@@ -80,7 +128,7 @@ export class Battle {
 
   /** Who an attack of `kind` may target: enemies for damage, wounded allies for heals. */
   private targetPool(u: UnitState, kind: AttackKind): UnitState[] {
-    return kind === "heal" ? this.alive(u.team).filter((a) => a.id !== u.id && a.hp < a.stats.hp) : this.alive(otherTeam(u.team));
+    return kind === "heal" ? this.alive(u.team).filter((a) => a.id !== u.id && a.hp < a.stats.hp) : this.alive(otherTeam(u.team)).filter((e) => !isInvisible(e));
   }
 
   /**
@@ -135,7 +183,7 @@ export class Battle {
   }
 
   candidates(id: string): ScoredAction[] {
-    return scoreActions({ map: this.config.map, units: this.state.units, doctrine: this.config.doctrine, rng: this.rng }, this.unit(id));
+    return scoreActions({ map: this.config.map, units: this.state.units, doctrine: this.config.doctrine, rng: this.rng, runes: this.state.runes }, this.unit(id));
   }
 
   /**
@@ -222,6 +270,7 @@ export class Battle {
     if (action.kind !== "wait") {
       const t = this.unit(action.target);
       if (action.kind === "attack" && (!t.alive || t.team === u.team)) throw new Error("bad target");
+      if (action.kind === "attack" && isInvisible(t)) throw new Error(`${t.name} is invisible`);
       if (action.kind === "heal" && (!t.alive || t.team !== u.team)) throw new Error("bad heal target");
       const atk = attackById(u, action.attack);
       if (atk.kind !== action.kind) throw new Error(`${atk.name} is a ${atk.kind}, not a ${action.kind}`);
@@ -236,6 +285,10 @@ export class Battle {
       u.y = action.moveTo.y;
       this.emit({ type: "move", unit: u.id, path });
     }
+    // standing on a rune (moved onto it, or acting from a shrine that just spawned one) picks it up
+    this.pickup(u);
+    // attacking or healing breaks invisibility (Dota rule)
+    if (action.kind !== "wait" && isInvisible(u)) this.expire(u);
 
     if (action.kind === "attack" && resolved) {
       const { t, atk } = resolved;
@@ -312,6 +365,19 @@ export class Battle {
       return;
     }
     this.emit({ type: "turn_start", turn: this.state.turn, team: this.state.activeTeam });
+    // buffs count down at the start of the owner's phase; 0 → gone
+    for (const u of this.alive(this.state.activeTeam)) {
+      if (!u.buff) continue;
+      u.buff.turns--;
+      if (u.buff.turns <= 0) this.expire(u);
+    }
+    // shrines respawn on the turn they were scheduled for (once per round, on the first team's phase)
+    if (this.state.activeTeam === (this.config.firstTeam ?? "red"))
+      for (const p of this.shrines()) {
+        const k = posKey(p);
+        const at = this.state.respawnAt.get(k);
+        if (at !== undefined && this.state.turn >= at && !this.state.runes.has(k)) this.spawnRune(p);
+      }
   }
 
   private checkEnd() {

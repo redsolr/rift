@@ -1,4 +1,5 @@
 import { MapDef, Pos, TERRAIN, Terrain, UnitState } from "./types";
+import { effectiveMov } from "./runes";
 
 export const idx = (map: MapDef, x: number, y: number) => y * map.width + x;
 export const inBounds = (map: MapDef, x: number, y: number) =>
@@ -54,7 +55,7 @@ export function reachable(map: MapDef, unit: UnitState, units: UnitState[]): Rea
       const occ = occupied.get(posKey(n));
       if (occ && occ.team !== unit.team) continue;
       const nc = c + mc;
-      if (nc > unit.stats.mov) continue;
+      if (nc > effectiveMov(unit)) continue;
       const k = posKey(n);
       if (nc < (cost.get(k) ?? Infinity)) {
         cost.set(k, nc);
@@ -102,7 +103,7 @@ export function threatCount(pos: Pos, enemies: UnitState[]): number {
   let n = 0;
   for (const e of enemies) {
     if (!e.alive) continue;
-    if (dist(pos, e) <= e.stats.mov + e.stats.rangeMax) n++;
+    if (dist(pos, e) <= effectiveMov(e) + e.stats.rangeMax) n++;
   }
   return n;
 }

@@ -1,5 +1,6 @@
 import { BattleConfig, BattleEvent, Pos, ScoredAction, Team, UnitDef } from "@/sim/types";
-import { dist } from "@/sim/grid";
+import { dist, posKey } from "@/sim/grid";
+import { RUNES, RuneKind } from "@/sim/runes";
 
 /**
  * Pure event → view reducer. The renderer only ever sees `View`, floats and effects; this
@@ -18,6 +19,8 @@ export interface ViewUnit {
   hitSeq: number;
   /** finished its activation this phase (attack/heal/wait seen since the last turn_start) */
   acted: boolean;
+  /** rune buff carried (mirrors the engine: counts down at the owner's phase start) */
+  buff: { kind: RuneKind; turns: number } | null;
 }
 
 export interface Float {
@@ -27,10 +30,10 @@ export interface Float {
   color: string;
 }
 
-export type EffectStyle = "arrow" | "magic" | "melee" | "heal";
+export type EffectStyle = "arrow" | "magic" | "melee" | "heal" | "rune";
 export type Effect =
   | { key: number; kind: "projectile"; style: EffectStyle; from: Pos; to: Pos; delay: number }
-  | { key: number; kind: "burst"; style: EffectStyle; at: Pos; delay: number };
+  | { key: number; kind: "burst"; style: EffectStyle; at: Pos; delay: number; color?: string };
 
 export interface View {
   units: Record<string, ViewUnit>;
@@ -39,6 +42,8 @@ export interface View {
   ended: boolean;
   winner: Team | "draw" | null;
   lastDecision: Record<string, ScoredAction[]>; // unit id -> candidates of its latest decision
+  /** runes lying on the board, posKey → kind */
+  runes: Record<string, RuneKind>;
 }
 
 export type CamFocus = { x: number; y: number; zoom: "in" | "out" | "keep" };
@@ -65,6 +70,9 @@ const EVENT_MS: Record<BattleEvent["type"], number> = {
   heal: 380,
   wait: 120,
   death: 300,
+  rune_spawn: 350,
+  rune_pickup: 500,
+  rune_expire: 0,
   end: 1600,
 };
 
@@ -76,8 +84,8 @@ let effectKey = 0;
 
 export function initialView(cfg: BattleConfig): View {
   const units: Record<string, ViewUnit> = {};
-  for (const u of cfg.units) units[u.id] = { id: u.id, x: u.x, y: u.y, hp: u.stats.hp, alive: true, actionSeq: 0, hitSeq: 0, acted: false };
-  return { units, turn: 1, activeTeam: cfg.firstTeam ?? "red", ended: false, winner: null, lastDecision: {} };
+  for (const u of cfg.units) units[u.id] = { id: u.id, x: u.x, y: u.y, hp: u.stats.hp, alive: true, actionSeq: 0, hitSeq: 0, acted: false, buff: null };
+  return { units, turn: 1, activeTeam: cfg.firstTeam ?? "red", ended: false, winner: null, lastDecision: {}, runes: {} };
 }
 
 export function initialPlayback(cfg: BattleConfig): PlaybackState {
@@ -90,7 +98,7 @@ export function effectStyleOf(units: UnitDef[], id: string): EffectStyle {
 }
 
 export function applyEvent(prev: PlaybackState, e: BattleEvent, cfg: BattleConfig, playerTeam: Team): PlaybackResult {
-  const v: View = { ...prev.view, units: { ...prev.view.units }, lastDecision: { ...prev.view.lastDecision } };
+  const v: View = { ...prev.view, units: { ...prev.view.units }, lastDecision: { ...prev.view.lastDecision }, runes: { ...prev.view.runes } };
   const floats = [...prev.floats];
   const effects = [...prev.effects];
   let ms = EVENT_MS[e.type];
@@ -103,6 +111,9 @@ export function applyEvent(prev: PlaybackState, e: BattleEvent, cfg: BattleConfi
       v.turn = e.turn;
       v.activeTeam = e.team;
       for (const id of Object.keys(v.units)) if (v.units[id].acted) v.units[id] = { ...v.units[id], acted: false };
+      // buffs count down at the owner's phase start (the engine emits rune_expire when one hits 0)
+      for (const u of cfg.units)
+        if (u.team === e.team && v.units[u.id]?.buff && v.units[u.id].buff!.turns > 1) v.units[u.id] = { ...v.units[u.id], buff: { ...v.units[u.id].buff!, turns: v.units[u.id].buff!.turns - 1 } };
       banner = { kind: "phase", team: e.team };
       break;
     case "decision":
@@ -146,6 +157,22 @@ export function applyEvent(prev: PlaybackState, e: BattleEvent, cfg: BattleConfi
     }
     case "death":
       v.units[e.unit] = { ...v.units[e.unit], alive: false };
+      break;
+    case "rune_spawn":
+      v.runes[posKey(e.at)] = e.rune;
+      effects.push({ key: ++effectKey, kind: "burst", style: "rune", at: e.at, delay: 0, color: RUNES[e.rune].color });
+      break;
+    case "rune_pickup": {
+      delete v.runes[posKey(e.at)];
+      const u = v.units[e.unit];
+      v.units[e.unit] = { ...u, buff: { kind: e.rune, turns: e.turns } };
+      floats.push({ key: ++floatKey, unit: e.unit, text: `${RUNES[e.rune].glyph} ${RUNES[e.rune].label}`, color: RUNES[e.rune].color });
+      effects.push({ key: ++effectKey, kind: "burst", style: "rune", at: e.at, delay: 0, color: RUNES[e.rune].color });
+      focus = { x: e.at.x, y: e.at.y, zoom: "keep" };
+      break;
+    }
+    case "rune_expire":
+      v.units[e.unit] = { ...v.units[e.unit], buff: null };
       break;
     case "end":
       v.ended = true;

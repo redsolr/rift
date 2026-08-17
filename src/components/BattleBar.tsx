@@ -1,4 +1,5 @@
 "use client";
+import { RUNES, RuneKind } from "@/sim/runes";
 import { useEffect, useMemo, useRef } from "react";
 import { selectCaughtUp, useGame } from "@/store/game";
 import { TERRAIN, TerrainDef, UnitDef } from "@/sim/types";
@@ -71,7 +72,7 @@ export default function BattleBar() {
 
   return (
     <div ref={ref} className={`battle-bar ${duel ? "duel" : "solo"}`} aria-label="Battle forecast">
-      {lv && <Side u={left} hp={lv.hp} terrain={leftTerr} side="left" attack={fc?.attack ?? null} />}
+      {lv && <Side u={left} hp={lv.hp} terrain={leftTerr} side="left" attack={fc?.attack ?? null} buff={lv.buff} />}
 
       {duel && (
         <div className="bb-center">
@@ -101,8 +102,8 @@ export default function BattleBar() {
               <div className="bb-bar-fill" style={{ width: `${(100 * myHpAfter) / left!.stats.hp}%` }} />
               {fc!.retaliation != null && <div className="bb-bar-loss" style={{ left: `${(100 * myHpAfter) / left!.stats.hp}%`, width: `${(100 * (lv!.hp - myHpAfter)) / left!.stats.hp}%` }} />}
             </div>
-            <span className={`bb-big ${fc!.retaliationKill ? "dead" : ""}`}>{myHpAfter}</span>
-            <span className={`bb-big ${fc!.kill ? "dead" : ""}`}>{fc!.hpAfter}</span>
+            <span className={`bb-big ${fc!.retaliationKill ? "dead" : fc!.retaliation != null ? "hurt" : ""}`}>{myHpAfter}</span>
+            <span className={`bb-big ${fc!.kill ? "dead" : "hurt"}`}>{fc!.hpAfter}</span>
             <div className="bb-bar right">
               <div className="bb-bar-fill" style={{ width: `${(100 * fc!.hpAfter) / right!.stats.hp}%` }} />
               <div className="bb-bar-loss" style={{ right: `${(100 * fc!.hpAfter) / right!.stats.hp}%`, width: `${(100 * (rv!.hp - fc!.hpAfter)) / right!.stats.hp}%` }} />
@@ -117,7 +118,7 @@ export default function BattleBar() {
   );
 }
 
-function Side({ u, hp, terrain, side, attack = null }: { u: UnitDef; hp: number; terrain: TerrainDef | null; side: "left" | "right"; attack?: { id: string; name: string } | null }) {
+function Side({ u, hp, terrain, side, attack = null, buff = null }: { u: UnitDef; hp: number; terrain: TerrainDef | null; side: "left" | "right"; attack?: { id: string; name: string } | null; buff?: { kind: RuneKind; turns: number } | null }) {
   // the range shown follows the attack being forecast; without one it is the weapon's own
   const [lo, hi] = attack ? attackRange(u, attackById(u, attack.id)) : [u.stats.rangeMin, u.stats.rangeMax];
   return (
@@ -142,6 +143,11 @@ function Side({ u, hp, terrain, side, attack = null }: { u: UnitDef; hp: number;
         <div className="bb-hpbar">
           <div style={{ width: `${(100 * hp) / u.stats.hp}%` }} />
         </div>
+        {buff && (
+          <div className="bb-buff" style={{ color: RUNES[buff.kind].color }}>
+            {RUNES[buff.kind].glyph} {RUNES[buff.kind].label} · {buff.turns} turn{buff.turns === 1 ? "" : "s"} · {RUNES[buff.kind].blurb}
+          </div>
+        )}
         <div className="bb-stats">
           {(["atk", "def", "spd", "mov"] as const).map((k) => (
             <span key={k} className="bb-stat">

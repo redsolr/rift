@@ -1,6 +1,8 @@
 // Pure simulation types. Nothing in src/sim may import from React, Three, or the store.
 
-export type Terrain = "ground" | "forest" | "wall" | "water" | "hill" | "objective";
+import type { Buff, RuneKind } from "./runes";
+
+export type Terrain = "ground" | "forest" | "wall" | "water" | "hill" | "objective" | "shrine";
 
 export interface TerrainDef {
   label: string;
@@ -17,6 +19,7 @@ export const TERRAIN: Record<Terrain, TerrainDef> = {
   water: { label: "Water", moveCost: null, defense: 0, color: "#3d6f9e", height: 0.02 },
   wall: { label: "Wall", moveCost: null, defense: 0, color: "#4a4a52", height: 0.6 },
   objective: { label: "Objective", moveCost: 1, defense: 1, color: "#b59a3c", height: 0.12 },
+  shrine: { label: "Rune shrine", moveCost: 1, defense: 0, color: "#6f5f86", height: 0.12 },
 };
 
 export const TERRAINS = Object.keys(TERRAIN) as Terrain[];
@@ -87,6 +90,8 @@ export interface UnitState extends UnitDef {
   hp: number; // current
   alive: boolean;
   acted: boolean;
+  /** rune buff carried (one at a time), null when none — see sim/runes.ts */
+  buff: Buff | null;
 }
 
 export interface MapDef {
@@ -163,4 +168,7 @@ export type BattleEvent =
   | { type: "heal"; healer: string; target: string; attack: string; amount: number; targetHp: number }
   | { type: "wait"; unit: string }
   | { type: "death"; unit: string }
+  | { type: "rune_spawn"; rune: RuneKind; at: Pos }
+  | { type: "rune_pickup"; unit: string; rune: RuneKind; at: Pos; turns: number }
+  | { type: "rune_expire"; unit: string; rune: RuneKind }
   | { type: "end"; winner: Team | "draw"; turn: number };

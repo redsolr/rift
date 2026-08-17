@@ -20,19 +20,18 @@ const FRAME: Record<Team, { a: string; b: string; c: string; ink: string }> = {
 };
 
 /**
- * Card tier — FUT/Hearthstone-style rarity read, derived from the overall rating (data, not archetype):
- * gold ≥ 90 (Knight, Fighter on default stats) · silver ≥ 86 (Archer, Mage) · base (Healer).
- * Drives the trim metal, the star row, the baked holo band, the animated foil sweep and the ground aura.
+ * Card tier — FUT/Hearthstone-style rarity read, derived from the overall rating (data, not archetype).
+ * Deliberately scarce: only **gold ≥ 90** is special (Knight + Fighter on default stats = 2 per side); everyone
+ * else is a plain card — no stars, no foil, quiet steel trim — so gold actually reads as gold.
+ * Gold drives the metallic trim gradient, the ★★★ row, the baked holo band, the animated foil sweep and the ground aura.
  */
-export type Tier = "gold" | "silver" | "base";
+export type Tier = "gold" | "base";
 export function tierOf(u: UnitDef): Tier {
-  const o = overall(u);
-  return o >= 90 ? "gold" : o >= 86 ? "silver" : "base";
+  return overall(u) >= 90 ? "gold" : "base";
 }
 export const TIER: Record<Tier, { trim: string; hi: string; lo: string; stars: number; foil: number; label: string }> = {
   gold: { trim: "#f2c96b", hi: "#fff3c2", lo: "#b8862a", stars: 3, foil: 1, label: "GOLD" },
-  silver: { trim: "#d8dee8", hi: "#ffffff", lo: "#8b95a6", stars: 2, foil: 0.55, label: "SILVER" },
-  base: { trim: "#c98a52", hi: "#ecc19a", lo: "#7d4d26", stars: 1, foil: 0, label: "BRONZE" },
+  base: { trim: "#aab2bf", hi: "#d9dee6", lo: "#6d7480", stars: 0, foil: 0, label: "STANDARD" },
 };
 
 /** Overall rating, calibrated so the five archetypes land ~84–92. */

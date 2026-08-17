@@ -69,8 +69,8 @@ export function makeUnit(team: Team, archetype: Archetype, x: number, y: number,
 
 /**
  * 16 wide × 12 tall (landscape). Red (enemy) holds the far bank (rows 0–1), blue (you) the near bank
- * (rows 10–11) — the player's army is always on the NEAR side of the camera, FE-style. A river with three crossings,
- * forests on the flanks, hills near the fords, two wall stubs.
+ * (rows 10–11) — the player's army is always on the NEAR side of the camera, FE-style. Open middle (the river was
+ * removed 2026-08-18 — it made play-testing slow), forests on the flanks, hills, two wall stubs. Rune shrines sit where the two outer fords were (Dota river runes).
  */
 export function defaultMap(): MapDef {
   const width = 16,
@@ -81,15 +81,15 @@ export function defaultMap(): MapDef {
     "....#.....hh....",
     "....#.....hh..f.",
     ".f..............",
-    "~~~.~~~~~.~~~~.~",
-    "~~~.~~~~~.~~~~.~",
+    "...s............",
+    "..............s.",
     "..............f.",
     "..hh......#.....",
     "..hh......#..f..",
     ".........f......",
     "..ff.......ff...",
   ];
-  const map: Record<string, Terrain> = { ".": "ground", f: "forest", h: "hill", "~": "water", "#": "wall", o: "objective" };
+  const map: Record<string, Terrain> = { ".": "ground", f: "forest", h: "hill", "~": "water", "#": "wall", o: "objective", s: "shrine" };
   const tiles: Terrain[] = [];
   for (const r of rows) for (const ch of r) tiles.push(map[ch]);
   if (tiles.length !== width * height) throw new Error("bad default map");
@@ -127,7 +127,7 @@ export function defaultConfig(): BattleConfig {
 
 export function encodeConfig(c: BattleConfig): string {
   const json = JSON.stringify({
-    m: { w: c.map.width, h: c.map.height, t: c.map.tiles.map((t) => "gfwvho"["ground,forest,wall,water,hill,objective".split(",").indexOf(t)]).join("") },
+    m: { w: c.map.width, h: c.map.height, t: c.map.tiles.map((t) => "gfwvhos"["ground,forest,wall,water,hill,objective,shrine".split(",").indexOf(t)]).join("") },
     u: c.units,
     d: c.doctrine,
     x: c.maxTurns,
@@ -141,7 +141,7 @@ export function decodeConfig(code: string): BattleConfig {
   const b64 = code.replace(/-/g, "+").replace(/_/g, "/");
   const json = typeof atob === "function" ? decodeURIComponent(escape(atob(b64))) : Buffer.from(b64, "base64").toString("utf8");
   const raw = JSON.parse(json);
-  const keys: Terrain[] = ["ground", "forest", "wall", "water", "hill", "objective"];
-  const tiles = (raw.m.t as string).split("").map((ch: string) => keys["gfwvho".indexOf(ch)]);
+  const keys: Terrain[] = ["ground", "forest", "wall", "water", "hill", "objective", "shrine"];
+  const tiles = (raw.m.t as string).split("").map((ch: string) => keys["gfwvhos".indexOf(ch)]);
   return { map: { width: raw.m.w, height: raw.m.h, tiles }, units: raw.u, doctrine: raw.d, maxTurns: raw.x, firstTeam: raw.f ?? "red" };
 }

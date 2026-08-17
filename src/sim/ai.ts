@@ -2,6 +2,7 @@ import { AttackDef, AttackKind, attacksReaching } from "./attacks";
 import { damage, defenseAt, healAmount } from "./combat";
 import { dist, reachable, standable, threatCount } from "./grid";
 import { Rng } from "./rng";
+import { RUNES, RuneKind, isInvisible } from "./runes";
 import {
   Action,
   Doctrine,
@@ -33,6 +34,8 @@ export interface AiContext {
   units: UnitState[];
   doctrine: Record<Team, Doctrine>;
   rng: Rng;
+  /** runes lying on the board (posKey → kind); optional so headless callers can omit */
+  runes?: Map<string, RuneKind>;
 }
 
 const objectiveTiles = (map: MapDef): Pos[] => {
@@ -55,7 +58,13 @@ const nearest = (from: Pos, list: Pos[]): { p: Pos; d: number } | null => {
 export function scoreActions(ctx: AiContext, unit: UnitState): ScoredAction[] {
   const { map, units, rng } = ctx;
   const doctrine = ctx.doctrine[unit.team];
-  const enemies = units.filter((u) => u.alive && u.team !== unit.team);
+  // invisible enemies cannot be attacked — they are not candidates (they still count as threats: the AI knows they are there)
+  const enemies = units.filter((u) => u.alive && u.team !== unit.team && !isInvisible(u));
+  const runeTiles: { p: Pos; kind: RuneKind }[] = [];
+  ctx.runes?.forEach((kind, k) => {
+    const [x, y] = k.split(",").map(Number);
+    runeTiles.push({ p: { x, y }, kind });
+  });
   const allies = units.filter((u) => u.alive && u.team === unit.team && u.id !== unit.id);
   const p = unit.personality;
   const o = unit.orders;
@@ -99,6 +108,18 @@ export function scoreActions(ctx: AiContext, unit: UnitState): ScoredAction[] {
     if (retreating) {
       const n = nearest(t, enemies);
       if (n) terms.push({ label: `Retreat (<${o.retreatHpPct}% HP)`, value: Math.round((25 + 6 * n.d) * adh) });
+    }
+    // runes: standing on one grabs it (big, scaled by how much it helps this unit); being near one pulls a little
+    if (runeTiles.length) {
+      const here = runeTiles.find((r) => r.p.x === t.x && r.p.y === t.y);
+      if (here) {
+        const want = here.kind === "double_damage" ? 0.6 + p.aggression / 100 : here.kind === "haste" ? 1 : 0.6 + (100 - p.courage) / 100;
+        const already = unit.buff ? 0.4 : 1;
+        terms.push({ label: `Grab rune: ${RUNES[here.kind].label}`, value: Math.round(28 * want * already) });
+      } else if (!unit.buff) {
+        const n = nearest(t, runeTiles.map((r) => r.p))!;
+        if (n.d <= 4) terms.push({ label: "Rune nearby", value: 10 - 2 * n.d });
+      }
     }
   };
 
