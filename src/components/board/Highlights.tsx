@@ -3,7 +3,7 @@ import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { deployZone, selectCaughtUp, selectDropTarget, useGame } from "@/store/game";
-import { parseKey, pathTo, posKey, reachable, standable, terrainAt, tileHeight, tilesInRange } from "@/sim/grid";
+import { parseKey, pathTo, reachable, standable, terrainAt, tileHeight, tilesInRange } from "@/sim/grid";
 import { attackById, attackRange, tilesInAnyRange } from "@/sim/attacks";
 import { Pos, TERRAIN, UnitDef, UnitState, otherTeam } from "@/sim/types";
 import { makeUnit } from "@/sim/presets";
@@ -115,38 +115,17 @@ export default function Highlights() {
   const selDef = placing ? (editorSubject?.def ?? null) : selected0;
   const mine = !!selDef && selDef.team === playerTeam;
   const editorOrigin = editorSubject?.origin ?? null;
-  const editorPreview = useMemo(() => {
-    const none = { movable: [] as Pos[], band: [] as Pos[] };
-    if (!editorOrigin || !selDef) return none;
-    if (TERRAIN[terrainAt(config.map, editorOrigin.x, editorOrigin.y)].moveCost === null) return none;
+  const editorMovable = useMemo(() => {
+    if (!editorOrigin || !selDef) return [] as Pos[];
+    if (TERRAIN[terrainAt(config.map, editorOrigin.x, editorOrigin.y)].moveCost === null) return [] as Pos[];
     const me = { ...asState(selDef), x: editorOrigin.x, y: editorOrigin.y };
     const others = config.units.filter((u) => u.id !== selDef.id).map(asState);
-    const reach = reachable(config.map, me, others);
-    const movable = standable(reach, me, others);
-    const mv = new Set([...movable.map(posKey), posKey(me)]);
-    const seen = new Set<string>();
-    const band: Pos[] = [];
-    for (const k of reach.cost.keys())
-      for (const p of tilesInAnyRange(config.map, me, parseKey(k))) {
-        const pk = posKey(p);
-        if (mv.has(pk) || seen.has(pk)) continue;
-        seen.add(pk);
-        band.push(p);
-      }
-    return { movable, band };
+    return standable(reachable(config.map, me, others), me, others);
   }, [editorOrigin, selDef, config.map, config.units]);
-  // FE paint: blue = tiles this unit can move to; red = tiles it can attack into but not stand on.
-  const movable = placing ? editorPreview.movable : mode === "manual" ? moveTiles : preview;
-  const liveBand = useMemo(() => {
-    if (!sel || !selDef || !sel.alive || !battle || !caughtUp) return [];
-    if (!movable.length) return [];
-    const mv = new Set(movable.map((p) => `${p.x},${p.y}`));
-    mv.add(`${sel.x},${sel.y}`);
-    const out: { x: number; y: number }[] = [];
-    for (const k of battle.threatTiles(selDef.id)) if (!mv.has(k)) out.push(parseKey(k));
-    return out;
-  }, [sel, selDef, battle, caughtUp, movable]);
-  const attackBand = placing ? editorPreview.band : liveBand;
+  // FE Three Hopes paint: blue = tiles this unit can move to; the red diamond = attack range from where it stands (or the
+  // hovered / pending tile). There is NO outer "attack after moving" band — Three Hopes dropped it (half the map turned red
+  // and it read as enemy danger); we cut it 2026-08-18 for the same reason. Enemy threat is the ◆ Danger toggle, only.
+  const movable = placing ? editorMovable : mode === "manual" ? moveTiles : preview;
   // hovering a reachable tile previews the destination (FE cursor): path + attack squares + arcs
   const hoverPreview = useMemo(() => {
     if (placing || pendingMove || !hover || !movable.length || !selDef || !mine) return null;
@@ -178,13 +157,10 @@ export default function Highlights() {
   return (
     <group>
       {danger.map((p) => (
-        <Highlight key={`d${p.x},${p.y}`} x={p.x} y={p.y} color="#c04cff" opacity={0.15} />
+        <Highlight key={`d${p.x},${p.y}`} x={p.x} y={p.y} color="#ff3b3b" opacity={0.2} />
       ))}
       {zone.map((p) => (
         <Highlight key={`z${p.x},${p.y}`} x={p.x} y={p.y} color={playerTeam === "blue" ? "#6f8fff" : "#ff7a7a"} opacity={playerTeam === "blue" ? 0.45 : 0.3} border={playerTeam === "blue" ? "#e8eeff" : "#ffd0d0"} borderOpacity={0.8} lift={0.015} />
-      ))}
-      {attackBand.map((p) => (
-        <Highlight key={`a${p.x},${p.y}`} x={p.x} y={p.y} color={mine ? "#ff7a8a" : "#ff5a5a"} opacity={mine ? 0.34 : 0.22} border={mine ? "#ff4a5e" : undefined} borderOpacity={0.8} />
       ))}
       {movable.map((p) => (
         <Highlight key={`m${p.x},${p.y}`} x={p.x} y={p.y} color={mine ? "#6f8fff" : "#ff7a7a"} opacity={mine ? 0.5 : 0.3} border={mine ? "#e8eeff" : undefined} borderOpacity={0.8} />
