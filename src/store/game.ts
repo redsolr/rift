@@ -1,8 +1,11 @@
 "use client";
 import { create } from "zustand";
 import { Battle, SimStats, runMany } from "@/sim/battle";
+import { Effect, Float, View, applyEvent, initialPlayback, initialView } from "./playback";
+export type { Effect, EffectStyle, Float, View, ViewUnit } from "./playback";
 import { decodeConfig, defaultConfig, encodeConfig, makeUnit } from "@/sim/presets";
 import {
+  Action,
   Archetype,
   BattleConfig,
   BattleEvent,
@@ -10,7 +13,6 @@ import {
   Orders,
   Personality,
   Pos,
-  ScoredAction,
   Stats,
   Team,
   Terrain,
@@ -20,57 +22,6 @@ import {
 export type Mode = "manual" | "manager" | "editor";
 export type Tool = { kind: "select" } | { kind: "terrain"; terrain: Terrain } | { kind: "unit"; team: Team; archetype: Archetype } | { kind: "erase" };
 
-export interface ViewUnit {
-  id: string;
-  x: number;
-  y: number;
-  hp: number;
-  alive: boolean;
-  /** monotonically increasing per attack/heal so the renderer can trigger a bump */
-  actionSeq: number;
-  hitSeq: number;
-}
-
-export interface Float {
-  key: number;
-  unit: string;
-  text: string;
-  color: string;
-}
-
-export type EffectStyle = "arrow" | "magic" | "melee" | "heal";
-export type Effect =
-  | { key: number; kind: "projectile"; style: EffectStyle; from: Pos; to: Pos; delay: number }
-  | { key: number; kind: "burst"; style: EffectStyle; at: Pos; delay: number };
-
-export interface View {
-  units: Record<string, ViewUnit>;
-  turn: number;
-  activeTeam: Team;
-  ended: boolean;
-  winner: Team | "draw" | null;
-  lastDecision: Record<string, ScoredAction[]>; // unit id -> candidates of its latest decision
-}
-
-const EVENT_MS: Record<BattleEvent["type"], number> = {
-  turn_start: 1300,
-  decision: 0,
-  move: 0, // computed from path
-  attack: 420,
-  heal: 380,
-  wait: 120,
-  death: 300,
-  end: 0,
-};
-
-function initialView(cfg: BattleConfig): View {
-  const units: Record<string, ViewUnit> = {};
-  for (const u of cfg.units) units[u.id] = { id: u.id, x: u.x, y: u.y, hp: u.stats.hp, alive: true, actionSeq: 0, hitSeq: 0 };
-  return { units, turn: 1, activeTeam: cfg.firstTeam ?? "red", ended: false, winner: null, lastDecision: {} };
-}
-
-let floatKey = 0;
-let effectKey = 0;
 let timer: ReturnType<typeof setTimeout> | null = null;
 
 interface GameState {
@@ -164,6 +115,9 @@ interface GameState {
   loadDefault: () => void;
 }
 
+/** True when the renderer has replayed every engine event — the only moment input is accepted. */
+export const selectCaughtUp = (s: Pick<GameState, "cursor" | "events">) => s.cursor >= s.events.length;
+
 export const useGame = create<GameState>((set, get) => {
   const stopTimer = () => {
     if (timer) clearTimeout(timer);
@@ -171,85 +125,20 @@ export const useGame = create<GameState>((set, get) => {
   };
 
   /** Apply the next event to the view. Returns the ms to wait before the next one. */
+  /** Apply the next event to the view via the pure playback reducer. Returns the dwell ms, or null when caught up. */
   const applyNext = (): number | null => {
     const s = get();
     if (s.cursor >= s.events.length) return null;
-    const e = s.events[s.cursor];
-    const v: View = { ...s.view, units: { ...s.view.units }, lastDecision: { ...s.view.lastDecision } };
-    const floats = [...s.floats];
-    const effects = [...s.effects];
-    const styleOf = (id: string): EffectStyle => {
-      const a = s.config.units.find((u) => u.id === id)?.archetype;
-      return a === "archer" ? "arrow" : a === "mage" ? "magic" : a === "healer" ? "heal" : "melee";
-    };
-    let ms = EVENT_MS[e.type];
-    let focus: { x: number; y: number; zoom: "in" | "out" | "keep" } | null = null;
-    let banner: GameState["banner"] | null = null;
-    switch (e.type) {
-      case "turn_start":
-        v.turn = e.turn;
-        v.activeTeam = e.team;
-        banner = { kind: "phase", team: e.team, seq: s.banner.seq + 1 };
-        break;
-      case "decision":
-        v.lastDecision[e.unit] = e.candidates;
-        break;
-      case "move": {
-        const end = e.path[e.path.length - 1];
-        v.units[e.unit] = { ...v.units[e.unit], x: end.x, y: end.y };
-        ms = 90 * Math.max(1, e.path.length - 1) + 120;
-        focus = { x: end.x, y: end.y, zoom: "in" };
-        break;
-      }
-      case "attack": {
-        const a = v.units[e.attacker];
-        const t = v.units[e.target];
-        focus = { x: (a.x + t.x) / 2, y: (a.y + t.y) / 2, zoom: "in" };
-        v.units[e.attacker] = { ...a, actionSeq: a.actionSeq + 1 };
-        v.units[e.target] = { ...t, hp: e.targetHp, hitSeq: t.hitSeq + 1 };
-        floats.push({ key: ++floatKey, unit: e.target, text: `-${e.damage}`, color: "#ff5c5c" });
-        {
-          const style = styleOf(e.attacker);
-          const from = { x: a.x, y: a.y };
-          const to = { x: t.x, y: t.y };
-          const ranged = Math.abs(a.x - t.x) + Math.abs(a.y - t.y) > 1 || style === "magic";
-          if (style === "magic") effects.push({ key: ++effectKey, kind: "burst", style, at: from, delay: 0 });
-          if (ranged) effects.push({ key: ++effectKey, kind: "projectile", style, from, to, delay: style === "magic" ? 0.15 : 0.05 });
-          effects.push({ key: ++effectKey, kind: "burst", style, at: to, delay: ranged ? (style === "magic" ? 0.5 : 0.35) : 0.12 });
-          if (ranged) ms = style === "magic" ? 800 : 620;
-        }
-        break;
-      }
-      case "heal": {
-        const h = v.units[e.healer];
-        const t = v.units[e.target];
-        focus = { x: (h.x + t.x) / 2, y: (h.y + t.y) / 2, zoom: "in" };
-        v.units[e.healer] = { ...h, actionSeq: h.actionSeq + 1 };
-        v.units[e.target] = { ...t, hp: e.targetHp };
-        floats.push({ key: ++floatKey, unit: e.target, text: `+${e.amount}`, color: "#6cf58a" });
-        effects.push({ key: ++effectKey, kind: "burst", style: "heal", at: { x: h.x, y: h.y }, delay: 0 });
-        effects.push({ key: ++effectKey, kind: "burst", style: "heal", at: { x: t.x, y: t.y }, delay: 0.2 });
-        break;
-      }
-      case "death":
-        v.units[e.unit] = { ...v.units[e.unit], alive: false };
-        break;
-      case "end":
-        v.ended = true;
-        v.winner = e.winner;
-        focus = { x: (s.config.map.width - 1) / 2, y: (s.config.map.height - 1) / 2, zoom: "out" };
-        banner = { kind: e.winner === "draw" ? "draw" : e.winner === s.playerTeam ? "victory" : "defeat", team: e.winner === "draw" ? s.playerTeam : e.winner, seq: s.banner.seq + 1 };
-        ms = 1600;
-        break;
-      case "wait": {
-        const w = v.units[e.unit];
-        focus = { x: w.x, y: w.y, zoom: "keep" };
-        break;
-      }
-    }
-    const camFocus = focus && s.followCam ? { ...focus, seq: s.camFocus.seq + 1 } : s.camFocus;
-    set({ view: v, cursor: s.cursor + 1, floats: floats.slice(-12), effects: effects.slice(-16), camFocus, banner: banner ?? s.banner });
-    return ms;
+    const r = applyEvent({ view: s.view, floats: s.floats, effects: s.effects }, s.events[s.cursor], s.config, s.playerTeam);
+    set({
+      view: r.view,
+      floats: r.floats,
+      effects: r.effects,
+      cursor: s.cursor + 1,
+      camFocus: r.focus && s.followCam ? { ...r.focus, seq: s.camFocus.seq + 1 } : s.camFocus,
+      banner: r.banner ? { ...r.banner, seq: s.banner.seq + 1 } : s.banner,
+    });
+    return r.ms;
   };
 
   const schedule = () => {
@@ -290,6 +179,27 @@ export const useGame = create<GameState>((set, get) => {
 
   const clearManual = () => set({ moveTiles: [], pendingMove: null, targets: [] });
 
+  /** Everything that resets when a battle starts, ends or the setup changes. */
+  const resetPlayback = (cfg: BattleConfig, battle: Battle | null) => ({
+    battle,
+    events: battle ? [...battle.log] : [],
+    cursor: 0,
+    ...initialPlayback(cfg),
+    playing: false,
+    selected: null,
+  });
+
+  /** The one way a manual action reaches the engine: act → sync log → clear selection → play it out. */
+  const commit = (action: Action) => {
+    const b = get().battle;
+    if (!b) return;
+    b.act(action);
+    sync();
+    set({ selected: null });
+    clearManual();
+    startPlayback();
+  };
+
   return {
     config: defaultConfig(),
     mode: "manager",
@@ -325,7 +235,7 @@ export const useGame = create<GameState>((set, get) => {
 
     setMode: (mode) => {
       stopTimer();
-      set({ mode, battle: null, events: [], cursor: 0, view: initialView(get().config), playing: false, selected: null, floats: [], effects: [], tool: { kind: "select" } });
+      set({ mode, ...resetPlayback(get().config, null), tool: { kind: "select" } });
       clearManual();
     },
 
@@ -334,7 +244,7 @@ export const useGame = create<GameState>((set, get) => {
       const cfg = get().config;
       const s = seed ?? get().seed;
       const battle = new Battle(cfg, s);
-      set({ battle, seed: s, events: [...battle.log], cursor: 0, view: initialView(cfg), floats: [], effects: [], selected: null, simStats: null });
+      set({ ...resetPlayback(cfg, battle), seed: s, simStats: null });
       clearManual();
       startPlayback();
     },
@@ -352,14 +262,14 @@ export const useGame = create<GameState>((set, get) => {
       const cfg = get().config;
       const battle = new Battle(cfg, get().seed);
       battle.runToEnd();
-      set({ battle, events: [...battle.log], cursor: 0, view: initialView(cfg), floats: [], effects: [], selected: null });
+      set(resetPlayback(cfg, battle));
       clearManual();
       startPlayback();
     },
 
     resetToSetup: () => {
       stopTimer();
-      set({ battle: null, events: [], cursor: 0, view: initialView(get().config), playing: false, selected: null, floats: [] });
+      set(resetPlayback(get().config, null));
       clearManual();
     },
 
@@ -453,12 +363,7 @@ export const useGame = create<GameState>((set, get) => {
         const targets = s.battle.targetsFrom(s.selected, p).map((u) => u.id);
         if (targets.length === 0) {
           // nothing to do from there — just move (FE would ask "Wait", but that is pure friction)
-          const u = s.battle.unit(s.selected);
-          s.battle.act({ kind: "wait", unit: u.id, moveTo: p });
-          sync();
-          set({ selected: null });
-          clearManual();
-          startPlayback();
+          commit({ kind: "wait", unit: s.selected, moveTo: p });
           return;
         }
         set({ pendingMove: p, targets });
@@ -494,12 +399,7 @@ export const useGame = create<GameState>((set, get) => {
       const s = get();
       if (!s.battle || !s.selected) return;
       const u = s.battle.unit(s.selected);
-      const to = s.pendingMove ?? { x: u.x, y: u.y };
-      s.battle.act({ kind: "wait", unit: u.id, moveTo: to });
-      sync();
-      set({ selected: null });
-      clearManual();
-      startPlayback();
+      commit({ kind: "wait", unit: u.id, moveTo: s.pendingMove ?? { x: u.x, y: u.y } });
     },
 
     commitTarget: (id) => {
@@ -507,11 +407,7 @@ export const useGame = create<GameState>((set, get) => {
       if (!s.battle || !s.selected || !s.pendingMove) return;
       const u = s.battle.unit(s.selected);
       const kind = u.archetype === "healer" && s.battle.unit(id).team === u.team ? "heal" : "attack";
-      s.battle.act({ kind, unit: u.id, moveTo: s.pendingMove, target: id });
-      sync();
-      set({ selected: null });
-      clearManual();
-      startPlayback();
+      commit({ kind, unit: u.id, moveTo: s.pendingMove, target: id });
     },
 
     endPhaseAI: () => {
@@ -647,7 +543,7 @@ export const useGame = create<GameState>((set, get) => {
       try {
         const config = decodeConfig(code.trim());
         stopTimer();
-        set({ config, battle: null, events: [], cursor: 0, view: initialView(config), playing: false, selected: null, simStats: null });
+        set({ config, ...resetPlayback(config, null), simStats: null });
         clearManual();
         return true;
       } catch {
@@ -657,7 +553,7 @@ export const useGame = create<GameState>((set, get) => {
     loadDefault: () => {
       const config = defaultConfig();
       stopTimer();
-      set({ config, battle: null, events: [], cursor: 0, view: initialView(config), playing: false, selected: null, simStats: null });
+      set({ config, ...resetPlayback(config, null), simStats: null });
       clearManual();
     },
   };

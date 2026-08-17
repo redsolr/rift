@@ -1,6 +1,6 @@
 import { scoreActions } from "./ai";
 import { damage, healAmount } from "./combat";
-import { inRange, pathTo, reachable, standable, Reach } from "./grid";
+import { inRange, pathTo, posKey, reachable, standable, tilesInRange, Reach } from "./grid";
 import { Rng } from "./rng";
 import {
   Action,
@@ -95,19 +95,9 @@ export class Battle {
   threatTiles(id: string): Set<string> {
     const u = this.unit(id);
     if (!u.alive) return new Set();
-    const map = this.config.map;
     const out = new Set<string>();
-    const origins = [...this.standableFor(id), { x: u.x, y: u.y }];
-    for (const o of origins)
-      for (let dy = -u.stats.rangeMax; dy <= u.stats.rangeMax; dy++)
-        for (let dx = -u.stats.rangeMax; dx <= u.stats.rangeMax; dx++) {
-          const d = Math.abs(dx) + Math.abs(dy);
-          if (d < u.stats.rangeMin || d > u.stats.rangeMax) continue;
-          const x = o.x + dx,
-            y = o.y + dy;
-          if (x < 0 || y < 0 || x >= map.width || y >= map.height) continue;
-          out.add(`${x},${y}`);
-        }
+    for (const o of [...this.standableFor(id), { x: u.x, y: u.y }])
+      for (const p of tilesInRange(this.config.map, o, u.stats.rangeMin, u.stats.rangeMax)) out.add(posKey(p));
     return out;
   }
 
@@ -121,8 +111,7 @@ export class Battle {
   /** Living enemies of `id` that could attack the given tile on their next activation. */
   threatsTo(id: string, at?: Pos): UnitState[] {
     const u = this.unit(id);
-    const p = at ?? { x: u.x, y: u.y };
-    const key = `${p.x},${p.y}`;
+    const key = posKey(at ?? u);
     return this.alive(otherTeam(u.team)).filter((e) => this.threatTiles(e.id).has(key));
   }
 
@@ -160,7 +149,7 @@ export class Battle {
     if (u.team !== this.state.activeTeam) throw new Error(`not ${u.team}'s turn`);
     if (u.acted) throw new Error(`${u.id} already acted`);
     const reach = this.reachFor(u.id);
-    const key = `${action.moveTo.x},${action.moveTo.y}`;
+    const key = posKey(action.moveTo);
     if (!reach.cost.has(key)) throw new Error(`${u.id} cannot reach ${key}`);
     if (this.state.units.some((o) => o.alive && o.id !== u.id && o.x === action.moveTo.x && o.y === action.moveTo.y))
       throw new Error(`${key} occupied`);

@@ -13,14 +13,18 @@ Next.js 16 (app router, Turbopack) · React 19 · TypeScript · Three.js via `@r
 ## Architecture — the one rule
 
 ```
-src/sim/        pure, deterministic engine. NO imports from React/Three/store. Ever.
-src/store/      Zustand: owns the Battle instance + the event cursor the renderer replays
-src/components/ Board.tsx (Three renderer, sees ONLY events/view), Hud.tsx, Panel.tsx
-scripts/sim.ts  headless batch runner (npm run sim -- 1000)
+src/sim/          pure, deterministic engine. NO imports from React/Three/store. Ever.
+src/store/        game.ts = Zustand store (Battle instance, cursor, modes, camera/banner signals)
+                  playback.ts = PURE event → view reducer (timing, floats, effects, focus, banner) — tested
+src/components/   Board.tsx composes board/* (Tiles, Highlights, Units, Arcs, ActionMenu, CameraRig)
+                  Panel.tsx composes panel/* (Squad, UnitSections, EditorPanel, BattleLog, SharePanel)
+                  Forecast, UnitBadge, PhaseBanner, CameraWidget, Effects, Hud, Drawer, cards.ts
+scripts/sim.ts    headless batch runner (npm run sim -- 1000)
 ```
 
 - **Determinism is load-bearing.** `Battle(config, seed)` + the action sequence fully determines the event log. Sim code uses `Rng` (mulberry32) only — never `Math.random`/`Date`. Integer math only. `runMany` with the same seeds must return identical stats; a vitest guards this.
-- **Renderer replays events; it never computes combat.** `store.view` is derived by applying `battle.log` up to `cursor`. Manual clicks and AI turns both go through `battle.act()`.
+- **Renderer replays events; it never computes combat.** `store/playback.ts#applyEvent` derives `view`/floats/effects/camera-focus/banner from each engine event; the store just advances the cursor. Manual clicks and AI turns both reach the engine through the store's single `commit(action)` path.
+- **Shared geometry helpers live in `sim/grid.ts`** (`tileHeight`, `tilesInRange`, `posKey`/`parseKey`, `pathTo`) — never re-derive a range diamond or tile height inline. `selectCaughtUp` is the one definition of "input is allowed now".
 - **Every AI decision is explainable.** `scoreActions()` returns candidates with named `terms`; the sum IS the score. Personality/orders/doctrine only add or scale terms — no per-archetype hardcoded branches. The "Why did it do that?" panel is a first-class feature, not a debug view.
 - Orders are data (`Orders`, `Doctrine`), so the editor, explain panel, share codes and future PvP order-locking all consume one schema.
 

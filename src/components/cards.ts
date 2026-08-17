@@ -4,7 +4,7 @@ import { ARCHETYPE_LABEL } from "@/sim/presets";
 
 /**
  * Procedural FUT-style unit cards, drawn to a canvas. Used as a billboard texture on the
- * board and as an <img> in HTML panels. Pure presentation — nothing here feeds the sim.
+ * board and blitted into small canvases in HTML panels. Pure presentation — nothing here feeds the sim.
  */
 
 export const CARD_W = 256;
@@ -178,8 +178,4 @@ export function renderCard(u: UnitDef): HTMLCanvasElement {
 
   cache.set(key, c);
   return c;
-}
-
-export function cardDataUrl(u: UnitDef): string {
-  return renderCard(u).toDataURL();
 }

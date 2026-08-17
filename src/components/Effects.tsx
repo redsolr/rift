@@ -3,7 +3,8 @@ import { useFrame } from "@react-three/fiber";
 import { useRef } from "react";
 import * as THREE from "three";
 import { Effect, EffectStyle, useGame } from "@/store/game";
-import { Pos, TERRAIN } from "@/sim/types";
+import { Pos } from "@/sim/types";
+import { tileHeight } from "@/sim/grid";
 
 const STYLE_COLOR: Record<EffectStyle, string> = {
   arrow: "#f3e7c9",
@@ -14,7 +15,7 @@ const STYLE_COLOR: Record<EffectStyle, string> = {
 
 function useTileY() {
   const map = useGame((s) => s.config.map);
-  return (p: Pos) => (TERRAIN[map.tiles[p.y * map.width + p.x]]?.height ?? 0.1) + 0.45;
+  return (p: Pos) => tileHeight(map, p) + 0.45;
 }
 
 /** Arrow: straight thin bolt with a slight arc. Magic: glowing orb + trailing orb, straight line. */

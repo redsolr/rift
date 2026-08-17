@@ -5,6 +5,9 @@ export const inBounds = (map: MapDef, x: number, y: number) =>
   x >= 0 && y >= 0 && x < map.width && y < map.height;
 export const terrainAt = (map: MapDef, x: number, y: number): Terrain =>
   map.tiles[idx(map, x, y)];
+/** Visual height of the tile at p (0.1 for out-of-range lookups) — shared by every renderer piece. */
+export const tileHeight = (map: MapDef, p: Pos): number =>
+  inBounds(map, p.x, p.y) ? TERRAIN[terrainAt(map, p.x, p.y)].height : 0.1;
 export const dist = (a: Pos, b: Pos) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 export const posKey = (p: Pos) => `${p.x},${p.y}`;
 export const parseKey = (k: string): Pos => {
@@ -102,4 +105,20 @@ export function threatCount(pos: Pos, enemies: UnitState[]): number {
     if (dist(pos, e) <= e.stats.mov + e.stats.rangeMax) n++;
   }
   return n;
+}
+
+/**
+ * Manhattan ring [rangeMin, rangeMax] around `center`, clipped to the map. Symmetric, so it is both
+ * "what a unit standing at center can hit" and "from where a unit could hit center".
+ */
+export function tilesInRange(map: MapDef, center: Pos, rangeMin: number, rangeMax: number): Pos[] {
+  const out: Pos[] = [];
+  for (let dy = -rangeMax; dy <= rangeMax; dy++)
+    for (let dx = -rangeMax; dx <= rangeMax; dx++) {
+      const d = Math.abs(dx) + Math.abs(dy);
+      if (d < rangeMin || d > rangeMax) continue;
+      const p = { x: center.x + dx, y: center.y + dy };
+      if (inBounds(map, p.x, p.y)) out.push(p);
+    }
+  return out;
 }

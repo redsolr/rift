@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef } from "react";
-import { useGame } from "@/store/game";
+import { selectCaughtUp, useGame } from "@/store/game";
 import { TERRAIN, UnitDef, otherTeam } from "@/sim/types";
 import { ARCHETYPE_LABEL } from "@/sim/presets";
 import { CARD_H, CARD_W, WEAPON, overall, renderCard } from "./cards";
@@ -18,14 +18,12 @@ export default function Forecast() {
   const hoverUnit = useGame((s) => s.hoverUnit);
   const pendingMove = useGame((s) => s.pendingMove);
   const targets = useGame((s) => s.targets);
-  const cursor = useGame((s) => s.cursor);
-  const events = useGame((s) => s.events);
+  const caughtUp = useGame(selectCaughtUp);
   const view = useGame((s) => s.view);
   const units = useGame((s) => s.config.units);
   const map = useGame((s) => s.config.map);
   const mode = useGame((s) => s.mode);
 
-  const caughtUp = cursor >= events.length;
   const attacker = useMemo(() => units.find((u) => u.id === selected) ?? null, [units, selected]);
   const defenderId = useMemo(() => {
     if (!attacker) return null;
