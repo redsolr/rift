@@ -4,44 +4,19 @@
  */
 export type SpeakerId = "rook" | "mina";
 
-/** how the walking sprite is drawn (Ragnarok-style chibi pixel art) — colours + hair style per character */
-export interface Look {
-  hair: string;
-  hairDark: string;
-  hairLight: string;
-  style: "short" | "long";
-  eyes: string;
-  skin: string;
-  outfit: string;
-  outfitDark: string;
-  accent: string;
-  boots: string;
-}
-
 export interface Speaker {
   id: SpeakerId;
   name: string;
   /** which portrait to use (team × archetype in `components/portraits.ts`) */
   team: "blue" | "red";
   archetype: "knight" | "fighter" | "archer" | "mage" | "healer";
-  look: Look;
+  /** KayKit Adventurers model in `public/models/kaykit/<model>.glb` (CC0) — placeholder 3D body */
+  model: "Knight" | "Mage";
 }
 
 export const SPEAKERS: Record<SpeakerId, Speaker> = {
-  rook: {
-    id: "rook",
-    name: "Rook",
-    team: "blue",
-    archetype: "knight",
-    look: { hair: "#3f9aa8", hairDark: "#2a6b78", hairLight: "#7fd0dc", style: "short", eyes: "#5aa8ff", skin: "#f2cfae", outfit: "#2a2b38", outfitDark: "#1a1b26", accent: "#7fb2ff", boots: "#15100c" },
-  },
-  mina: {
-    id: "mina",
-    name: "Mina",
-    team: "blue",
-    archetype: "healer",
-    look: { hair: "#6e4030", hairDark: "#4a2a1e", hairLight: "#a06a50", style: "long", eyes: "#5fbf6f", skin: "#f4d3b4", outfit: "#8a2440", outfitDark: "#5e1830", accent: "#e8c070", boots: "#2a1c14" },
-  },
+  rook: { id: "rook", name: "Rook", team: "blue", archetype: "knight", model: "Knight" },
+  mina: { id: "mina", name: "Mina", team: "blue", archetype: "healer", model: "Mage" },
 };
 
 export interface Choice {

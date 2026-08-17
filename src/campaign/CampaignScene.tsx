@@ -1,21 +1,22 @@
 "use client";
-import { useEffect, useMemo, useRef } from "react";
+import { Suspense, useEffect, useMemo, useRef } from "react";
 import { Canvas, ThreeEvent, useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import Room, { OBSTACLES, ROOM } from "./Room";
-import Actor from "./Actor";
+import Character from "./Character";
 import { SPEAKERS } from "./script";
 import { useCampaign } from "./store";
 
 /**
  * Campaign prototype — the walkable room. FE Three Houses monastery feel: third-person camera behind the player at a
- * fixed pitch, WASD / arrows to walk (click or tap the floor to walk there), the NPC prompts "Talk" when close,
+ * fixed pitch, WASD / arrows to walk (Shift = run; click or tap the floor to walk there — runs when far), the NPC prompts "Talk" when close,
  * E / Enter / clicking her opens the dialogue; during a conversation the camera eases in on the pair.
  * Player position is a ref updated per frame — never React state.
  */
 const NPC_POS = new THREE.Vector3(-1.4, 0, 1.15); // by the table, facing the door
 const PLAYER_START = new THREE.Vector3(2.6, 0, 3.4);
-const SPEED = 3.4;
+const WALK = 2.6;
+const RUN = 5.2;
 const TALK_DIST = 1.9;
 const RADIUS = 0.32;
 
@@ -57,9 +58,10 @@ function collide(p: THREE.Vector3): void {
 function World() {
   const playerPos = useRef(PLAYER_START.clone());
   const npcPos = useRef(NPC_POS.clone());
-  const moving = useRef(false);
-  const facing = useRef(-1);
-  const npcFacing = useRef(1);
+  const gait = useRef<"idle" | "walk" | "run">("idle");
+  const heading = useRef(0); // model forward = +z → faces the camera at start
+  const npcGait = useRef<"idle" | "walk" | "run">("idle");
+  const npcHeading = useRef(0.4);
   const target = useRef<THREE.Vector3 | null>(null);
   const camera = useThree((s) => s.camera);
   const camLook = useRef(new THREE.Vector3(PLAYER_START.x, 1, PLAYER_START.z));
@@ -107,18 +109,19 @@ function World() {
       }
     }
     const len = Math.hypot(vx, vz);
-    moving.current = len > 0;
+    const running = keys.has("shift") || (!!target.current && target.current.distanceTo(p) > 3.5);
+    gait.current = len > 0 ? (running ? "run" : "walk") : "idle";
     if (len > 0) {
-      const step = Math.min(dt, 0.05) * SPEED;
+      const step = Math.min(dt, 0.05) * (running ? RUN : WALK);
       const before = p.clone();
       p.x += (vx / len) * step;
       p.z += (vz / len) * step;
       collide(p);
-      if (Math.abs(p.x - before.x) > 1e-4) facing.current = p.x > before.x ? 1 : -1;
+      heading.current = Math.atan2(vx, vz);
       if (target.current && p.distanceTo(before) < 1e-4) target.current = null; // stuck against something
     }
-    // --- NPC faces the player
-    npcFacing.current = p.x > npcPos.current.x ? 1 : -1;
+    // --- NPC turns to face the player
+    npcHeading.current = Math.atan2(p.x - npcPos.current.x, p.z - npcPos.current.z);
     // --- proximity
     setNearNpc(p.distanceTo(npcPos.current) < TALK_DIST);
     // --- camera: behind + above the player; during dialogue ease onto the pair, closer and lower
@@ -153,16 +156,18 @@ function World() {
         <planeGeometry args={[ROOM.w, ROOM.d]} />
         <meshBasicMaterial />
       </mesh>
-      <Actor speaker={SPEAKERS.rook} posRef={playerPos} movingRef={moving} facingRef={facing} />
-      <group
-        onClick={(e) => {
-          e.stopPropagation();
-          if (useCampaign.getState().nearNpc) talk();
-          else target.current = new THREE.Vector3(NPC_POS.x + 1.2, 0, NPC_POS.z + 0.6);
-        }}
-      >
-        <Actor speaker={SPEAKERS.mina} posRef={npcPos} facingRef={npcFacing} scale={0.96} />
-      </group>
+      <Suspense fallback={null}>
+        <Character speaker={SPEAKERS.rook} posRef={playerPos} gaitRef={gait} headingRef={heading} />
+        <group
+          onClick={(e) => {
+            e.stopPropagation();
+            if (useCampaign.getState().nearNpc) talk();
+            else target.current = new THREE.Vector3(NPC_POS.x + 1.2, 0, NPC_POS.z + 0.6);
+          }}
+        >
+          <Character speaker={SPEAKERS.mina} posRef={npcPos} gaitRef={npcGait} headingRef={npcHeading} height={1.56} />
+        </group>
+      </Suspense>
     </>
   );
 }
