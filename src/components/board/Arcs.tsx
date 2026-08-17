@@ -9,22 +9,19 @@ import { tileHeight } from "@/sim/grid";
 import { Pos } from "@/sim/types";
 
 /**
- * FFXII-style target line: a SOLID ribbon — wide soft glow under a coloured core under a white-hot spine —
- * with a small bead in the arc colour that travels along it toward the target and a breathing glow at the tip. No dashes,
- * no arrowhead. Threat arcs are thin red; the target arc is gold and a little bolder.
+ * FFXII-style target line: a SOLID ribbon — wide soft glow under a coloured core — with a small bead in the arc
+ * colour travelling along it toward the target and a small static bead at the tip. No dashes, no arrowhead, no white. Threat arcs are thin red; the target arc is gold and a little bolder.
  */
-function Arc({ from, to, color, hot, width = 2 }: { from: Pos; to: Pos; color: string; hot: string; width?: number }) {
+function Arc({ from, to, color, width = 2 }: { from: Pos; to: Pos; color: string; width?: number }) {
   const map = useGame((s) => s.config.map);
   const glowA = useRef<Line2>(null);
   const glowB = useRef<Line2>(null);
-  const spine = useRef<Line2>(null);
   const tip = useRef<THREE.Mesh>(null);
-  const tipGlow = useRef<THREE.Mesh>(null);
   const pulse = useRef<THREE.Mesh>(null);
   const t = useRef(0);
   // additive blending on drei Lines: the material is created inside Line, so set it after mount
   useEffect(() => {
-    for (const r of [glowA, glowB, spine]) {
+    for (const r of [glowA, glowB]) {
       const m = r.current?.material as THREE.Material | undefined;
       if (m && m.blending !== THREE.AdditiveBlending) {
         m.blending = THREE.AdditiveBlending;
@@ -60,27 +57,20 @@ function Arc({ from, to, color, hot, width = 2 }: { from: Pos; to: Pos; color: s
         (pulse.current.material as THREE.MeshBasicMaterial).opacity = 0.9 * fade;
       }
     }
-    if (tip.current) tip.current.scale.setScalar(1 + 0.18 * Math.sin(t.current * 6));
-    if (tipGlow.current) tipGlow.current.scale.setScalar(1.6 + 0.5 * Math.sin(t.current * 6 + 1));
   });
 
   return (
     <group>
-      {/* soft outer glow → tighter glow → coloured core → white-hot spine */}
+      {/* soft outer glow → tighter glow → coloured core */}
       <Line ref={glowA} points={pts} color={color} lineWidth={width * 7} transparent opacity={0.10} depthTest={false} />
       <Line ref={glowB} points={pts} color={color} lineWidth={width * 3} transparent opacity={0.28} depthTest={false} />
       <Line points={pts} color={color} lineWidth={width * 1.25} transparent opacity={0.95} depthTest={false} />
-      <Line ref={spine} points={pts} color={hot} lineWidth={Math.max(0.5, width * 0.4)} transparent opacity={0.7} depthTest={false} />
       {/* travelling pulse: a single bead in the arc colour */}
       <mesh ref={pulse}>
         <sphereGeometry args={[0.045, 10, 8]} />
         <meshBasicMaterial color={color} transparent opacity={0.9} depthTest={false} depthWrite={false} toneMapped={false} />
       </mesh>
-      {/* tip: coloured bead + breathing halo */}
-      <mesh ref={tipGlow} position={end}>
-        <sphereGeometry args={[0.07, 12, 10]} />
-        <meshBasicMaterial color={color} transparent opacity={0.4} depthTest={false} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
-      </mesh>
+      {/* tip: a small static bead in the arc colour */}
       <mesh ref={tip} position={end}>
         <sphereGeometry args={[0.045, 12, 10]} />
         <meshBasicMaterial color={color} transparent opacity={0.95} depthTest={false} depthWrite={false} toneMapped={false} />
@@ -131,9 +121,9 @@ export default function Arcs() {
   return (
     <group>
       {data.threats.map((t) => (
-        <Arc key={t.id} from={t.from} to={data.at} color="#c41a12" hot="#ff6a55" width={1.8} />
+        <Arc key={t.id} from={t.from} to={data.at} color="#c41a12" width={1.8} />
       ))}
-      {data.target && <Arc from={data.at} to={data.target.to} color="#e0a020" hot="#fff0b8" width={2.6} />}
+      {data.target && <Arc from={data.at} to={data.target.to} color="#e0a020" width={2.6} />}
     </group>
   );
 }
