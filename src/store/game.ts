@@ -507,6 +507,11 @@ export const useGame = create<GameState>((set, get) => {
       const b = s.battle;
       if (s.mode === "manual" && b && !b.state.ended && b.state.activeTeam === s.playerTeam && s.cursor >= s.events.length) {
         const u = b.unit(id);
+        // clicking the unit that is ALREADY selected (and not yet placed) = open its command menu where it stands
+        if (s.selected === id && !s.pendingMove && u.team === s.playerTeam && u.alive && !u.acted) {
+          placeAndOpenMenu(id, { x: u.x, y: u.y });
+          return;
+        }
         if (u.team === s.playerTeam && u.alive && !u.acted) {
           set({ selected: id, moveTiles: b.standableFor(id), pendingMove: null, menuPage: null, menuKind: "attack", pendingAttack: null, hoverAttack: null, targets: [] });
           return;
@@ -540,6 +545,11 @@ export const useGame = create<GameState>((set, get) => {
           return;
         }
         return;
+      }
+      // a tile with a living unit on it IS that unit (the ray may land on the tile beside a card's foot)
+      if (s.mode === "manual" && s.battle) {
+        const occupant = s.battle.alive().find((u) => u.x === p.x && u.y === p.y);
+        if (occupant && !(s.selected === occupant.id && s.moveTiles.some((m) => m.x === p.x && m.y === p.y))) return get().clickUnit(occupant.id);
       }
       if (s.mode === "manual" && s.battle && s.selected && s.moveTiles.length) {
         if (!s.moveTiles.some((m) => m.x === p.x && m.y === p.y)) {

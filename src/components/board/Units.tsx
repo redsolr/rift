@@ -62,7 +62,8 @@ export function CardMesh({ def, dim, selected, opacity = 1, tint, cutaway = fals
   const ghost = opacity < 1;
   return (
     <Billboard follow lockX={false} lockY={false} lockZ={false} position={[0, CARD_H3 / 2 + 0.05 + lift, 0]}>
-      <mesh>
+      {/* a cut-away card also stops catching the pointer, so clicks/right-clicks reach the unit behind it */}
+      <mesh raycast={cutaway ? () => null : undefined}>
         <planeGeometry args={[CARD_W3, CARD_H3]} />
         {/* cutaway: the top of the card fades so the unit standing right behind stays readable (Sims roof-off) */}
         <meshBasicMaterial key={cutaway ? "cut" : "full"} map={texture} alphaMap={cutaway ? cutawayAlphaMap() : null} transparent alphaTest={0.05} opacity={opacity} color={tint ?? (dim ? "#6a6a72" : "#ffffff")} toneMapped={false} depthWrite={!cutaway && !ghost} />
