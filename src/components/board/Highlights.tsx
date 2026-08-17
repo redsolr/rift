@@ -191,73 +191,82 @@ function FocusTile({ x, y, color }: { x: number; y: number; color: string }) {
   );
 }
 
-/** FE Three Hopes movement path: a flat WHITE ribbon on the ground, square corners, filled arrowhead at the destination. */
+/** FE Three Hopes movement path: a slim WHITE ribbon on the ground with ROUNDED turns (quarter arcs) and a swept, notched arrowhead. */
 function PathLine({ path }: { path: Pos[] }) {
   const map = useGame((s) => s.config.map);
   const W = 0.06; // ribbon width (tiles) — FE: a slim line, ~1/16 of a tile
+  const R = 0.32; // corner radius (tiles)
   const geo = useMemo(() => {
     if (path.length < 2) return null;
-    const pts = path.map((p) => new THREE.Vector3(p.x, tileHeight(map, p) + 0.045, p.y));
-    const geos: THREE.BufferGeometry[] = [];
-    const last = pts.length - 1;
-    // arrowhead: a filled triangle whose base sits at the tile edge and whose tip lands near the tile centre
-    const tip = pts[last];
-    const dir = tip.clone().sub(pts[last - 1]).normalize();
+    const raw = path.map((p) => new THREE.Vector3(p.x, tileHeight(map, p) + 0.045, p.y));
+    const last = raw.length - 1;
+    // arrowhead geometry along the final direction; the ribbon stops at the head's notch
+    const dir = raw[last].clone().sub(raw[last - 1]).normalize();
     const side = new THREE.Vector3(-dir.z, 0, dir.x);
-    const headLen = 0.24;
-    const headHalf = 0.13;
-    // the tip lands a touch PAST the destination tile centre (FE), the head base sits just before it
-    const headTip = tip.clone().add(dir.clone().multiplyScalar(0.1));
-    const headBase = headTip.clone().sub(dir.clone().multiplyScalar(headLen));
-    // ribbon segments (each a flat quad); the final one stops at the arrowhead base
-    for (let i = 0; i < last; i++) {
-      const a = pts[i];
-      const b = i === last - 1 ? headBase : pts[i + 1];
-      const d = b.clone().sub(a);
-      const len = d.length();
-      if (len < 1e-4) continue;
-      d.normalize();
-      const n = new THREE.Vector3(-d.z, 0, d.x).multiplyScalar(W / 2);
-      const a2 = a;
-      const b2 = b;
-      const q = new THREE.BufferGeometry();
-      const y = Math.max(a.y, b.y);
-      const v = [a2.x + n.x, y, a2.z + n.z, b2.x + n.x, y, b2.z + n.z, b2.x - n.x, y, b2.z - n.z, a2.x - n.x, y, a2.z - n.z];
-      q.setAttribute("position", new THREE.Float32BufferAttribute(v, 3));
-      q.setIndex([0, 1, 2, 0, 2, 3]);
-      geos.push(q);
-    }
-    // rounded joints
+    const headLen = 0.3;
+    const headHalf = 0.15;
+    const notch = 0.09; // how far the back of the head is swept forward at the centre
+    const headTip = raw[last].clone().add(dir.clone().multiplyScalar(0.12));
+    const headBack = headTip.clone().sub(dir.clone().multiplyScalar(headLen)); // barb line
+    const headNotch = headBack.clone().add(dir.clone().multiplyScalar(notch));
+    // centreline: straight runs cut short by R at every turn, quarter arcs inserted
+    const line: THREE.Vector3[] = [raw[0].clone()];
     for (let i = 1; i < last; i++) {
-      const c = pts[i];
-      const disc = new THREE.BufferGeometry();
-      const seg = 10;
-      const dv: number[] = [c.x, c.y, c.z];
-      const di: number[] = [];
-      for (let k = 0; k <= seg; k++) {
-        const ang = (k / seg) * Math.PI * 2;
-        dv.push(c.x + Math.cos(ang) * (W / 2), c.y, c.z + Math.sin(ang) * (W / 2));
-        if (k > 0) di.push(0, k, k + 1);
+      const prev = raw[i - 1];
+      const cur = raw[i];
+      const next = raw[i + 1];
+      const dIn = cur.clone().sub(prev).normalize();
+      const dOut = next.clone().sub(cur).normalize();
+      if (Math.abs(dIn.dot(dOut)) > 0.999) {
+        line.push(cur.clone());
+        continue;
       }
-      disc.setAttribute("position", new THREE.Float32BufferAttribute(dv, 3));
-      disc.setIndex(di);
-      geos.push(disc);
+      const pIn = cur.clone().sub(dIn.clone().multiplyScalar(R));
+      const pOut = cur.clone().add(dOut.clone().multiplyScalar(R));
+      const N = 8;
+      for (let k = 0; k <= N; k++) {
+        const t = k / N;
+        // quadratic bezier pIn → cur → pOut ≈ a quarter arc for a 90° turn
+        const q = pIn.clone().multiplyScalar((1 - t) * (1 - t)).add(cur.clone().multiplyScalar(2 * (1 - t) * t)).add(pOut.clone().multiplyScalar(t * t));
+        q.y = Math.max(pIn.y, pOut.y);
+        line.push(q);
+      }
     }
-    const h = new THREE.BufferGeometry();
-    const l = headBase.clone().add(side.clone().multiplyScalar(headHalf));
-    const r = headBase.clone().sub(side.clone().multiplyScalar(headHalf));
-    const y = Math.max(headBase.y, headTip.y);
-    h.setAttribute("position", new THREE.Float32BufferAttribute([l.x, y, l.z, headTip.x, y, headTip.z, r.x, y, r.z], 3));
-    h.setIndex([0, 1, 2]);
-    geos.push(h);
-    // merge by hand (no BufferGeometryUtils import): concatenate positions + reindex
+    line.push(headNotch.clone());
+    // ribbon: one quad per centreline segment + a disc at every joint (angles are small, so this reads smooth)
     const pos: number[] = [];
     const idx: number[] = [];
-    for (const g of geos) {
+    const quad = (a: THREE.Vector3, b: THREE.Vector3) => {
+      const d = b.clone().sub(a);
+      if (d.length() < 1e-5) return;
+      d.normalize();
+      const n = new THREE.Vector3(-d.z, 0, d.x).multiplyScalar(W / 2);
+      const y = Math.max(a.y, b.y);
       const base = pos.length / 3;
-      pos.push(...Array.from(g.getAttribute("position").array as Float32Array));
-      idx.push(...Array.from(g.getIndex()!.array as unknown as number[]).map((i) => i + base));
+      pos.push(a.x + n.x, y, a.z + n.z, b.x + n.x, y, b.z + n.z, b.x - n.x, y, b.z - n.z, a.x - n.x, y, a.z - n.z);
+      idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+    };
+    const disc = (c: THREE.Vector3) => {
+      const seg = 10;
+      const base = pos.length / 3;
+      pos.push(c.x, c.y, c.z);
+      for (let k = 0; k <= seg; k++) {
+        const ang = (k / seg) * Math.PI * 2;
+        pos.push(c.x + Math.cos(ang) * (W / 2), c.y, c.z + Math.sin(ang) * (W / 2));
+        if (k > 0) idx.push(base, base + k, base + k + 1);
+      }
+    };
+    for (let i = 0; i < line.length - 1; i++) {
+      quad(line[i], line[i + 1]);
+      if (i > 0) disc(line[i]);
     }
+    // swept arrowhead: tip, right barb, notch, left barb (two triangles)
+    const y = headTip.y;
+    const l = headBack.clone().add(side.clone().multiplyScalar(headHalf));
+    const r = headBack.clone().sub(side.clone().multiplyScalar(headHalf));
+    const b0 = pos.length / 3;
+    pos.push(headTip.x, y, headTip.z, r.x, y, r.z, headNotch.x, y, headNotch.z, l.x, y, l.z);
+    idx.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3);
     const out = new THREE.BufferGeometry();
     out.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
     out.setIndex(idx);
