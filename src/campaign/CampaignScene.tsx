@@ -13,7 +13,8 @@ import { useCampaign } from "./store";
  * E / Enter / clicking her opens the dialogue; during a conversation the camera eases in on the pair.
  * Player position is a ref updated per frame — never React state.
  */
-const NPC_POS = new THREE.Vector3(-1.4, 0, 1.15); // by the table, facing the door
+const NPC_POS = new THREE.Vector3(-1.4, 0, 1.15); // by the table
+const NPC_FACING = 0.55; // idle heading: toward the hearth side of the room
 const PLAYER_START = new THREE.Vector3(2.6, 0, 3.4);
 const WALK = 2.6;
 const RUN = 5.2;
@@ -120,8 +121,8 @@ function World() {
       heading.current = Math.atan2(vx, vz);
       if (target.current && p.distanceTo(before) < 1e-4) target.current = null; // stuck against something
     }
-    // --- NPC turns to face the player
-    npcHeading.current = Math.atan2(p.x - npcPos.current.x, p.z - npcPos.current.z);
+    // --- NPC minds her own business (faces the room); she turns to you only while you are talking
+    npcHeading.current = inDialogue ? Math.atan2(p.x - npcPos.current.x, p.z - npcPos.current.z) : NPC_FACING;
     // --- proximity
     setNearNpc(p.distanceTo(npcPos.current) < TALK_DIST);
     // --- camera: behind + above the player; during dialogue ease onto the pair, closer and lower
