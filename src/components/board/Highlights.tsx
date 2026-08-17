@@ -2,13 +2,12 @@
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { Line } from "@react-three/drei";
 import { selectCaughtUp, useGame } from "@/store/game";
 import { parseKey, pathTo, tileHeight, tilesInRange } from "@/sim/grid";
 import { attackById, attackRange, tilesInAnyRange } from "@/sim/attacks";
 import { Pos, otherTeam } from "@/sim/types";
 
-/** Hollow square frame (outer 0.98, inner 0.86) — the FE tile edge. Built once. */
+/** Hollow square frame (outer 0.98, inner 0.93) — the thin FE tile edge. Built once. */
 const FRAME_GEO = (() => {
   const shape = new THREE.Shape();
   shape.moveTo(-0.49, -0.49);
@@ -37,7 +36,7 @@ function Highlight({ x, y, color, opacity = 0.45, y0, border, borderOpacity = 0.
         </mesh>
       )}
       <mesh position={[0, 0, 0.001]}>
-        <planeGeometry args={border ? [0.86, 0.86] : [0.92, 0.92]} />
+        <planeGeometry args={border ? [0.93, 0.93] : [0.94, 0.94]} />
         <meshBasicMaterial color={color} transparent opacity={opacity} depthWrite={false} />
       </mesh>
     </group>
@@ -131,22 +130,22 @@ export default function Highlights() {
         <Highlight key={`d${p.x},${p.y}`} x={p.x} y={p.y} color="#c04cff" opacity={0.15} />
       ))}
       {attackBand.map((p) => (
-        <Highlight key={`a${p.x},${p.y}`} x={p.x} y={p.y} color={mine ? "#ff4a4a" : "#ff2d2d"} opacity={mine ? 0.4 : 0.2} border={mine ? "#ff8a80" : undefined} borderOpacity={0.35} />
+        <Highlight key={`a${p.x},${p.y}`} x={p.x} y={p.y} color={mine ? "#ff7a8a" : "#ff5a5a"} opacity={mine ? 0.34 : 0.22} border={mine ? "#ff4a5e" : undefined} borderOpacity={0.8} />
       ))}
       {movable.map((p) => (
-        <Highlight key={`m${p.x},${p.y}`} x={p.x} y={p.y} color={mine ? "#3d8bff" : "#ff5a5a"} opacity={mine ? 0.55 : 0.32} border={mine ? "#dcecff" : undefined} borderOpacity={0.35} />
+        <Highlight key={`m${p.x},${p.y}`} x={p.x} y={p.y} color={mine ? "#6f8fff" : "#ff7a7a"} opacity={mine ? 0.5 : 0.3} border={mine ? "#e8eeff" : undefined} borderOpacity={0.8} />
       ))}
       {pendingRange.map((p) => (
-        <Highlight key={`q${p.x},${p.y}`} x={p.x} y={p.y} color={healing ? "#6cf58a" : "#e26bd0"} opacity={0.5} border={healing ? "#9cffb0" : "#ff8a3c"} borderOpacity={0.9} lift={0.03} />
+        <Highlight key={`q${p.x},${p.y}`} x={p.x} y={p.y} color={healing ? "#7ff29a" : "#ff6f8c"} opacity={0.36} border={healing ? "#b8ffc8" : "#ff3d5c"} borderOpacity={0.85} lift={0.03} />
       ))}
       {targets.map((id) => {
         const u = view.units[id];
         return u ? <Highlight key={`t${id}`} x={u.x} y={u.y} color={selDef && config.units.find((q) => q.id === id)?.team === selDef.team ? "#3ddc6a" : "#ff4040"} opacity={0.6} /> : null;
       })}
-      {previewFrom && <Highlight x={previewFrom.x} y={previewFrom.y} color="#ffd54f" opacity={0.7} />}
+      {previewFrom && <Highlight x={previewFrom.x} y={previewFrom.y} color="#fff3b0" opacity={0.45} border="#ffffff" borderOpacity={0.9} lift={0.035} />}
       {focusEnemy && <FocusTile x={focusEnemy.x} y={focusEnemy.y} color={selected && targets.includes(hoverUnit!) ? "#ffe082" : "#ff6a6a"} />}
       {path && <PathLine path={path} />}
-      {sel && sel.alive && <Highlight x={sel.x} y={sel.y} color="#ffe082" opacity={0.5} />}
+      {sel && sel.alive && <Highlight x={sel.x} y={sel.y} color="#ffffff" opacity={0.28} border="#ffffff" borderOpacity={0.9} lift={0.034} />}
       {hover && !unitAt(hover.x, hover.y) && <Highlight x={hover.x} y={hover.y} color="#ffffff" opacity={0.18} />}
     </group>
   );
@@ -192,23 +191,66 @@ function FocusTile({ x, y, color }: { x: number; y: number; color: string }) {
   );
 }
 
-/** Yellow movement path drawn on the ground (FE cursor arrow). */
+/** FE Three Hopes movement path: a flat WHITE ribbon on the ground, square corners, filled arrowhead at the destination. */
 function PathLine({ path }: { path: Pos[] }) {
   const map = useGame((s) => s.config.map);
-  const pts = useMemo(() => path.map((p) => new THREE.Vector3(p.x, tileHeight(map, p) + 0.06, p.y)), [path, map]);
-  if (pts.length < 2) return null;
-  const end = pts[pts.length - 1];
-  const prev = pts[pts.length - 2];
-  const dir = end.clone().sub(prev).normalize();
-  const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+  const W = 0.13; // ribbon width (tiles)
+  const geo = useMemo(() => {
+    if (path.length < 2) return null;
+    const pts = path.map((p) => new THREE.Vector3(p.x, tileHeight(map, p) + 0.045, p.y));
+    const geos: THREE.BufferGeometry[] = [];
+    const last = pts.length - 1;
+    // arrowhead: a filled triangle whose base sits at the tile edge and whose tip lands near the tile centre
+    const tip = pts[last];
+    const dir = tip.clone().sub(pts[last - 1]).normalize();
+    const side = new THREE.Vector3(-dir.z, 0, dir.x);
+    const headLen = 0.42;
+    const headHalf = 0.24;
+    const headBase = tip.clone().sub(dir.clone().multiplyScalar(0.02 + headLen));
+    const headTip = tip.clone().sub(dir.clone().multiplyScalar(0.02));
+    // ribbon segments (each a flat quad); the final one stops at the arrowhead base
+    for (let i = 0; i < last; i++) {
+      const a = pts[i];
+      const b = i === last - 1 ? headBase : pts[i + 1];
+      const d = b.clone().sub(a);
+      const len = d.length();
+      if (len < 1e-4) continue;
+      d.normalize();
+      const n = new THREE.Vector3(-d.z, 0, d.x).multiplyScalar(W / 2);
+      // extend by W/2 at joints so square corners close
+      const a2 = i === 0 ? a : a.clone().sub(d.clone().multiplyScalar(W / 2));
+      const b2 = i === last - 1 ? b : b.clone().add(d.clone().multiplyScalar(W / 2));
+      const q = new THREE.BufferGeometry();
+      const y = Math.max(a.y, b.y);
+      const v = [a2.x + n.x, y, a2.z + n.z, b2.x + n.x, y, b2.z + n.z, b2.x - n.x, y, b2.z - n.z, a2.x - n.x, y, a2.z - n.z];
+      q.setAttribute("position", new THREE.Float32BufferAttribute(v, 3));
+      q.setIndex([0, 1, 2, 0, 2, 3]);
+      geos.push(q);
+    }
+    const h = new THREE.BufferGeometry();
+    const l = headBase.clone().add(side.clone().multiplyScalar(headHalf));
+    const r = headBase.clone().sub(side.clone().multiplyScalar(headHalf));
+    const y = Math.max(headBase.y, headTip.y);
+    h.setAttribute("position", new THREE.Float32BufferAttribute([l.x, y, l.z, headTip.x, y, headTip.z, r.x, y, r.z], 3));
+    h.setIndex([0, 1, 2]);
+    geos.push(h);
+    // merge by hand (no BufferGeometryUtils import): concatenate positions + reindex
+    const pos: number[] = [];
+    const idx: number[] = [];
+    for (const g of geos) {
+      const base = pos.length / 3;
+      pos.push(...Array.from(g.getAttribute("position").array as Float32Array));
+      idx.push(...Array.from(g.getIndex()!.array as unknown as number[]).map((i) => i + base));
+    }
+    const out = new THREE.BufferGeometry();
+    out.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    out.setIndex(idx);
+    return out;
+  }, [path, map]);
+  if (!geo) return null;
   return (
-    <group>
-      <Line points={pts} color="#ffd54f" lineWidth={5} transparent opacity={0.9} depthTest={false} />
-      <mesh position={end.clone().sub(dir.clone().multiplyScalar(0.18))} quaternion={q}>
-        <coneGeometry args={[0.16, 0.34, 4]} />
-        <meshBasicMaterial color="#ffd54f" depthTest={false} />
-      </mesh>
-    </group>
+    <mesh geometry={geo} renderOrder={5}>
+      <meshBasicMaterial color="#ffffff" transparent opacity={0.95} depthTest={false} depthWrite={false} side={THREE.DoubleSide} />
+    </mesh>
   );
 }
-
