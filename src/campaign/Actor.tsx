@@ -7,94 +7,103 @@ import { Speaker } from "./script";
 import { blobTexture } from "./roomTextures";
 
 /**
- * A character in the room as a PAPER-DOLL STANDEE (Paper Mario / Octopath read): a billboard that yaws to face the
- * camera, carrying a canvas that stacks the keyed portrait bust over a painted body (tunic in the team colour, legs,
- * boots) so the bust art we already have reads as a full standing figure. Bobs while walking, sways idle, flips to
- * face its travel direction, and casts a soft blob shadow. The slot for real character models later.
+ * A character in the room as a RAGNAROK-STYLE 2D SPRITE: a chibi pixel sprite (~2.5 heads tall) billboarded in the
+ * 3D room, nearest-filtered so the pixels stay crisp, on a 4-frame walk-cycle sprite sheet, mirrored to face its
+ * travel direction. Generated per character from the art we have: the FACE is cropped out of the keyed portrait and
+ * downsampled to a pixel head (with a dark outline), the body is drawn in pixels in the team colours. Blob shadow
+ * underneath. The slot for hand-drawn RO-style sheets later (same sheet layout: 4 frames × FW, one row).
  */
-export const ACTOR_H = 1.85;
+export const ACTOR_H = 1.35; // world height of the sprite (RO chibi: ~1.5 tiles)
+const FW = 40; // frame width (px)
+const FH = 60; // frame height (px)
+const FRAMES = 4;
 
-const TEAM_CLOTH: Record<Speaker["team"], { tunic: string; sash: string }> = {
-  blue: { tunic: "#243250", sash: "#3f7fe0" },
-  red: { tunic: "#4a2426", sash: "#e0554a" },
+const TEAM_CLOTH: Record<Speaker["team"], { tunic: string; tunicDark: string; sash: string; skin: string }> = {
+  blue: { tunic: "#2f4a86", tunicDark: "#22355f", sash: "#7fb2ff", skin: "#f0c9a6" },
+  red: { tunic: "#8a2f2f", tunicDark: "#5f2020", sash: "#ff9a8a", skin: "#f0c9a6" },
 };
 
-function drawStandee(sp: Speaker): HTMLCanvasElement | null {
+/** pixel-art helpers on an integer grid */
+function px(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, c: string) {
+  ctx.fillStyle = c;
+  ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
+}
+
+function drawSheet(sp: Speaker): HTMLCanvasElement | null {
   const bust = portraitCanvas(sp.team, sp.archetype);
   if (!bust) return null;
-  const W = 512;
-  const H = 1024;
-  const c = document.createElement("canvas");
-  c.width = W;
-  c.height = H;
-  const ctx = c.getContext("2d")!;
   const cloth = TEAM_CLOTH[sp.team];
-  // ---- body (painted): boots, legs, tunic, belt, sash
-  const cx = W / 2;
-  ctx.fillStyle = "#1a1410";
-  ctx.beginPath(); // boots
-  ctx.roundRect(cx - 95, H - 120, 80, 110, 18);
-  ctx.roundRect(cx + 15, H - 120, 80, 110, 18);
-  ctx.fill();
-  ctx.fillStyle = "#2b2622";
-  ctx.beginPath(); // legs
-  ctx.roundRect(cx - 92, H - 420, 74, 320, 22);
-  ctx.roundRect(cx + 18, H - 420, 74, 320, 22);
-  ctx.fill();
-  // tunic: shoulders wide, hem below the hips
-  ctx.fillStyle = cloth.tunic;
-  ctx.beginPath();
-  ctx.moveTo(cx - 175, 470);
-  ctx.quadraticCurveTo(cx - 200, 560, cx - 150, 720);
-  ctx.lineTo(cx + 150, 720);
-  ctx.quadraticCurveTo(cx + 200, 560, cx + 175, 470);
-  ctx.quadraticCurveTo(cx, 430, cx - 175, 470);
-  ctx.closePath();
-  ctx.fill();
-  // belt + sash
-  ctx.fillStyle = "#3a2a1c";
-  ctx.fillRect(cx - 150, 640, 300, 26);
-  ctx.fillStyle = cloth.sash;
-  ctx.beginPath();
-  ctx.moveTo(cx - 60, 470);
-  ctx.lineTo(cx + 40, 700);
-  ctx.lineTo(cx + 90, 700);
-  ctx.lineTo(cx - 10, 470);
-  ctx.closePath();
-  ctx.fill();
-  // cloth shading
-  const sh = ctx.createLinearGradient(cx - 200, 0, cx + 200, 0);
-  sh.addColorStop(0, "rgba(0,0,0,0.35)");
-  sh.addColorStop(0.45, "rgba(0,0,0,0)");
-  sh.addColorStop(1, "rgba(0,0,0,0.3)");
-  ctx.fillStyle = sh;
-  ctx.fillRect(cx - 200, 430, 400, H - 430);
-  // ---- bust: cover-fit into the top ~58 %, face centred by its focus, bottom faded into the tunic
-  const bw = bust.width;
-  const bh = bust.height;
+  const sheet = document.createElement("canvas");
+  sheet.width = FW * FRAMES;
+  sheet.height = FH;
+  const ctx = sheet.getContext("2d")!;
+  ctx.imageSmoothingEnabled = false;
+  // --- pixel head from the portrait: crop a square around the face focus, downsample to 22px, round the corners
   const f = portraitFocus(sp.team, sp.archetype);
-  const targetH = 600;
-  const scale = Math.max((W * 0.9) / bw, targetH / bh);
-  const dw = bw * scale;
-  const dh = bh * scale;
-  const dx = cx - f.x * dw;
-  const dy = 20 - Math.max(0, f.y * dh - 190); // head near the top of the canvas
-  const tmp = document.createElement("canvas");
-  tmp.width = W;
-  tmp.height = H;
-  const t = tmp.getContext("2d")!;
-  t.drawImage(bust, dx, dy, dw, dh);
-  // fade the bust out from y=520 → 640 so it melts into the tunic; also clip the sides softly
-  t.globalCompositeOperation = "destination-out";
-  const fade = t.createLinearGradient(0, 500, 0, 640);
-  fade.addColorStop(0, "rgba(0,0,0,0)");
-  fade.addColorStop(1, "rgba(0,0,0,1)");
-  t.fillStyle = fade;
-  t.fillRect(0, 500, W, H - 500);
-  t.globalCompositeOperation = "source-over";
-  ctx.drawImage(tmp, 0, 0);
-  // ---- outline: a soft dark rim so the standee separates from the room (paper-doll edge)
-  return c;
+  const side = Math.min(bust.width, bust.height) * 0.42;
+  const sx = Math.max(0, Math.min(bust.width - side, f.x * bust.width - side / 2));
+  const sy = Math.max(0, Math.min(bust.height - side, f.y * bust.height - side * 0.55));
+  const HEAD = 22;
+  const headC = document.createElement("canvas");
+  headC.width = headC.height = HEAD;
+  const hc = headC.getContext("2d")!;
+  hc.imageSmoothingEnabled = true;
+  hc.imageSmoothingQuality = "high";
+  // two-step downsample keeps the features readable at 22px
+  const mid = document.createElement("canvas");
+  mid.width = mid.height = 88;
+  const mc = mid.getContext("2d")!;
+  mc.imageSmoothingQuality = "high";
+  mc.drawImage(bust, sx, sy, side, side, 0, 0, 88, 88);
+  hc.beginPath();
+  hc.roundRect(0, 0, HEAD, HEAD, 7);
+  hc.clip();
+  hc.drawImage(mid, 0, 0, 88, 88, 0, 0, HEAD, HEAD);
+  // pixel-quantise a touch (posterise) so it sits with the pixel body
+  const id = hc.getImageData(0, 0, HEAD, HEAD);
+  for (let i = 0; i < id.data.length; i += 4) {
+    id.data[i] = Math.round(id.data[i] / 12) * 12;
+    id.data[i + 1] = Math.round(id.data[i + 1] / 12) * 12;
+    id.data[i + 2] = Math.round(id.data[i + 2] / 12) * 12;
+  }
+  hc.putImageData(id, 0, 0);
+
+  for (let fr = 0; fr < FRAMES; fr++) {
+    const ox = fr * FW;
+    const cx = ox + FW / 2;
+    // walk cycle: 0 = contact, 1 = pass, 2 = contact (other leg), 3 = pass; body bobs 1px on the pass frames
+    const bob = fr % 2 === 1 ? -1 : 0;
+    const legA = fr === 0 ? 3 : fr === 2 ? -3 : 0; // forward/back swing (px)
+    const legB = -legA;
+    // legs (dark trousers) + boots
+    px(ctx, cx - 7 + legA * 0.5, 44 + bob, 5, 12, "#2a2420");
+    px(ctx, cx + 2 + legB * 0.5, 44 + bob, 5, 12, "#2a2420");
+    px(ctx, cx - 8 + legA * 0.5, 54 + bob, 7, 4, "#15100c");
+    px(ctx, cx + 1 + legB * 0.5, 54 + bob, 7, 4, "#15100c");
+    // torso (tunic) with a darker side + belt
+    px(ctx, cx - 9, 28 + bob, 18, 18, cloth.tunic);
+    px(ctx, cx + 5, 28 + bob, 4, 18, cloth.tunicDark);
+    px(ctx, cx - 9, 42 + bob, 18, 3, "#3a2a1c");
+    // sash
+    px(ctx, cx - 3, 28 + bob, 4, 16, cloth.sash);
+    // arms (skin) swinging opposite to the legs
+    px(ctx, cx - 12, 30 + bob + legB * 0.6, 3, 12, cloth.skin);
+    px(ctx, cx + 9, 30 + bob + legA * 0.6, 3, 12, cloth.skin);
+    // collar / neck
+    px(ctx, cx - 3, 26 + bob, 6, 3, cloth.skin);
+    // head (big, RO chibi) with a 1px dark outline
+    const hx = cx - HEAD / 2;
+    const hy = 5 + bob;
+    ctx.fillStyle = "#1a1418";
+    ctx.beginPath();
+    ctx.roundRect(hx - 1, hy - 1, HEAD + 2, HEAD + 2, 8);
+    ctx.fill();
+    ctx.drawImage(headC, hx, hy);
+    // body outline (cheap): 1px dark under the torso + legs edges
+    px(ctx, cx - 10, 28 + bob, 1, 18, "#1a1418");
+    px(ctx, cx + 9, 28 + bob, 1, 18, "#1a1418");
+  }
+  return sheet;
 }
 
 export default function Actor({
@@ -117,11 +126,14 @@ export default function Actor({
   // the standee texture is derived from (speaker, portraits loaded) — memoised, disposed when replaced
   const tex = useMemo(() => {
     void version;
-    const c = drawStandee(speaker);
+    const c = drawSheet(speaker);
     if (!c) return null;
     const t = new THREE.CanvasTexture(c);
     t.colorSpace = THREE.SRGBColorSpace;
-    t.anisotropy = 8;
+    t.magFilter = THREE.NearestFilter;
+    t.minFilter = THREE.NearestFilter;
+    t.generateMipmaps = false;
+    t.repeat.set(1 / FRAMES, 1);
     return t;
   }, [speaker, version]);
   useEffect(() => () => tex?.dispose(), [tex]);
@@ -140,27 +152,28 @@ export default function Actor({
     const yaw = Math.atan2(camera.position.x - p.x, camera.position.z - p.z);
     g.rotation.y = yaw;
     const moving = movingRef?.current ?? false;
-    const bob = moving ? Math.abs(Math.sin(t.current * 9)) * 0.06 : Math.sin(t.current * 1.6) * 0.012;
-    const tilt = moving ? Math.sin(t.current * 9) * 0.04 : 0;
     if (card.current) {
-      card.current.position.y = ACTOR_H * scale * 0.5 + bob;
-      card.current.rotation.z = tilt;
+      card.current.position.y = ACTOR_H * scale * 0.5;
       const face = facingRef?.current ?? 1;
       card.current.scale.x = face * Math.abs(card.current.scale.x || 1);
+      // walk cycle: 4 frames at ~8 fps while moving, frame 1 (pass pose) when idle
+      const frame = moving ? Math.floor(t.current * 8) % FRAMES : 1;
+      const m = card.current.material as THREE.MeshBasicMaterial;
+      if (m.map) m.map.offset.x = frame / FRAMES;
     }
   });
-  const w = ACTOR_H * scale * 0.5; // canvas is 1:2
+  const w = ACTOR_H * scale * (FW / FH);
   return (
     <group ref={group}>
       {/* shadow blob */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, 0]}>
-        <planeGeometry args={[1.1 * scale, 0.7 * scale]} />
+        <planeGeometry args={[0.8 * scale, 0.5 * scale]} />
         <meshBasicMaterial map={blob} transparent depthWrite={false} opacity={0.9} />
       </mesh>
       <mesh ref={card} position={[0, (ACTOR_H * scale) / 2, 0]} castShadow>
         <planeGeometry args={[w, ACTOR_H * scale]} />
         {tex ? (
-          <meshBasicMaterial map={tex} color="#efe6dc" transparent alphaTest={0.05} side={THREE.DoubleSide} toneMapped={false} />
+          <meshBasicMaterial map={tex} transparent alphaTest={0.5} side={THREE.DoubleSide} toneMapped={false} />
         ) : (
           <meshStandardMaterial color={TEAM_CLOTH[speaker.team].tunic} transparent opacity={0.6} side={THREE.DoubleSide} />
         )}
