@@ -1,1 +1,46 @@
-@AGENTS.md
+# Tactician — browser tactical manager
+
+> Standalone venture (one app, one repo — see hq `venture-shape-one-app-one-repo`). No shared backend, no platform dependency. Portfolio doctrine (`D:\App\Jurisimus\platform\CLAUDE.md`) applies for working discipline; this file governs locally.
+
+**One-line pitch:** build a squad, write its doctrine, watch it fight, read *why* it lost, change two things, rematch. Manager mode is the hero; Manual mode is the teaching layer; the Editor is how we (and later players) test maps and AI behaviour.
+
+Concept doc: `docs/concept.md` (the original brief + the sharpening notes). Capability map: `FEATURES.md` — **update it in the SAME commit as any feature-visible change.**
+
+## Stack
+
+Next.js 16 (app router, Turbopack) · React 19 · TypeScript · Three.js via `@react-three/fiber` + `drei` · Zustand · Tailwind v4 (only the reset; the UI is plain CSS in `globals.css`) · Vitest. Port **3030**. No backend, no auth, no DB yet — those arrive only when async Arena needs to store a seed + two configs.
+
+## Architecture — the one rule
+
+```
+src/sim/        pure, deterministic engine. NO imports from React/Three/store. Ever.
+src/store/      Zustand: owns the Battle instance + the event cursor the renderer replays
+src/components/ Board.tsx (Three renderer, sees ONLY events/view), Hud.tsx, Panel.tsx
+scripts/sim.ts  headless batch runner (npm run sim -- 1000)
+```
+
+- **Determinism is load-bearing.** `Battle(config, seed)` + the action sequence fully determines the event log. Sim code uses `Rng` (mulberry32) only — never `Math.random`/`Date`. Integer math only. `runMany` with the same seeds must return identical stats; a vitest guards this.
+- **Renderer replays events; it never computes combat.** `store.view` is derived by applying `battle.log` up to `cursor`. Manual clicks and AI turns both go through `battle.act()`.
+- **Every AI decision is explainable.** `scoreActions()` returns candidates with named `terms`; the sum IS the score. Personality/orders/doctrine only add or scale terms — no per-archetype hardcoded branches. The "Why did it do that?" panel is a first-class feature, not a debug view.
+- Orders are data (`Orders`, `Doctrine`), so the editor, explain panel, share codes and future PvP order-locking all consume one schema.
+
+## Commands
+
+| Command                                      | What                                              |
+| -------------------------------------------- | ------------------------------------------------- |
+| `npm run dev`                                | http://localhost:3030                             |
+| `npm run test`                               | vitest — sim determinism, rules, grid, share-code |
+| `npm run sim -- 1000 [seedFrom] [shareCode]` | headless win-rates                                |
+| `npm run verify`                             | lint → tsc → test → build — **this is the DoD**   |
+
+## Definition of Done
+
+`npm run verify` exits clean. Any feature-visible change also updates `FEATURES.md` in the same commit. New engine rules get a vitest that asserts the *promise* (e.g. "hold units move less than pursue units"), not the implementation. UI/pixel claims get a headless Playwright screenshot probe before being reported (the store is exposed as `window.__tactician` for exactly this; classroom's Playwright install can drive it — see `docs/concept.md` § probe).
+
+## Zustand traps (already hit once)
+
+Selectors must return stable references — never `useGame((s) => s.config.units.filter(...))`; select the array and `useMemo` the filter. React-compiler lint forbids reading refs during render; use `useEffect` keyed on the value.
+
+## What NOT to build yet
+
+Campaign, story, accounts, backend, multiplayer, items, skill trees, more than 5 archetypes, cosmetics. The only question that matters right now: **do people press Rematch?**
