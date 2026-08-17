@@ -10,6 +10,16 @@ import { Terrain } from "@/sim/types";
 const SIZE = 256;
 const cache = new Map<string, THREE.Texture>();
 const matCache = new Map<Terrain, THREE.MeshStandardMaterial>();
+let planterMats: THREE.MeshStandardMaterial[] | null = null;
+/** Wall tile in the city theme = a raised stone planter: stone sides, soil top (box face order +x −x +y −y +z −z). */
+export function planterMaterials(): THREE.MeshStandardMaterial[] {
+  if (planterMats) return planterMats;
+  const dom = typeof document !== "undefined";
+  const side = new THREE.MeshStandardMaterial({ map: dom ? stoneTexture() : null, color: "#d8d2c4", roughness: 0.9 });
+  const top = new THREE.MeshStandardMaterial({ map: dom ? soilTexture() : null, color: "#c9b9a4", roughness: 1 });
+  planterMats = [side, side, top, side, side, side];
+  return planterMats;
+}
 
 function lcg(seed: number) {
   let s = seed >>> 0;
@@ -182,6 +192,25 @@ export function stoneTexture(): THREE.Texture {
   }
   grain(ctx, rnd, 1000, 0.18, false);
   grain(ctx, rnd, 400, 0.15, true);
+  return finish(k, c);
+}
+
+/** Planter soil: dark loam with a few pebbles (the top face of a wall tile in the city theme). */
+export function soilTexture(): THREE.Texture {
+  const k = "soil";
+  if (cache.has(k)) return cache.get(k)!;
+  const c = canvas();
+  const ctx = c.getContext("2d")!;
+  const rnd = lcg(89);
+  ctx.fillStyle = "#4a3a2c";
+  ctx.fillRect(0, 0, SIZE, SIZE);
+  for (let i = 0; i < 160; i++) {
+    ctx.fillStyle = `hsla(${20 + rnd() * 15}, ${25 + rnd() * 15}%, ${18 + rnd() * 14}%, 0.6)`;
+    ctx.beginPath();
+    ctx.ellipse(rnd() * SIZE, rnd() * SIZE, 5 + rnd() * 14, 4 + rnd() * 9, rnd() * Math.PI, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  grain(ctx, rnd, 700, 0.2, true);
   return finish(k, c);
 }
 

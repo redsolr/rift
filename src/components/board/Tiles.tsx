@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { useGame } from "@/store/game";
 import { TERRAIN } from "@/sim/types";
 import { dragged } from "./shared";
-import { sceneMaterial, tileHash } from "./textures";
+import { planterMaterials, sceneMaterial, tileHash } from "./textures";
 
 export default function Tiles() {
   const map = useGame((s) => s.config.map);
@@ -36,7 +36,7 @@ export default function Tiles() {
             key={`${x},${y},${boardView}`}
             position={[x, d.height / 2, y]}
             rotation={scene ? [0, Math.floor(tileHash(x, y, 99) * 4) * (Math.PI / 2), 0] : undefined}
-            material={scene ? sceneMaterial(t) : undefined}
+            material={scene ? (t === "wall" ? planterMaterials() : sceneMaterial(t)) : undefined}
             receiveShadow
             castShadow={scene && d.height > 0.2}
             onClick={(e: ThreeEvent<MouseEvent>) => {

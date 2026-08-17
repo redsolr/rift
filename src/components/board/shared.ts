@@ -3,7 +3,7 @@ import { Team } from "@/sim/types";
 
 export const TEAM_COLOR: Record<Team, string> = { red: "#e0554a", blue: "#4a86e0" };
 /** Saturated variants for additive ground FX (selection ring) — the reference RTS ring is a hot cyan, not the muted UI blue. */
-export const TEAM_GLOW: Record<Team, string> = { red: "#ff5a48", blue: "#38b6ff" };
+export const TEAM_GLOW: Record<Team, string> = { red: "#ff5a48", blue: "#19e3ff" };
 export const CARD_W3 = 0.92;
 export const CARD_H3 = CARD_W3 * (352 / 256);
 

@@ -8,8 +8,9 @@ import { inBounds, terrainAt, tileHeight } from "@/sim/grid";
 import { sceneMaterial, tileHash } from "./textures";
 
 /**
- * City dressing for the "scene" board view (FE Three Hopes town-square read): cypress trees on
- * forest tiles, crates + barrels beside walls, terracotta kerbs where the plaza meets other terrain,
+ * City dressing for the "scene" board view (FE Three Hopes town-square read): every WALL tile is a raised
+ * planter with one centred cypress (a tree owns its tile — impassable, so units never stand "in" a tree),
+ * forest = low hedge shrubs a card can stand among, sparse crates by the planters, terracotta kerbs where the plaza meets other terrain,
  * scrolling water — plus the GRID OVERLAY, which shows only while a unit is selected (FE) or the
  * HUD ▦ Grid debug toggle is on. Everything is deterministic per tile (`tileHash`), all instanced.
  * Terrain heights come from `sim/grid.ts#tileHeight` — nothing here re-derives geometry.
@@ -49,17 +50,17 @@ function Instanced({ items, geo, mat, castShadow = true }: { items: Inst[]; geo:
 }
 
 // shared geometries / materials (module singletons — never recreated per render)
-const TRUNK_GEO = new THREE.CylinderGeometry(0.035, 0.05, 0.3, 6);
-const CONE_LO_GEO = new THREE.ConeGeometry(0.19, 0.55, 7);
-const CONE_HI_GEO = new THREE.ConeGeometry(0.13, 0.5, 7);
-const PLANTER_GEO = new THREE.BoxGeometry(0.34, 0.16, 0.34);
+const TRUNK_GEO = new THREE.CylinderGeometry(0.04, 0.055, 0.3, 6);
+const CONE_LO_GEO = new THREE.ConeGeometry(0.24, 0.7, 8);
+const CONE_HI_GEO = new THREE.ConeGeometry(0.16, 0.6, 8);
+const SHRUB_GEO = new THREE.SphereGeometry(0.11, 8, 6);
 const CRATE_GEO = new THREE.BoxGeometry(0.22, 0.22, 0.22);
 const BARREL_GEO = new THREE.CylinderGeometry(0.1, 0.09, 0.24, 8);
 const KERB_GEO = new THREE.PlaneGeometry(1, 0.11);
 const TRUNK_MAT = new THREE.MeshStandardMaterial({ color: "#5a3f2a", roughness: 1 });
 const CONE_MAT = new THREE.MeshStandardMaterial({ color: "#2f5f34", roughness: 1 });
 const CONE_HI_MAT = new THREE.MeshStandardMaterial({ color: "#3a7440", roughness: 1 });
-const PLANTER_MAT = new THREE.MeshStandardMaterial({ color: "#8a6a4a", roughness: 1 });
+const SHRUB_MAT = new THREE.MeshStandardMaterial({ color: "#2e6b3a", roughness: 1 });
 const CRATE_MAT = new THREE.MeshStandardMaterial({ color: "#a67c4e", roughness: 1 });
 const BARREL_MAT = new THREE.MeshStandardMaterial({ color: "#6e4a2e", roughness: 1 });
 const KERB_MAT = new THREE.MeshBasicMaterial({ color: "#c96f48", transparent: true, opacity: 0.9, depthWrite: false });
@@ -77,31 +78,31 @@ export default function Scenery() {
     const trunks: Inst[] = [];
     const conesLo: Inst[] = [];
     const conesHi: Inst[] = [];
-    const planters: Inst[] = [];
+    const shrubs: Inst[] = [];
     const crates: Inst[] = [];
     const barrels: Inst[] = [];
     const kerbs: Inst[] = [];
     const tree = (x: number, z: number, y: number, k: number, scale = 1) => {
       trunks.push({ p: [x, y + 0.15 * scale, z], s: [scale, scale, scale] });
-      conesLo.push({ p: [x, y + 0.45 * scale, z], ry: k * 6.28, s: [scale, scale, scale] });
-      conesHi.push({ p: [x, y + 0.85 * scale, z], ry: k * 6.28 + 0.4, s: [scale, scale, scale] });
+      conesLo.push({ p: [x, y + 0.55 * scale, z], ry: k * 6.28, s: [scale, scale, scale] });
+      conesHi.push({ p: [x, y + 1.0 * scale, z], ry: k * 6.28 + 0.4, s: [scale, scale, scale] });
     };
     for (let y = 0; y < map.height; y++)
       for (let x = 0; x < map.width; x++) {
         const t = terrainAt(map, x, y);
         const h = TERRAIN[t].height;
-        if (t === "forest") {
-          // two or three cypresses per forest tile, off-centre so a unit card still reads
-          const n = 2 + (tileHash(x, y, 1) < 0.4 ? 1 : 0);
-          for (let i = 0; i < n; i++) {
-            const a = tileHash(x, y, 10 + i) * Math.PI * 2;
-            const r = 0.24 + tileHash(x, y, 20 + i) * 0.14;
-            tree(x + Math.cos(a) * r, y + Math.sin(a) * r, h, tileHash(x, y, 30 + i), 0.85 + tileHash(x, y, 40 + i) * 0.35);
-          }
+        if (t === "wall") {
+          // a tree OWNS its tile (FE): every impassable tile is a raised planter with ONE cypress dead-centre,
+          // uniform size — rows of walls in the map read as tree-lined avenues, never a random copse
+          tree(x, y, h, 0.25, 1.15);
         }
-        if (t === "hill" && tileHash(x, y, 2) < 0.3) {
-          const a = tileHash(x, y, 11) * Math.PI * 2;
-          tree(x + Math.cos(a) * 0.3, y + Math.sin(a) * 0.3, h, tileHash(x, y, 31), 0.7);
+        if (t === "forest") {
+          // walkable cover: low hedge shrubs hugging the tile edges — a card still stands in the middle
+          const n = 3;
+          for (let i = 0; i < n; i++) {
+            const a = (i / n) * Math.PI * 2 + tileHash(x, y, 10 + i) * 0.8;
+            shrubs.push({ p: [x + Math.cos(a) * 0.36, h + 0.07, y + Math.sin(a) * 0.36], s: [1, 0.7 + tileHash(x, y, 20 + i) * 0.5, 1] });
+          }
         }
         if (PLAZA.includes(t)) {
           // kerbs: terracotta band along any side that meets non-plaza terrain (the FE plaza-border read)
@@ -119,24 +120,16 @@ export default function Scenery() {
             if (nt === "wall") nearWall = true;
             if (nt !== null && !PLAZA.includes(nt)) kerbs.push({ p: [x + dx * 0.44, h + 0.012, y + dz * 0.44], ry, rx: -Math.PI / 2 });
           }
-          // planter trees on quiet plaza tiles (never on objectives/shrines): the tree-lined square
-          if (t === "ground" && !nearWall && tileHash(x, y, 3) < 0.07) {
-            const cx = x + (tileHash(x, y, 12) < 0.5 ? -0.3 : 0.3);
-            const cz = y + (tileHash(x, y, 13) < 0.5 ? -0.3 : 0.3);
-            planters.push({ p: [cx, h + 0.08, cz] });
-            tree(cx, cz, h + 0.12, tileHash(x, y, 32), 0.75);
-          }
-          // crates + barrels stacked against walls
-          if (nearWall && tileHash(x, y, 4) < 0.45) {
-            const cx = x + (tileHash(x, y, 14) - 0.5) * 0.5;
-            const cz = y + (tileHash(x, y, 15) - 0.5) * 0.5;
+          // a few crates + barrels tucked against planters — sparse, low, never mid-tile
+          if (t === "ground" && nearWall && tileHash(x, y, 4) < 0.22) {
+            const cx = x + (tileHash(x, y, 14) < 0.5 ? -0.3 : 0.3);
+            const cz = y + (tileHash(x, y, 15) < 0.5 ? -0.3 : 0.3);
             crates.push({ p: [cx, h + 0.11, cz], ry: tileHash(x, y, 16) * 0.6 });
-            if (tileHash(x, y, 5) < 0.6) barrels.push({ p: [cx + 0.24, h + 0.12, cz - 0.1] });
-            if (tileHash(x, y, 6) < 0.3) crates.push({ p: [cx, h + 0.33, cz], ry: tileHash(x, y, 17) * 0.6, s: [0.85, 0.85, 0.85] });
+            if (tileHash(x, y, 5) < 0.5) barrels.push({ p: [cx + (cx > x ? -0.22 : 0.22), h + 0.12, cz], s: [0.9, 0.9, 0.9] });
           }
         }
       }
-    return { trunks, conesLo, conesHi, planters, crates, barrels, kerbs };
+    return { trunks, conesLo, conesHi, shrubs, crates, barrels, kerbs };
   }, [map]);
 
   // one draw call: every tile's outline at its own height
@@ -174,7 +167,7 @@ export default function Scenery() {
           <Instanced items={dressing.trunks} geo={TRUNK_GEO} mat={TRUNK_MAT} />
           <Instanced items={dressing.conesLo} geo={CONE_LO_GEO} mat={CONE_MAT} />
           <Instanced items={dressing.conesHi} geo={CONE_HI_GEO} mat={CONE_HI_MAT} />
-          <Instanced items={dressing.planters} geo={PLANTER_GEO} mat={PLANTER_MAT} />
+          <Instanced items={dressing.shrubs} geo={SHRUB_GEO} mat={SHRUB_MAT} />
           <Instanced items={dressing.crates} geo={CRATE_GEO} mat={CRATE_MAT} />
           <Instanced items={dressing.barrels} geo={BARREL_GEO} mat={BARREL_MAT} />
           <Instanced items={dressing.kerbs} geo={KERB_GEO} mat={KERB_MAT} castShadow={false} />
