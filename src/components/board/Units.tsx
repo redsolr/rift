@@ -8,8 +8,8 @@ import { tileHeight } from "@/sim/grid";
 import { UnitDef } from "@/sim/types";
 import { TIER, cardKey, renderCard, tierOf } from "../cards";
 import { CardAura, CardFoil } from "./CardFoil";
-import SelectionRing from "./SelectionRing";
-import { CARD_H3, CARD_W3, TEAM_COLOR, TEAM_GLOW, dragged } from "./shared";
+import SelectionRing, { HpArc } from "./SelectionRing";
+import { CARD_H3, CARD_W3, TEAM_GLOW, dragged } from "./shared";
 
 /** Billboarded FUT-style card. Texture is a cached canvas from cards.ts; `dim` marks an acted unit. */
 const textureCache = new Map<string, THREE.CanvasTexture>();
@@ -125,22 +125,8 @@ function Unit({ def }: { def: UnitDef }) {
         {selected ? <SelectionRing color={TEAM_GLOW[def.team]} strength={1} spin /> : hovered ? <SelectionRing color={TEAM_GLOW[def.team]} strength={0.4} spin={false} /> : null}
         {/* gold-tier aura: slow motes drifting up around the card base */}
         {!acted && tierOf(def) === "gold" && <CardAura color={TIER.gold.trim} seed={def.id.length + def.x * 7 + def.y * 13} />}
-        {/* HP bar */}
-        <group position={[0, CARD_H3 + 0.18, 0]}>
-          <mesh>
-            <planeGeometry args={[0.7, 0.09]} />
-            <meshBasicMaterial color="#111" side={THREE.DoubleSide} />
-          </mesh>
-          <mesh position={[-(0.7 * (1 - pct)) / 2, 0, 0.001]}>
-            <planeGeometry args={[0.7 * pct, 0.07]} />
-            <meshBasicMaterial color={pct > 0.5 ? "#6cf58a" : pct > 0.25 ? "#ffd54f" : "#ff5c5c"} side={THREE.DoubleSide} />
-          </mesh>
-        </group>
-        <Html position={[0, CARD_H3 + 0.36, 0]} center distanceFactor={12} zIndexRange={[1, 0]} style={{ pointerEvents: "none" }}>
-          <div className="unit-label" style={{ color: TEAM_COLOR[def.team] }}>
-            {def.name}
-          </div>
-        </Html>
+        {/* FE-style HP gauge: curved arc on the ground in front of the unit, always shown for both teams (the card carries the name) */}
+        <HpArc pct={pct} color={TEAM_GLOW[def.team]} />
         {myFloats.map((f) => (
           <Html key={f.key} position={[0, CARD_H3 + 0.5, 0]} center distanceFactor={12} zIndexRange={[1, 0]} style={{ pointerEvents: "none" }}>
             <div className="dmg-float" style={{ color: f.color }}>

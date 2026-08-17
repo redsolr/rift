@@ -80,7 +80,7 @@ export default function SelectionRing({ color, strength = 1, spin = true }: { co
       if (radar.current) radar.current.rotation.z = tt * 1.1;
     }
   });
-  const R = 0.56;
+  const R = 0.36; // well inside the tile (tile = 1.0); the HP arc sits just outside it
   return (
     <group ref={root} position={[0, 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]}>
       {/* soft glow ring */}
@@ -109,6 +109,37 @@ export default function SelectionRing({ color, strength = 1, spin = true }: { co
         <mesh ref={radar} position={[0, 0, 0.0005]}>
           <planeGeometry args={[R * 2.6, R * 2.6]} />
           <meshBasicMaterial map={sweep} color={color} transparent opacity={0.5 * strength} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+        </mesh>
+      )}
+    </group>
+  );
+}
+
+/**
+ * FE Three Hopes-style HP gauge: a curved arc on the ground in FRONT of the unit (toward the fixed camera, +z),
+ * team-coloured fill over a dark track, always visible for both teams. Local -y maps to world +z after the -π/2 tilt.
+ */
+export function HpArc({ pct, color }: { pct: number; color: string }) {
+  const span = Math.PI * 0.72; // ~130°
+  const start = -Math.PI / 2 - span / 2;
+  const fill = Math.max(0, Math.min(1, pct)) * span;
+  const low = pct <= 0.25;
+  return (
+    <group position={[0, 0.032, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <mesh>
+        <ringGeometry args={[0.42, 0.5, 40, 1, start - 0.03, span + 0.06]} />
+        <meshBasicMaterial color="#05070c" transparent opacity={0.85} depthWrite={false} />
+      </mesh>
+      {fill > 0 && (
+        <mesh position={[0, 0, 0.001]}>
+          <ringGeometry args={[0.435, 0.485, 40, 1, start, fill]} />
+          <meshBasicMaterial color={low ? "#ffb347" : color} depthWrite={false} toneMapped={false} />
+        </mesh>
+      )}
+      {fill > 0 && (
+        <mesh position={[0, 0, 0.002]}>
+          <ringGeometry args={[0.44, 0.48, 40, 1, start, fill]} />
+          <meshBasicMaterial color={low ? "#ffb347" : color} transparent opacity={0.55} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
         </mesh>
       )}
     </group>
