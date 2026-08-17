@@ -619,7 +619,10 @@ export const useGame = create<GameState>((set, get) => {
 
     // ---- editor: map library ----
     hydrateMaps: () => {
-      const lib = loadMaps();
+      const stored = loadMaps();
+      // the library entry named "default" ALWAYS carries the code's current default map — a stale localStorage copy
+      // (e.g. the pre-2026-08-18 river) must never resurrect terrain the code has since changed
+      const lib = { ...stored, maps: stored.maps.map((m) => (m.id === "default" ? { ...m, config: defaultConfig() } : m)) };
       const active = lib.maps.find((m) => m.id === lib.activeMapId) ?? null;
       const config = active?.config ?? get().config;
       stopTimer();

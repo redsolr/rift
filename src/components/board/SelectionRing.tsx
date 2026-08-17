@@ -115,44 +115,76 @@ export default function SelectionRing({ color, strength = 1, spin = true }: { co
   );
 }
 
+/** HP smile textures, cached per (colour, pct in 1/50 steps): a THIN tapered arc with a soft glow over a faint dark track. */
+const hpTexCache = new Map<string, THREE.CanvasTexture>();
+function hpTexture(color: string, pct: number): THREE.CanvasTexture | null {
+  if (typeof document === "undefined") return null;
+  const q = Math.round(Math.max(0, Math.min(1, pct)) * 50) / 50;
+  const key = `${color}|${q}`;
+  const hit = hpTexCache.get(key);
+  if (hit) return hit;
+  const W = 256;
+  const H = 128;
+  const c = document.createElement("canvas");
+  c.width = W;
+  c.height = H;
+  const ctx = c.getContext("2d")!;
+  const cx = W / 2;
+  const cy = -18; // circle centre above the canvas → only the bottom "smile" is visible
+  const R = 118;
+  const half = (Math.PI * 0.62) / 2; // ~112° smile
+  const a0 = Math.PI / 2 - half;
+  const a1 = Math.PI / 2 + half;
+  const seg = (from: number, to: number, w: number, style: string, blur = 0) => {
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, from, to);
+    ctx.lineWidth = w;
+    ctx.lineCap = "round";
+    ctx.strokeStyle = style;
+    ctx.shadowBlur = blur;
+    ctx.shadowColor = blur ? style : "transparent";
+    ctx.stroke();
+  };
+  // faint dark track
+  seg(a0, a1, 7, "rgba(0,0,0,0.45)");
+  if (q > 0) {
+    // fill grows from the LEFT end (screen-left when the camera looks down +z), tapered: thin at the ends, thickest mid
+    const fillTo = a0 + (a1 - a0) * q;
+    const n = 18;
+    for (let i = 0; i < n; i++) {
+      const t0 = a0 + ((fillTo - a0) * i) / n;
+      const t1 = a0 + ((fillTo - a0) * (i + 1)) / n + 0.01;
+      const mid = (i + 0.5) / n;
+      const along = a0 + (fillTo - a0) * mid; // position on the whole smile
+      const u = (along - a0) / (a1 - a0); // 0..1 across the full arc
+      const taper = Math.sin(u * Math.PI); // 0 at ends, 1 mid
+      const w = 3 + 4.5 * taper;
+      seg(t0, t1, w + 6, color, 14); // glow
+      seg(t0, t1, w, color, 0); // core
+      seg(t0, t1, Math.max(1, w * 0.35), "rgba(255,255,255,0.75)", 0); // bright spine
+    }
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  hpTexCache.set(key, tex);
+  return tex;
+}
+
 /**
- * FE Three Hopes-style HP gauge: a curved arc on the ground in FRONT of the unit (toward the fixed camera, +z),
- * team-coloured fill over a dark track, always visible for both teams. Local -y maps to world +z after the -π/2 tilt.
+ * FE Three Hopes-style HP gauge: a thin, glowing "smile" on the ground right under the unit's feet
+ * (toward the fixed camera, +z), team-coloured, always visible for both teams. Local -y maps to world +z after the -π/2 tilt.
  */
 export function HpArc({ pct, color }: { pct: number; color: string }) {
-  // FE Three Hopes read: a SHORT thick "smile" (~95°) right under the feet, glossy — dark track, bright fill,
-  // a lighter highlight along the outer edge and a soft additive glow. Not a long thin thread.
-  const span = Math.PI * 0.53;
-  const start = -Math.PI / 2 - span / 2;
-  const fill = Math.max(0, Math.min(1, pct)) * span;
   const low = pct <= 0.25;
   const c = low ? "#ffb347" : color;
-  const R0 = 0.4,
-    R1 = 0.52;
+  const tex = hpTexture(c, pct);
+  if (!tex) return null;
   return (
-    <group position={[0, 0.032, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+    <group position={[0, 0.03, 0.2]} rotation={[-Math.PI / 2, 0, 0]}>
       <mesh>
-        <ringGeometry args={[R0 - 0.015, R1 + 0.015, 40, 1, start - 0.04, span + 0.08]} />
-        <meshBasicMaterial color="#04060b" transparent opacity={0.9} depthWrite={false} />
+        <planeGeometry args={[0.72, 0.36]} />
+        <meshBasicMaterial map={tex} transparent depthWrite={false} toneMapped={false} />
       </mesh>
-      {fill > 0 && (
-        <>
-          <mesh position={[0, 0, 0.001]}>
-            <ringGeometry args={[R0, R1, 40, 1, start, fill]} />
-            <meshBasicMaterial color={c} depthWrite={false} toneMapped={false} />
-          </mesh>
-          {/* gloss highlight along the outer edge */}
-          <mesh position={[0, 0, 0.002]}>
-            <ringGeometry args={[R1 - 0.035, R1 - 0.008, 40, 1, start, fill]} />
-            <meshBasicMaterial color="#ffffff" transparent opacity={0.55} depthWrite={false} toneMapped={false} />
-          </mesh>
-          {/* soft glow */}
-          <mesh position={[0, 0, 0.0005]}>
-            <ringGeometry args={[R0 - 0.06, R1 + 0.06, 40, 1, start, fill]} />
-            <meshBasicMaterial color={c} transparent opacity={0.35} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
-          </mesh>
-        </>
-      )}
     </group>
   );
 }
