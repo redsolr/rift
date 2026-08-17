@@ -122,7 +122,8 @@ export function applyEvent(prev: PlaybackState, e: BattleEvent, cfg: BattleConfi
       v.units[e.attacker] = { ...a, actionSeq: a.actionSeq + 1, acted: true };
       v.units[e.target] = { ...t, hp: e.targetHp, hitSeq: t.hitSeq + 1 };
       floats.push({ key: ++floatKey, unit: e.target, text: `-${e.damage}`, color: "#ff5c5c" });
-      const style = effectStyleOf(cfg.units, e.attacker);
+      const s0 = effectStyleOf(cfg.units, e.attacker);
+      const style = s0 === "heal" ? "melee" : s0; // a healer swinging its staff is a melee hit
       const from = { x: a.x, y: a.y };
       const to = { x: t.x, y: t.y };
       const ranged = dist(a, t) > 1 || style === "magic";

@@ -52,7 +52,7 @@ export default function BattleBar() {
   const fc = useMemo(() => {
     if (!battle || !caughtUp || !left || !right) return null;
     if (!view.units[left.id]?.alive || !view.units[right.id]?.alive) return null;
-    if (left.archetype === "healer" || left.team === right.team) return null;
+    if (left.team === right.team) return null;
     return battle.forecast(left.id, right.id, pendingMove ?? undefined, pendingAttack ?? hoverAttack ?? undefined);
   }, [battle, caughtUp, left, right, pendingMove, pendingAttack, hoverAttack, view.units]);
 

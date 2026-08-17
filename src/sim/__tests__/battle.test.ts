@@ -263,6 +263,30 @@ describe("attacks (four per unit)", () => {
     expect(attacksOf(fighter).map((a) => a.id)).toContain("slash");
   });
 
+  it("every unit has at least one damaging attack; the healer heals allies and bashes enemies with the right kind", () => {
+    for (const a of ARCHETYPES) expect(ATTACKS[a].some((x) => x.kind === "attack")).toBe(true);
+    const cfg: BattleConfig = {
+      map: { width: 5, height: 1, tiles: Array(5).fill("ground") },
+      units: [makeUnit("blue", "healer", 1, 0), makeUnit("blue", "knight", 0, 0), makeUnit("red", "fighter", 2, 0)],
+      doctrine: { red: { aggression: "balanced", objective: "advance" }, blue: { aggression: "balanced", objective: "advance" } },
+      maxTurns: 10,
+      firstTeam: "blue",
+    };
+    const b = new Battle(cfg, 1);
+    const [healer, knight, fighter] = b.state.units;
+    knight.hp -= 10;
+    const at = { x: 1, y: 0 };
+    expect(b.bestAttack(healer.id, at, fighter.id)?.id).toBe("staff_bash");
+    expect(b.bestAttack(healer.id, at, knight.id)?.id).toBe("mend");
+    expect(b.targetsFrom(healer.id, at, undefined, "attack").map((u) => u.id)).toEqual([fighter.id]);
+    expect(b.targetsFrom(healer.id, at, undefined, "heal").map((u) => u.id)).toEqual([knight.id]);
+    // kind mismatch is refused; a real bash lands for max(1, 7 − 3 − 3)
+    expect(() => b.act({ kind: "attack", unit: healer.id, moveTo: at, target: fighter.id, attack: "heal" })).toThrow(/is a heal/);
+    b.act({ kind: "attack", unit: healer.id, moveTo: at, target: fighter.id, attack: "staff_bash" });
+    const hit = b.log.find((e) => e.type === "attack");
+    expect(hit && hit.type === "attack" && hit.damage).toBe(1);
+  });
+
   it("the AI names the attack it chose and its action carries a legal attack id", () => {
     const b = new Battle(defaultConfig(), 3);
     b.runToEnd();

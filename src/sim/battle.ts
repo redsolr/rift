@@ -1,5 +1,5 @@
 import { scoreActions } from "./ai";
-import { AttackDef, attackById, attackRange, attacksOf, attacksReaching, attackUsable, inAnyRange, tilesInAnyRange } from "./attacks";
+import { AttackDef, AttackKind, attackById, attackRange, attacksOf, attacksReaching, attackUsable, inAnyRange, tilesInAnyRange } from "./attacks";
 import { damage, healAmount } from "./combat";
 import { inRange, pathTo, posKey, reachable, standable, Reach } from "./grid";
 import { Rng } from "./rng";
@@ -78,25 +78,38 @@ export class Battle {
     return standable(this.reachFor(id), this.unit(id), this.state.units);
   }
 
-  /** Legal targets from `at`. With `attackId`: only that attack (movement condition applied); without: any usable attack. */
-  targetsFrom(id: string, at: Pos, attackId?: string): UnitState[] {
+  /** Who an attack of `kind` may target: enemies for damage, wounded allies for heals. */
+  private targetPool(u: UnitState, kind: AttackKind): UnitState[] {
+    return kind === "heal" ? this.alive(u.team).filter((a) => a.id !== u.id && a.hp < a.stats.hp) : this.alive(otherTeam(u.team));
+  }
+
+  /**
+   * Legal targets from `at`. With `attackId`: only that attack (movement condition applied).
+   * With `kind`: any usable attack of that kind. With neither: any usable attack of either kind.
+   */
+  targetsFrom(id: string, at: Pos, attackId?: string, kind?: AttackKind): UnitState[] {
     const u = this.unit(id);
     const moved = at.x !== u.x || at.y !== u.y;
-    const list = u.archetype === "healer" ? this.alive(u.team).filter((a) => a.id !== id && a.hp < a.stats.hp) : this.alive(otherTeam(u.team));
     if (attackId) {
       const a = attackById(u, attackId);
       if (!attackUsable(a, moved)) return [];
       const [lo, hi] = attackRange(u, a);
-      return list.filter((t) => inRange(at, t, lo, hi));
+      return this.targetPool(u, a.kind).filter((t) => inRange(at, t, lo, hi));
     }
-    return list.filter((t) => attacksReaching(u, at, moved, t).length > 0);
+    const kinds: AttackKind[] = kind ? [kind] : ["attack", "heal"];
+    const out: UnitState[] = [];
+    for (const k of kinds)
+      for (const t of this.targetPool(u, k)) if (attacksReaching(u, at, moved, t).some((a) => a.kind === k)) out.push(t);
+    return out;
   }
 
-  /** The unit's four attacks with, for standing on `at`, whether each is usable and which targets it reaches. */
-  attackOptions(id: string, at: Pos): { attack: AttackDef; usable: boolean; targets: string[] }[] {
+  /** The unit's attacks (optionally one kind) with, for standing on `at`, whether each is usable and which targets it reaches. */
+  attackOptions(id: string, at: Pos, kind?: AttackKind): { attack: AttackDef; usable: boolean; targets: string[] }[] {
     const u = this.unit(id);
     const moved = at.x !== u.x || at.y !== u.y;
-    return attacksOf(u).map((attack) => ({ attack, usable: attackUsable(attack, moved), targets: this.targetsFrom(id, at, attack.id).map((t) => t.id) }));
+    return attacksOf(u)
+      .filter((a) => !kind || a.kind === kind)
+      .map((attack) => ({ attack, usable: attackUsable(attack, moved), targets: this.targetsFrom(id, at, attack.id).map((t) => t.id) }));
   }
 
   /**
@@ -108,10 +121,11 @@ export class Battle {
     const u = this.unit(id);
     const t = this.unit(targetId);
     const moved = from.x !== u.x || from.y !== u.y;
+    const kind: AttackKind = t.team === u.team ? "heal" : "attack";
     let best: AttackDef | null = null;
     let bestVal = -1;
-    for (const a of attacksReaching(u, from, moved, t)) {
-      const v = u.archetype === "healer" ? healAmount(u, a) : damage(this.config.map, u, t, a);
+    for (const a of attacksReaching(u, from, moved, t).filter((x) => x.kind === kind)) {
+      const v = kind === "heal" ? healAmount(u, a) : damage(this.config.map, u, t, a);
       if (v > bestVal) {
         best = a;
         bestVal = v;
@@ -166,7 +180,7 @@ export class Battle {
     const moved = at.x !== a.x || at.y !== a.y;
     // the attack: the one asked for, else the best usable one that reaches, else the unit's first
     const chosen = attackId ? attackById(a, attackId) : this.bestAttack(attackerId, at, defenderId);
-    const atk = chosen ?? attacksOf(a)[0];
+    const atk = chosen ?? attacksOf(a).find((x) => x.kind === "attack") ?? attacksOf(a)[0];
     const [lo, hi] = attackRange(a, atk);
     const inRangeNow = attackUsable(atk, moved) && inRange(at, d, lo, hi);
     const dmg = damage(map, a, d, atk);
@@ -178,7 +192,7 @@ export class Battle {
       const probe: UnitState = { ...a, x: at.x, y: at.y };
       // the defender answers on ITS turn from where it stands — its best stationary-legal attack
       let best = 0;
-      for (const da of attacksReaching(d, d, false, at)) best = Math.max(best, damage(map, d, probe, da));
+      for (const da of attacksReaching(d, d, false, at)) if (da.kind === "attack") best = Math.max(best, damage(map, d, probe, da));
       if (best > 0) {
         retaliation = best;
         retaliationKill = retaliation >= a.hp;
@@ -210,6 +224,7 @@ export class Battle {
       if (action.kind === "attack" && (!t.alive || t.team === u.team)) throw new Error("bad target");
       if (action.kind === "heal" && (!t.alive || t.team !== u.team)) throw new Error("bad heal target");
       const atk = attackById(u, action.attack);
+      if (atk.kind !== action.kind) throw new Error(`${atk.name} is a ${atk.kind}, not a ${action.kind}`);
       if (!attackUsable(atk, moved)) throw new Error(`${atk.name} needs ${atk.cond === "moved" ? "a move first" : "to stand still"}`);
       if (!inRange(action.moveTo, t, ...attackRange(u, atk))) throw new Error("out of range");
       resolved = { t, atk };

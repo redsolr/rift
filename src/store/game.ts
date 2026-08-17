@@ -4,6 +4,7 @@ import { Battle, SimStats, runMany } from "@/sim/battle";
 import { Effect, Float, View, applyEvent, initialPlayback, initialView } from "./playback";
 export type { Effect, EffectStyle, Float, View, ViewUnit } from "./playback";
 import { DEFAULT_DOCTRINE, decodeConfig, defaultConfig, emptyMap, encodeConfig, makeUnit } from "@/sim/presets";
+import { AttackKind } from "@/sim/attacks";
 import {
   Action,
   Archetype,
@@ -89,6 +90,8 @@ interface GameState {
   pendingMove: Pos | null;
   /** which page of the in-board menu is open (null = no unit placed) */
   menuPage: MenuPage | null;
+  /** which picker is open / which kind the target step is for ("attack" enemies, "heal" allies) */
+  menuKind: AttackKind;
   /** attack chosen in the picker (target-select page); null = none yet */
   pendingAttack: string | null;
   /** attack row under the pointer in the picker — previews its range + forecast */
@@ -134,7 +137,7 @@ interface GameState {
   select: (id: string | null) => void;
   /** step back one menu page (target → picker → command → un-place); Esc and the Cancel/Back rows call this */
   cancelPending: () => void;
-  openAttacks: () => void;
+  openAttacks: (kind?: AttackKind) => void;
   chooseAttack: (id: string) => void;
   setHoverAttack: (id: string | null) => void;
   commitWait: () => void;
@@ -237,7 +240,14 @@ export const useGame = create<GameState>((set, get) => {
     schedule();
   };
 
-  const clearManual = () => set({ moveTiles: [], pendingMove: null, menuPage: null, pendingAttack: null, hoverAttack: null, targets: [] });
+  const clearManual = () => set({ moveTiles: [], pendingMove: null, menuPage: null, menuKind: "attack", pendingAttack: null, hoverAttack: null, targets: [] });
+
+  /** Place `id` on `p` (preview) and open the FE command menu there. */
+  const placeAndOpenMenu = (id: string, p: Pos) => {
+    const b = get().battle;
+    if (!b) return;
+    set({ selected: id, pendingMove: p, menuPage: "command", menuKind: "attack", pendingAttack: null, hoverAttack: null, targets: b.targetsFrom(id, p).map((u) => u.id) });
+  };
 
   /** Everything that resets when a battle starts, ends or the setup changes. */
   const resetPlayback = (cfg: BattleConfig, battle: Battle | null) => ({
@@ -293,6 +303,7 @@ export const useGame = create<GameState>((set, get) => {
     moveTiles: [],
     pendingMove: null,
     menuPage: null,
+    menuKind: "attack",
     pendingAttack: null,
     hoverAttack: null,
     targets: [],
@@ -408,7 +419,7 @@ export const useGame = create<GameState>((set, get) => {
       if (s.mode === "manual" && b && !b.state.ended && b.state.activeTeam === s.playerTeam && s.cursor >= s.events.length) {
         const u = b.unit(id);
         if (u.team === s.playerTeam && u.alive && !u.acted) {
-          set({ selected: id, moveTiles: b.standableFor(id), pendingMove: null, menuPage: null, pendingAttack: null, hoverAttack: null, targets: [] });
+          set({ selected: id, moveTiles: b.standableFor(id), pendingMove: null, menuPage: null, menuKind: "attack", pendingAttack: null, hoverAttack: null, targets: [] });
           return;
         }
       }
@@ -442,8 +453,7 @@ export const useGame = create<GameState>((set, get) => {
           return;
         }
         // FE: the unit previews on the tile and the command menu opens right away (Attack only if something is in reach)
-        const targets = s.battle.targetsFrom(s.selected, p).map((u) => u.id);
-        set({ pendingMove: p, menuPage: "command", pendingAttack: null, hoverAttack: null, targets });
+        placeAndOpenMenu(s.selected, p);
         return;
       }
       set({ selected: null });
@@ -452,16 +462,29 @@ export const useGame = create<GameState>((set, get) => {
 
     rightClickTile: (p) => {
       const s = get();
-      if (s.mode !== "manual" || !s.battle || !s.selected) return;
-      // enemy on the tile? treat as attack from the pending tile / current tile
-      const enemy = s.battle.alive().find((u) => u.x === p.x && u.y === p.y && u.id !== s.selected);
+      if (s.mode !== "manual" || !s.battle) return;
+      const b = s.battle;
+      const here = b.alive().find((u) => u.x === p.x && u.y === p.y);
+      // right-click on one of YOUR actable units (none / another selected, or itself): select it and open the
+      // command menu at its own tile at once — no left-click first
+      const yourTurn = !b.state.ended && b.state.activeTeam === s.playerTeam && s.cursor >= s.events.length;
+      if (here && yourTurn && here.team === s.playerTeam && !here.acted && (!s.selected || here.id === s.selected || !s.pendingMove || s.menuPage === "command")) {
+        if (s.selected !== here.id) set({ moveTiles: b.standableFor(here.id) });
+        placeAndOpenMenu(here.id, { x: here.x, y: here.y });
+        return;
+      }
+      if (!s.selected) return;
+      // target step: right-click on anything that is not a target = back (FE "B")
+      if (s.menuPage === "target" && !(here && s.targets.includes(here.id))) return get().cancelPending();
+      // enemy (or, for a heal, wounded ally) on the tile? treat as attack from the pending tile / current tile
+      const enemy = here && here.id !== s.selected && (here.team !== s.playerTeam || (s.pendingMove && s.targets.includes(here.id))) ? here : null;
       if (enemy) {
         if (s.pendingMove && s.targets.includes(enemy.id)) return get().commitTarget(enemy.id);
         // find any reachable tile from which the enemy is in range, prefer the current tile
         const u = s.battle.unit(s.selected);
         const from = [{ x: u.x, y: u.y }, ...s.moveTiles].find((t) => s.battle!.targetsFrom(u.id, t).some((x) => x.id === enemy.id));
         if (!from) return;
-        set({ pendingMove: from, menuPage: "command", pendingAttack: null, hoverAttack: null, targets: s.battle.targetsFrom(u.id, from).map((x) => x.id) });
+        placeAndOpenMenu(u.id, from);
         get().commitTarget(enemy.id);
         return;
       }
@@ -471,18 +494,19 @@ export const useGame = create<GameState>((set, get) => {
       const s = get();
       if (!s.selected || !s.battle) return;
       if (s.menuPage === "target" && s.pendingMove) {
-        set({ menuPage: "attacks", pendingAttack: null, hoverAttack: null, targets: s.battle.targetsFrom(s.selected, s.pendingMove).map((u) => u.id) });
+        set({ menuPage: "attacks", pendingAttack: null, hoverAttack: null, targets: s.battle.targetsFrom(s.selected, s.pendingMove, undefined, s.menuKind).map((u) => u.id) });
         return;
       }
-      if (s.menuPage === "attacks") {
-        set({ menuPage: "command", hoverAttack: null });
+      if (s.menuPage === "attacks" && s.pendingMove) {
+        set({ menuPage: "command", menuKind: "attack", hoverAttack: null, targets: s.battle.targetsFrom(s.selected, s.pendingMove).map((u) => u.id) });
         return;
       }
-      set({ pendingMove: null, menuPage: null, pendingAttack: null, hoverAttack: null, targets: [], moveTiles: s.battle.standableFor(s.selected) });
+      set({ pendingMove: null, menuPage: null, menuKind: "attack", pendingAttack: null, hoverAttack: null, targets: [], moveTiles: s.battle.standableFor(s.selected) });
     },
-    openAttacks: () => {
+    openAttacks: (kind = "attack") => {
       const s = get();
-      if (s.pendingMove && s.menuPage === "command") set({ menuPage: "attacks", hoverAttack: null });
+      if (s.battle && s.selected && s.pendingMove && s.menuPage === "command")
+        set({ menuPage: "attacks", menuKind: kind, hoverAttack: null, targets: s.battle.targetsFrom(s.selected, s.pendingMove, undefined, kind).map((u) => u.id) });
     },
     chooseAttack: (id) => {
       const s = get();
@@ -504,7 +528,7 @@ export const useGame = create<GameState>((set, get) => {
       const s = get();
       if (!s.battle || !s.selected || !s.pendingMove) return;
       const u = s.battle.unit(s.selected);
-      const kind = u.archetype === "healer" && s.battle.unit(id).team === u.team ? "heal" : "attack";
+      const kind = s.battle.unit(id).team === u.team ? "heal" : "attack";
       const attack = s.pendingAttack ?? s.battle.bestAttack(u.id, s.pendingMove, id)?.id;
       if (!attack) return;
       commit({ kind, unit: u.id, moveTo: s.pendingMove, target: id, attack });

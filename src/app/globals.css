@@ -871,19 +871,20 @@ button.danger {
 /* ---- in-board command menu (FE Three Hopes: dark smoke panel to the RIGHT of the unit) ---- */
 .action-menu-wrap {
   position: relative;
-  padding: 10px 14px;
+  padding: 14px 18px;
 }
+/* FE ink cloud: soft blobs, displaced by turbulence for the ragged edge, blurred so it FADES out — never a hard block */
 .action-smoke {
   position: absolute;
-  inset: -18px -26px;
+  inset: -34px -48px;
   pointer-events: none;
   z-index: -1;
   background:
-    radial-gradient(60% 55% at 15% 20%, rgba(4, 5, 9, 0.98) 0 40%, rgba(4, 5, 9, 0) 72%),
-    radial-gradient(55% 60% at 85% 25%, rgba(4, 5, 9, 0.98) 0 40%, rgba(4, 5, 9, 0) 72%),
-    radial-gradient(60% 55% at 20% 85%, rgba(4, 5, 9, 0.98) 0 40%, rgba(4, 5, 9, 0) 72%),
-    radial-gradient(60% 60% at 82% 80%, rgba(4, 5, 9, 0.98) 0 40%, rgba(4, 5, 9, 0) 72%),
-    radial-gradient(70% 70% at 50% 50%, rgba(4, 5, 9, 1) 0 55%, rgba(4, 5, 9, 0) 85%);
+    radial-gradient(55% 50% at 18% 22%, rgba(4, 5, 9, 0.9) 0 30%, rgba(4, 5, 9, 0) 70%),
+    radial-gradient(50% 55% at 84% 26%, rgba(4, 5, 9, 0.9) 0 30%, rgba(4, 5, 9, 0) 70%),
+    radial-gradient(55% 50% at 22% 82%, rgba(4, 5, 9, 0.9) 0 30%, rgba(4, 5, 9, 0) 70%),
+    radial-gradient(55% 55% at 80% 80%, rgba(4, 5, 9, 0.9) 0 30%, rgba(4, 5, 9, 0) 70%),
+    radial-gradient(62% 62% at 50% 50%, rgba(4, 5, 9, 0.96) 0 44%, rgba(4, 5, 9, 0) 76%);
   filter: url(#tact-ink);
 }
 .action-menu {
@@ -895,7 +896,7 @@ button.danger {
   padding: 14px 18px 12px 26px;
   color: #f4efe4;
   font-family: Georgia, "Times New Roman", serif;
-  background: rgba(6, 8, 13, 0.92);
+  background: rgba(6, 8, 13, 0.55);
   white-space: nowrap;
   user-select: none;
 }
@@ -1026,6 +1027,43 @@ button.danger {
   font-weight: 800;
 }
 
+
+/* ---- FE target-step prompt, centred on the board ---- */
+.attack-prompt {
+  position: absolute;
+  left: 50%;
+  top: 18%;
+  transform: translateX(-50%);
+  z-index: 4;
+  pointer-events: none;
+  text-align: center;
+  font-family: Georgia, "Times New Roman", serif;
+  color: #fff;
+}
+.ap-main {
+  display: inline-block;
+  padding: 8px 34px;
+  font-size: 22px;
+  letter-spacing: 0.04em;
+  background: linear-gradient(90deg, rgba(8, 10, 16, 0) 0%, rgba(8, 10, 16, 0.85) 18%, rgba(8, 10, 16, 0.85) 82%, rgba(8, 10, 16, 0) 100%);
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8);
+}
+.ap-key {
+  color: #f2c96b;
+  margin-right: 6px;
+}
+.ap-sub {
+  margin-left: 14px;
+  font-size: 14px;
+  color: #d9d2c2;
+}
+.ap-cancel {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #b9b2a3;
+  font-family: var(--font-sans, system-ui, sans-serif);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+}
 
 /* ---- turn controls (bottom-right of the board, above the battle bar) ---- */
 .turn-controls {

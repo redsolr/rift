@@ -1,4 +1,4 @@
-import { AttackDef, attacksReaching } from "./attacks";
+import { AttackDef, AttackKind, attacksReaching } from "./attacks";
 import { damage, defenseAt, healAmount } from "./combat";
 import { dist, reachable, standable, threatCount } from "./grid";
 import { Rng } from "./rng";
@@ -103,10 +103,11 @@ export function scoreActions(ctx: AiContext, unit: UnitState): ScoredAction[] {
   };
 
   /** Best usable attack from tile `t` against `target` by raw value (damage or heal); ties → table order. */
-  const pick = (t: Pos, target: UnitState, value: (a: AttackDef) => number): { attack: AttackDef; value: number } | null => {
+  const pick = (t: Pos, target: UnitState, kind: AttackKind, value: (a: AttackDef) => number): { attack: AttackDef; value: number } | null => {
     const moved = t.x !== start.x || t.y !== start.y;
     let best: { attack: AttackDef; value: number } | null = null;
     for (const a of attacksReaching(unit, t, moved, target)) {
+      if (a.kind !== kind) continue;
       const v = value(a);
       if (!best || v > best.value) best = { attack: a, value: v };
     }
@@ -116,7 +117,7 @@ export function scoreActions(ctx: AiContext, unit: UnitState): ScoredAction[] {
   for (const t of tiles) {
     // ---- attacks ----
     for (const e of enemies) {
-      const choice = pick(t, e, (a) => damage(map, unit, e, a));
+      const choice = pick(t, e, "attack", (a) => damage(map, unit, e, a));
       if (!choice) continue;
       const dmg = choice.value;
       const kill = dmg >= e.hp;
@@ -143,18 +144,18 @@ export function scoreActions(ctx: AiContext, unit: UnitState): ScoredAction[] {
       if (chase && !o.noPursue) terms.push({ label: "Pursue wounded", value: Math.round(p.aggression / 4) });
       if (retreating) terms.push({ label: "Retreating", value: -Math.round(45 * adh) });
       // counter-attack risk: a target that can hit back from where it stands (its best attack)
-      const counterDmg = attacksReaching(e, e, false, t).reduce((m, a) => Math.max(m, damage(map, e, unit, a)), 0);
+      const counterDmg = attacksReaching(e, e, false, t).reduce((m, a) => (a.kind === "attack" ? Math.max(m, damage(map, e, unit, a)) : m), 0);
       if (counterDmg > 0 && thinks) terms.push({ label: "Counter risk", value: -Math.round(counterDmg * 1.5 * ((100 - p.courage) / 100 + 0.3)) });
       positional(t, terms);
       const action: Action = { kind: "attack", unit: unit.id, moveTo: t, target: e.id, attack: choice.attack.id };
       out.push({ action, label: `${choice.attack.name} → ${e.name}${kill ? " (kill)" : ""}`, score: 0, terms });
     }
-    // ---- heals ----
-    if (unit.archetype === "healer") {
+    // ---- heals (any unit that owns a heal-kind attack) ----
+    {
       for (const a of allies) {
         if (a.hp >= a.stats.hp) continue;
         const missing = a.stats.hp - a.hp;
-        const choice = pick(t, a, (x) => Math.min(missing, healAmount(unit, x)));
+        const choice = pick(t, a, "heal", (x) => Math.min(missing, healAmount(unit, x)));
         if (!choice) continue;
         const amt = choice.value;
         const terms: ScoreTerm[] = [];

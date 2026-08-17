@@ -6,13 +6,17 @@ import { Archetype, MapDef, Pos, UnitState } from "./types";
  * spirit). Deterministic, integer, no accuracy yet: an attack changes the POWER
  * (flat bonus/malus on atk), the RANGE (null = the unit's own weapon range) and may
  * carry a CONDITION on movement — `stationary` (may not have moved this turn) or
- * `moved` (must have moved). Healers' four are heals: power adds to the heal amount.
+ * `moved` (must have moved). Each attack has a KIND: damage an enemy or heal an ally — the
+ * healer owns three heals and one weak attack; every unit has at least one attack.
  */
 export type AttackCondition = "none" | "stationary" | "moved";
+/** what the attack does: damage an enemy or heal an ally */
+export type AttackKind = "attack" | "heal";
 
 export interface AttackDef {
   id: string;
   name: string;
+  kind: AttackKind;
   /** flat modifier on the unit's atk (damage or heal amount) */
   power: number;
   /** [min, max] or null = the unit's own weapon range */
@@ -22,7 +26,8 @@ export interface AttackDef {
   hint: string;
 }
 
-const A = (id: string, name: string, power: number, range: [number, number] | null, cond: AttackCondition, hint: string): AttackDef => ({ id, name, power, range, cond, hint });
+const A = (id: string, name: string, power: number, range: [number, number] | null, cond: AttackCondition, hint: string): AttackDef => ({ id, name, kind: "attack", power, range, cond, hint });
+const H = (id: string, name: string, power: number, range: [number, number] | null, cond: AttackCondition, hint: string): AttackDef => ({ id, name, kind: "heal", power, range, cond, hint });
 
 export const ATTACKS: Record<Archetype, AttackDef[]> = {
   knight: [
@@ -49,11 +54,12 @@ export const ATTACKS: Record<Archetype, AttackDef[]> = {
     A("blaze", "Blaze", 3, null, "stationary", "Channelled — only without moving."),
     A("flare", "Flare", 1, null, "moved", "Cast on the move — only after moving."),
   ],
+  // every unit has at least one attack — the healer's is weak and adjacent-only
   healer: [
-    A("heal", "Heal", 0, null, "none", "Standard heal, range 1–2."),
-    A("far_heal", "Far Heal", -2, [1, 3], "none", "Reaches three tiles. Smaller."),
-    A("mend", "Mend", 3, [1, 1], "stationary", "Adjacent, without moving. Bigger."),
-    A("quick_heal", "Quick Heal", 1, null, "moved", "Heal on the move — only after moving."),
+    H("heal", "Heal", 0, null, "none", "Standard heal, range 1–2."),
+    H("far_heal", "Far Heal", -2, [1, 3], "none", "Reaches three tiles. Smaller."),
+    H("mend", "Mend", 3, [1, 1], "stationary", "Adjacent, without moving. Bigger."),
+    A("staff_bash", "Staff Bash", -3, [1, 1], "none", "A desperate swing. Weak, adjacent."),
   ],
 };
 
@@ -85,11 +91,11 @@ export function attacksReaching(u: UnitState, from: Pos, moved: boolean, target:
   });
 }
 
-/** Every tile any of the unit's attacks could reach from `from` (movement condition ignored — this is the threat primitive). */
-export function tilesInAnyRange(map: MapDef, u: UnitState, from: Pos): Pos[] {
+/** Every tile any of the unit's damaging attacks could reach from `from` (movement condition ignored — this is the threat primitive). */
+export function tilesInAnyRange(map: MapDef, u: UnitState, from: Pos, kind: AttackKind = "attack"): Pos[] {
   const seen = new Set<string>();
   const out: Pos[] = [];
-  for (const a of attacksOf(u))
+  for (const a of attacksOf(u).filter((x) => x.kind === kind))
     for (const p of tilesInRange(map, from, ...attackRange(u, a))) {
       const k = posKey(p);
       if (seen.has(k)) continue;
@@ -99,7 +105,7 @@ export function tilesInAnyRange(map: MapDef, u: UnitState, from: Pos): Pos[] {
   return out;
 }
 
-/** True if any attack (movement condition ignored) reaches `to` from `from`. */
+/** True if any damaging attack (movement condition ignored) reaches `to` from `from`. */
 export function inAnyRange(u: UnitState, from: Pos, to: Pos) {
-  return attacksOf(u).some((a) => inRange(from, to, ...attackRange(u, a)));
+  return attacksOf(u).some((a) => a.kind === "attack" && inRange(from, to, ...attackRange(u, a)));
 }

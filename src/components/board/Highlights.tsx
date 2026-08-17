@@ -50,6 +50,8 @@ export default function Highlights() {
   const targets = useGame((s) => s.targets);
   const pendingAttack = useGame((s) => s.pendingAttack);
   const hoverAttack = useGame((s) => s.hoverAttack);
+  const menuKind = useGame((s) => s.menuKind);
+  const menuPage = useGame((s) => s.menuPage);
   const hover = useGame((s) => s.hover);
   const selected = useGame((s) => s.selected);
   const view = useGame((s) => s.view);
@@ -106,11 +108,13 @@ export default function Highlights() {
   const attackOrigin = useMemo(() => previewFrom ?? (sel && sel.alive && mine ? { x: sel.x, y: sel.y } : null), [previewFrom, sel, mine]);
   // attack range from the pending / hovered tile: the chosen (or hovered) attack's range, else the union of all four
   const focusAttack = pendingAttack ?? hoverAttack;
+  // healing range (green) when a heal is focused / the Heal picker is open / a healer idles; else damage range
+  const healing = selDef ? (focusAttack ? attackById(selDef, focusAttack).kind === "heal" : menuPage && menuPage !== "command" ? menuKind === "heal" : selDef.archetype === "healer") : false;
   const pendingRange = useMemo(() => {
     if (!attackOrigin || !selDef) return [];
     if (focusAttack) return tilesInRange(config.map, attackOrigin, ...attackRange(selDef, attackById(selDef, focusAttack)));
-    return tilesInAnyRange(config.map, { ...selDef, hp: 0, alive: true, acted: false }, attackOrigin);
-  }, [attackOrigin, selDef, focusAttack, config.map]);
+    return tilesInAnyRange(config.map, { ...selDef, hp: 0, alive: true, acted: false }, attackOrigin, healing ? "heal" : "attack");
+  }, [attackOrigin, selDef, focusAttack, healing, config.map]);
   // movement path to the previewed tile
   const path = useMemo(() => {
     if (!previewFrom || !selected || !battle || !caughtUp) return null;
@@ -133,11 +137,11 @@ export default function Highlights() {
         <Highlight key={`m${p.x},${p.y}`} x={p.x} y={p.y} color={mine ? "#3d8bff" : "#ff5a5a"} opacity={mine ? 0.55 : 0.32} border={mine ? "#dcecff" : undefined} borderOpacity={0.35} />
       ))}
       {pendingRange.map((p) => (
-        <Highlight key={`q${p.x},${p.y}`} x={p.x} y={p.y} color={selDef?.archetype === "healer" ? "#6cf58a" : "#e26bd0"} opacity={0.5} border={selDef?.archetype === "healer" ? "#9cffb0" : "#ff8a3c"} borderOpacity={0.9} lift={0.03} />
+        <Highlight key={`q${p.x},${p.y}`} x={p.x} y={p.y} color={healing ? "#6cf58a" : "#e26bd0"} opacity={0.5} border={healing ? "#9cffb0" : "#ff8a3c"} borderOpacity={0.9} lift={0.03} />
       ))}
       {targets.map((id) => {
         const u = view.units[id];
-        return u ? <Highlight key={`t${id}`} x={u.x} y={u.y} color="#ff4040" opacity={0.6} /> : null;
+        return u ? <Highlight key={`t${id}`} x={u.x} y={u.y} color={selDef && config.units.find((q) => q.id === id)?.team === selDef.team ? "#3ddc6a" : "#ff4040"} opacity={0.6} /> : null;
       })}
       {previewFrom && <Highlight x={previewFrom.x} y={previewFrom.y} color="#ffd54f" opacity={0.7} />}
       {focusEnemy && <FocusTile x={focusEnemy.x} y={focusEnemy.y} color={selected && targets.includes(hoverUnit!) ? "#ffe082" : "#ff6a6a"} />}
