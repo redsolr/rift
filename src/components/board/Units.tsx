@@ -86,7 +86,15 @@ function Unit({ def }: { def: UnitDef }) {
   // of it (y + 1, one step toward the camera) fades so the pointed-at tile/unit stays readable. Nothing else fades.
   // groundHover = the pointer measured against the ground, ignoring cards — so pointing at the upper part of a card
   // (which visually covers the tile behind it) counts as pointing at that tile, and this card steps aside.
-  const cutaway = useGame((s) => !!s.groundHover && s.groundHover.x === vx && s.groundHover.y === vy - 1);
+  // …and only when there is actually someone on that tile to obscure — an empty tile behind never fades anything.
+  const cutaway = useGame((s) => {
+    const gh = s.groundHover;
+    if (!gh || gh.x !== vx || gh.y !== vy - 1) return false;
+    return s.config.units.some((u) => {
+      const v = s.view.units[u.id];
+      return u.id !== def.id && v && v.alive && v.x === gh.x && v.y === gh.y;
+    });
+  });
   const actionSeq = vu?.actionSeq ?? 0;
   const hitSeq = vu?.hitSeq ?? 0;
   const th = tileHeight(map, { x: vx, y: vy });
