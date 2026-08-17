@@ -13,7 +13,7 @@ import { Pos } from "@/sim/types";
  * with a bright pulse that travels along it toward the target and a breathing glow at the tip. No dashes,
  * no arrowhead. Threat arcs are thin red; the target arc is gold and a little bolder.
  */
-function Arc({ from, to, color, width = 2 }: { from: Pos; to: Pos; color: string; width?: number }) {
+function Arc({ from, to, color, hot, width = 2 }: { from: Pos; to: Pos; color: string; hot: string; width?: number }) {
   const map = useGame((s) => s.config.map);
   const glowA = useRef<Line2>(null);
   const glowB = useRef<Line2>(null);
@@ -63,7 +63,7 @@ function Arc({ from, to, color, width = 2 }: { from: Pos; to: Pos; color: string
         pulseTrail.current.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), p.clone().sub(back).normalize());
         // fade in over the first 10 %, out over the last 10 %
         const fade = Math.min(1, k / 0.1, (1 - k) / 0.1);
-        (pulse.current.material as THREE.MeshBasicMaterial).opacity = 0.95 * fade;
+        (pulse.current.material as THREE.MeshBasicMaterial).opacity = 0.9 * fade;
         (pulseTrail.current.material as THREE.MeshBasicMaterial).opacity = 0.55 * fade;
       }
     }
@@ -77,24 +77,24 @@ function Arc({ from, to, color, width = 2 }: { from: Pos; to: Pos; color: string
       <Line ref={glowA} points={pts} color={color} lineWidth={width * 7} transparent opacity={0.10} depthTest={false} />
       <Line ref={glowB} points={pts} color={color} lineWidth={width * 3} transparent opacity={0.28} depthTest={false} />
       <Line points={pts} color={color} lineWidth={width * 1.25} transparent opacity={0.95} depthTest={false} />
-      <Line ref={spine} points={pts} color="#ffffff" lineWidth={Math.max(0.6, width * 0.45)} transparent opacity={0.9} depthTest={false} />
+      <Line ref={spine} points={pts} color={hot} lineWidth={Math.max(0.5, width * 0.4)} transparent opacity={0.7} depthTest={false} />
       {/* travelling pulse + comet trail */}
       <mesh ref={pulse}>
-        <sphereGeometry args={[0.07, 10, 8]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={0.95} depthTest={false} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+        <sphereGeometry args={[0.04, 10, 8]} />
+        <meshBasicMaterial color={hot} transparent opacity={0.95} depthTest={false} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
       </mesh>
       <mesh ref={pulseTrail}>
-        <cylinderGeometry args={[0.012, 0.05, 0.4, 6]} />
+        <cylinderGeometry args={[0.008, 0.032, 0.36, 6]} />
         <meshBasicMaterial color={color} transparent opacity={0.55} depthTest={false} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
       </mesh>
       {/* tip: white-hot bead + breathing coloured halo */}
       <mesh ref={tipGlow} position={end}>
-        <sphereGeometry args={[0.1, 12, 10]} />
-        <meshBasicMaterial color={color} transparent opacity={0.35} depthTest={false} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+        <sphereGeometry args={[0.07, 12, 10]} />
+        <meshBasicMaterial color={color} transparent opacity={0.4} depthTest={false} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
       </mesh>
       <mesh ref={tip} position={end}>
-        <sphereGeometry args={[0.075, 12, 10]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={0.95} depthTest={false} depthWrite={false} toneMapped={false} />
+        <sphereGeometry args={[0.045, 12, 10]} />
+        <meshBasicMaterial color={hot} transparent opacity={0.95} depthTest={false} depthWrite={false} toneMapped={false} />
       </mesh>
     </group>
   );
@@ -142,9 +142,9 @@ export default function Arcs() {
   return (
     <group>
       {data.threats.map((t) => (
-        <Arc key={t.id} from={t.from} to={data.at} color="#ff4a3a" width={1.8} />
+        <Arc key={t.id} from={t.from} to={data.at} color="#c41a12" hot="#ff6a55" width={1.8} />
       ))}
-      {data.target && <Arc from={data.at} to={data.target.to} color="#ffc247" width={2.8} />}
+      {data.target && <Arc from={data.at} to={data.target.to} color="#e0a020" hot="#fff0b8" width={2.6} />}
     </group>
   );
 }
