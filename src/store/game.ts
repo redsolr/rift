@@ -90,6 +90,9 @@ interface GameState {
   hover: Pos | null;
   hoverUnit: string | null;
   showDanger: boolean;
+  /** Camera focus request: where to glide the camera; zoom in/out/keep; seq bumps on every request. */
+  camFocus: { x: number; y: number; zoom: "in" | "out" | "keep"; seq: number };
+  followCam: boolean;
   // manual
   moveTiles: Pos[];
   pendingMove: Pos | null;
@@ -120,6 +123,9 @@ interface GameState {
   setHover: (p: Pos | null) => void;
   setHoverUnit: (id: string | null) => void;
   toggleDanger: () => void;
+  toggleFollow: () => void;
+  focusCam: (p: Pos, zoom?: "in" | "out" | "keep") => void;
+  overview: () => void;
   select: (id: string | null) => void;
   cancelPending: () => void;
   commitWait: () => void;
@@ -167,6 +173,7 @@ export const useGame = create<GameState>((set, get) => {
       return a === "archer" ? "arrow" : a === "mage" ? "magic" : a === "healer" ? "heal" : "melee";
     };
     let ms = EVENT_MS[e.type];
+    let focus: { x: number; y: number; zoom: "in" | "out" | "keep" } | null = null;
     switch (e.type) {
       case "turn_start":
         v.turn = e.turn;
@@ -179,11 +186,13 @@ export const useGame = create<GameState>((set, get) => {
         const end = e.path[e.path.length - 1];
         v.units[e.unit] = { ...v.units[e.unit], x: end.x, y: end.y };
         ms = 90 * Math.max(1, e.path.length - 1) + 120;
+        focus = { x: end.x, y: end.y, zoom: "in" };
         break;
       }
       case "attack": {
         const a = v.units[e.attacker];
         const t = v.units[e.target];
+        focus = { x: (a.x + t.x) / 2, y: (a.y + t.y) / 2, zoom: "in" };
         v.units[e.attacker] = { ...a, actionSeq: a.actionSeq + 1 };
         v.units[e.target] = { ...t, hp: e.targetHp, hitSeq: t.hitSeq + 1 };
         floats.push({ key: ++floatKey, unit: e.target, text: `-${e.damage}`, color: "#ff5c5c" });
@@ -202,6 +211,7 @@ export const useGame = create<GameState>((set, get) => {
       case "heal": {
         const h = v.units[e.healer];
         const t = v.units[e.target];
+        focus = { x: (h.x + t.x) / 2, y: (h.y + t.y) / 2, zoom: "in" };
         v.units[e.healer] = { ...h, actionSeq: h.actionSeq + 1 };
         v.units[e.target] = { ...t, hp: e.targetHp };
         floats.push({ key: ++floatKey, unit: e.target, text: `+${e.amount}`, color: "#6cf58a" });
@@ -215,11 +225,16 @@ export const useGame = create<GameState>((set, get) => {
       case "end":
         v.ended = true;
         v.winner = e.winner;
+        focus = { x: (s.config.map.width - 1) / 2, y: (s.config.map.height - 1) / 2, zoom: "out" };
         break;
-      case "wait":
+      case "wait": {
+        const w = v.units[e.unit];
+        focus = { x: w.x, y: w.y, zoom: "keep" };
         break;
+      }
     }
-    set({ view: v, cursor: s.cursor + 1, floats: floats.slice(-12), effects: effects.slice(-16) });
+    const camFocus = focus && s.followCam ? { ...focus, seq: s.camFocus.seq + 1 } : s.camFocus;
+    set({ view: v, cursor: s.cursor + 1, floats: floats.slice(-12), effects: effects.slice(-16), camFocus });
     return ms;
   };
 
@@ -240,6 +255,7 @@ export const useGame = create<GameState>((set, get) => {
   const afterCatchUp = () => {
     const s = get();
     if (!s.battle || s.battle.state.ended) return;
+    if (s.followCam && (s.mode !== "manual" || s.battle.state.activeTeam === s.playerTeam)) get().overview();
     if (s.mode === "manual" && s.battle.state.activeTeam !== s.playerTeam) {
       s.battle.runPhaseAI();
       sync();
@@ -277,6 +293,8 @@ export const useGame = create<GameState>((set, get) => {
     hover: null,
     hoverUnit: null,
     showDanger: true,
+    camFocus: { x: 0, y: 0, zoom: "out", seq: 0 },
+    followCam: true,
     moveTiles: [],
     pendingMove: null,
     targets: [],
@@ -343,6 +361,12 @@ export const useGame = create<GameState>((set, get) => {
     setHover: (hover) => set({ hover }),
     setHoverUnit: (hoverUnit) => set({ hoverUnit }),
     toggleDanger: () => set({ showDanger: !get().showDanger }),
+    toggleFollow: () => set({ followCam: !get().followCam }),
+    focusCam: (p, zoom = "keep") => set({ camFocus: { x: p.x, y: p.y, zoom, seq: get().camFocus.seq + 1 } }),
+    overview: () => {
+      const m = get().config.map;
+      set({ camFocus: { x: (m.width - 1) / 2, y: (m.height - 1) / 2, zoom: "out", seq: get().camFocus.seq + 1 } });
+    },
     select: (selected) => {
       if (selected && get().mode === "manual") return get().clickUnit(selected);
       set({ selected });
@@ -364,6 +388,7 @@ export const useGame = create<GameState>((set, get) => {
         const u = b.unit(id);
         if (u.team === s.playerTeam && u.alive && !u.acted) {
           set({ selected: id, moveTiles: b.standableFor(id), pendingMove: null, targets: [] });
+          if (s.followCam) get().focusCam({ x: u.x, y: u.y }, "keep");
           return;
         }
       }

@@ -740,6 +740,10 @@ button.danger {
   position: relative;
   display: flex;
 }
+.follow-toggle.on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
 .danger-toggle.on {
   border-color: #ff3b3b;
   color: #ff6a6a;

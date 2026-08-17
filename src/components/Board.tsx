@@ -372,7 +372,14 @@ function Units() {
 function CameraRig({ cx, cz, w, h }: { cx: number; cz: number; w: number; h: number }) {
   const camera = useThree((s) => s.camera);
   const size = useThree((s) => s.size);
-  const controls = useThree((s) => s.controls) as { target: THREE.Vector3; update: () => void } | null;
+  const controls = useThree((s) => s.controls) as (THREE.EventDispatcher<{ start: object }> & { target: THREE.Vector3; update: () => void }) | null;
+  const camFocus = useGame((s) => s.camFocus);
+  // fixed viewing direction (unit vector from target to camera) + overview distance, recomputed on resize
+  const dir = useRef(new THREE.Vector3(0, 1, 1).normalize());
+  const fitDist = useRef(20);
+  const goal = useRef<{ target: THREE.Vector3; dist: number } | null>(null);
+  const initialised = useRef(false);
+
   useEffect(() => {
     (window as unknown as { __cam?: unknown; __controls?: unknown }).__cam = camera;
     (window as unknown as { __cam?: unknown; __controls?: unknown }).__controls = controls;
@@ -383,26 +390,62 @@ function CameraRig({ cx, cz, w, h }: { cx: number; cz: number; w: number; h: num
     // A tall map on a wide screen is viewed SIDEWAYS (red on the left, blue on the right)
     // so the board fills the viewport; otherwise upright (red at the top).
     const sideways = aspect > 1.15 && h > w * 1.15;
-    const spanAcross = sideways ? h : w; // extent along the screen x axis
-    const spanDeep = sideways ? w : h; // extent along the screen y axis (foreshortened by tilt)
-    const tilt = aspect < 1 ? 1.08 : 0.95; // radians from horizontal
-    // The near edge sits (halfD·cos tilt) closer than the centre, so fit against it.
+    const spanAcross = sideways ? h : w;
+    const spanDeep = sideways ? w : h;
+    const tilt = aspect < 1 ? 1.08 : 0.95; // radians from horizontal — the FE-style fixed angle
     const halfA = (spanAcross / 2) * 1.1 + 0.5;
     const halfD = (spanDeep / 2) * 1.1 + 0.5;
     const nearOffset = halfD * Math.cos(tilt);
     const needW = halfA / Math.tan(hFov / 2) + nearOffset;
     const needH = (halfD * Math.max(Math.sin(tilt), 0.75)) / Math.tan(vFov / 2) + nearOffset;
-    const dist = Math.max(needH, needW, 8);
-    const tz = aspect < 1 ? cz + h * 0.09 : cz;
-    if (sideways) cam.position.set(cx - Math.cos(tilt) * dist, Math.sin(tilt) * dist, cz);
-    else cam.position.set(cx, Math.sin(tilt) * dist, tz + Math.cos(tilt) * dist);
-    cam.lookAt(cx, 0, sideways ? cz : tz);
-    cam.updateProjectionMatrix();
-    if (controls) {
-      controls.target.set(cx, 0, sideways ? cz : tz);
-      controls.update();
+    fitDist.current = Math.max(needH, needW, 8);
+    dir.current = sideways ? new THREE.Vector3(-Math.cos(tilt), Math.sin(tilt), 0) : new THREE.Vector3(0, Math.sin(tilt), Math.cos(tilt));
+    const target = new THREE.Vector3(cx, 0, aspect < 1 ? cz + h * 0.09 : cz);
+    // snap on first fit / resize; later focus requests glide
+    if (!initialised.current || !controls) {
+      cam.position.copy(target).addScaledVector(dir.current, fitDist.current);
+      cam.lookAt(target);
+      cam.updateProjectionMatrix();
+      if (controls) {
+        controls.target.copy(target);
+        controls.update();
+        initialised.current = true;
+      }
+    } else {
+      goal.current = { target, dist: fitDist.current };
     }
   }, [camera, controls, size.width, size.height, cx, cz, w, h]);
+
+  // focus requests from the store (acting unit, selection, overview)
+  useEffect(() => {
+    if (!controls || camFocus.seq === 0) return;
+    const curDist = camera.position.distanceTo(controls.target);
+    const dist = camFocus.zoom === "in" ? Math.min(curDist, fitDist.current * 0.55) : camFocus.zoom === "out" ? fitDist.current : curDist;
+    goal.current = { target: new THREE.Vector3(camFocus.x, 0, camFocus.y), dist };
+  }, [camFocus, controls, camera]);
+
+  // a user gesture cancels any in-flight glide so the camera never fights the hand
+  useEffect(() => {
+    if (!controls) return;
+    const cancel = () => {
+      goal.current = null;
+    };
+    controls.addEventListener("start", cancel);
+    return () => controls.removeEventListener("start", cancel);
+  }, [controls]);
+
+  useFrame((_, dt) => {
+    const g = goal.current;
+    if (!g || !controls) return;
+    const k = 1 - Math.exp(-dt * 6);
+    controls.target.lerp(g.target, k);
+    const curDist = camera.position.distanceTo(controls.target);
+    const dist = curDist + (g.dist - curDist) * k;
+    camera.position.copy(controls.target).addScaledVector(dir.current, dist);
+    camera.lookAt(controls.target);
+    controls.update();
+    if (controls.target.distanceTo(g.target) < 0.02 && Math.abs(dist - g.dist) < 0.02) goal.current = null;
+  });
   return null;
 }
 
@@ -432,14 +475,18 @@ export default function Board() {
           <Arcs />
           <Effects />
         </group>
+        {/* Fixed viewing angle (FE-style): no rotate. Desktop: wheel = zoom, right/middle drag = pan, left = select.
+            Phone: one finger = tap only, two fingers = pan + pinch zoom. The rig glides to whoever is acting. */}
         <OrbitControls
           target={[cx, 0, cz]}
-          minPolarAngle={0.2}
-          maxPolarAngle={1.25}
-          minDistance={6}
-          maxDistance={60}
+          enableRotate={false}
           enablePan
-          touches={{ ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE }}
+          enableZoom
+          minDistance={5}
+          maxDistance={80}
+          screenSpacePanning={false}
+          mouseButtons={{ LEFT: -1 as unknown as THREE.MOUSE, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.PAN }}
+          touches={{ ONE: -1 as unknown as THREE.TOUCH, TWO: THREE.TOUCH.DOLLY_PAN }}
           makeDefault
         />
       </Canvas>
