@@ -7,8 +7,10 @@ import Effects from "./Effects";
 import Tiles from "./board/Tiles";
 import Highlights from "./board/Highlights";
 import Units from "./board/Units";
+import Runes from "./board/Runes";
 import Arcs from "./board/Arcs";
 import ActionMenu from "./board/ActionMenu";
+import AttackBand from "./board/AttackBand";
 import CameraRig from "./board/CameraRig";
 
 export default function Board() {
@@ -33,8 +35,10 @@ export default function Board() {
         <group>
           <Tiles />
           <Highlights />
+          <Runes />
           <Units />
           <ActionMenu />
+          <AttackBand />
           <Arcs />
           <Effects />
         </group>

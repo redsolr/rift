@@ -6,7 +6,6 @@ import Panel from "@/components/Panel";
 import Drawer from "@/components/Drawer";
 import BattleBar from "@/components/BattleBar";
 import TurnControls from "@/components/TurnControls";
-import AttackPrompt from "@/components/AttackPrompt";
 import SkillPanel from "@/components/SkillPanel";
 import Minimap from "@/components/Minimap";
 import CameraWidget from "@/components/CameraWidget";
@@ -75,7 +74,6 @@ export default function Home() {
           </div>
           <BattleBar />
           <TurnControls />
-          <AttackPrompt />
           <SkillPanel />
           <PhaseBanner />
           {mobile && <div className="mobile-hint">{selectedName ?? hint}</div>}

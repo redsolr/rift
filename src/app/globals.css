@@ -1344,41 +1344,67 @@ button.danger {
   }
 }
 
-/* ---- FE target-step prompt, centred on the board ---- */
-.attack-prompt {
-  position: absolute;
-  left: 50%;
-  top: 18%;
-  transform: translateX(-50%);
-  z-index: 4;
-  pointer-events: none;
+/* ---- FE "A Attack" band under the acting unit (target step) ---- */
+.attack-band {
+  position: relative;
   text-align: center;
   font-family: Georgia, "Times New Roman", serif;
   color: #fff;
+  white-space: nowrap;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.7));
 }
-.ap-main {
-  display: inline-block;
-  padding: 8px 34px;
-  font-size: 22px;
+.ab-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 44px;
+  font-size: 24px;
   letter-spacing: 0.04em;
-  background: linear-gradient(90deg, rgba(8, 10, 16, 0) 0%, rgba(8, 10, 16, 0.85) 18%, rgba(8, 10, 16, 0.85) 82%, rgba(8, 10, 16, 0) 100%);
-  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8);
+  /* ink smear: solid centre, ragged fade at both ends */
+  background: linear-gradient(90deg, rgba(8, 10, 16, 0) 0%, rgba(8, 10, 16, 0.92) 16%, rgba(8, 10, 16, 0.92) 84%, rgba(8, 10, 16, 0) 100%);
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9);
 }
-.ap-key {
-  color: #f2c96b;
-  margin-right: 6px;
-}
-.ap-sub {
-  margin-left: 14px;
-  font-size: 14px;
-  color: #d9d2c2;
-}
-.ap-cancel {
-  margin-top: 4px;
-  font-size: 12px;
-  color: #b9b2a3;
+.ab-key {
+  display: inline-grid;
+  place-items: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  border-radius: 50%;
+  background: #f4efe4;
+  color: #111;
   font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 13px;
+  font-weight: 900;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.6), 0 0 10px rgba(242, 201, 107, 0.6);
+}
+.ab-skill {
+  color: #f2c96b;
+  font-size: 18px;
+}
+.ab-skill::before {
+  content: "· ";
+  color: #b9b2a3;
+}
+.ab-sub {
+  margin-top: 2px;
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 11px;
+  font-weight: 700;
+  color: #d9d2c2;
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+}
+.attack-band.armed .ab-main {
+  background: linear-gradient(90deg, rgba(120, 96, 40, 0) 0%, rgba(120, 96, 40, 0.95) 16%, rgba(120, 96, 40, 0.95) 84%, rgba(120, 96, 40, 0) 100%);
+  animation: ab-pulse 0.9s ease-in-out infinite;
+}
+.attack-band.armed .ab-sub {
+  color: #f2c96b;
+}
+@keyframes ab-pulse {
+  50% {
+    filter: brightness(1.25);
+  }
 }
 
 /* ---- turn controls (bottom-right of the board, above the battle bar) ---- */
