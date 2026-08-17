@@ -273,6 +273,7 @@ function buildPathGeometry(raw: THREE.Vector3[], W: number, headScale: number): 
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
   geo.setIndex(idx);
+  geo.setDrawRange(0, 0); // useFrame sets the real range before the first draw; never flash the full arrow
   return { geo, triEnd, total };
 }
 
@@ -283,27 +284,35 @@ function drawCountFor(g: PathGeo, len: number): number {
   return tris * 3;
 }
 
+/**
+ * Visible arrow length lives OUTSIDE the component: crossing from one tile to the next fires pointerOut (hover → null)
+ * before pointerOver, which unmounts PathLine for a frame — a per-instance ref would reset and the arrow would regrow
+ * from zero every tile (the "hiccup"). Only a real gap (> 0.25 s without an arrow) starts a fresh draw-on.
+ */
+const pathAnim = { shown: 0, lastSeen: -1 };
+
 function PathLine({ path }: { path: Pos[] }) {
   const map = useGame((s) => s.config.map);
   const core = useRef<THREE.Mesh>(null);
   const glow = useRef<THREE.Mesh>(null);
-  /** visible length along the path, in tiles — eases toward the current total */
-  const shown = useRef(0);
   const geos = useMemo(() => {
     if (path.length < 2) return null;
     const raw = path.map((p) => new THREE.Vector3(p.x, tileHeight(map, p) + 0.045, p.y));
     return { core: buildPathGeometry(raw, 0.06, 1), glow: buildPathGeometry(raw, 0.16, 1.35) };
   }, [path, map]);
-  useFrame((_, dt) => {
+  useFrame((state, dt) => {
     if (!geos) return;
+    const now = state.clock.elapsedTime;
+    if (pathAnim.lastSeen < 0 || now - pathAnim.lastSeen > 0.25) pathAnim.shown = 0;
+    pathAnim.lastSeen = now;
     const target = geos.core.total;
     // constant-speed extend / retract (tiles per second) — brisk and linear, so the tip visibly travels; snaps the last sliver
     const SPEED = 14;
     const step = SPEED * dt;
-    if (Math.abs(target - shown.current) <= step) shown.current = target;
-    else shown.current += Math.sign(target - shown.current) * step;
-    core.current?.geometry.setDrawRange(0, drawCountFor(geos.core, shown.current));
-    glow.current?.geometry.setDrawRange(0, drawCountFor(geos.glow, shown.current));
+    if (Math.abs(target - pathAnim.shown) <= step) pathAnim.shown = target;
+    else pathAnim.shown += Math.sign(target - pathAnim.shown) * step;
+    core.current?.geometry.setDrawRange(0, drawCountFor(geos.core, pathAnim.shown));
+    glow.current?.geometry.setDrawRange(0, drawCountFor(geos.glow, pathAnim.shown));
   });
   if (!geos) return null;
   return (
