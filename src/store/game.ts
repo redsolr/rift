@@ -144,6 +144,8 @@ interface GameState {
   /** attack/heal `id` with the chosen attack, else the best usable one from the pending tile */
   commitTarget: (id: string) => void;
   endPhaseAI: () => void;
+  /** END TURN: every one of your units that has not acted simply waits where it stands; the enemy phase follows */
+  endTurn: () => void;
   // manager
   executePhase: () => void;
   setPhaseLen: (n: number) => void;
@@ -436,7 +438,11 @@ export const useGame = create<GameState>((set, get) => {
           if (s.config.units.some((u) => u.x === p.x && u.y === p.y)) return;
           const cfg = s.config;
           const u = makeUnit(t.team, t.archetype, p.x, p.y);
-          u.id = `${t.team[0]}${t.archetype[0]}${Date.now().toString(36)}`;
+          // unique even when several units land in the same millisecond
+          const base = `${t.team[0]}${t.archetype[0]}${Date.now().toString(36)}`;
+          let id = base;
+          for (let n = 2; cfg.units.some((x) => x.id === id); n++) id = `${base}${n}`;
+          u.id = id;
           set({ config: { ...cfg, units: [...cfg.units, u] }, view: initialView({ ...cfg, units: [...cfg.units, u] }), selected: u.id });
           return;
         }
@@ -479,13 +485,16 @@ export const useGame = create<GameState>((set, get) => {
       // enemy (or, for a heal, wounded ally) on the tile? treat as attack from the pending tile / current tile
       const enemy = here && here.id !== s.selected && (here.team !== s.playerTeam || (s.pendingMove && s.targets.includes(here.id))) ? here : null;
       if (enemy) {
-        if (s.pendingMove && s.targets.includes(enemy.id)) return get().commitTarget(enemy.id);
-        // find any reachable tile from which the enemy is in range, prefer the current tile
+        // target step with this enemy legal → confirm
+        if (s.menuPage === "target" && s.pendingMove && s.targets.includes(enemy.id)) return get().commitTarget(enemy.id);
+        // otherwise: move to a tile the enemy can be hit from (prefer staying put) and open the picker for
+        // the right kind — the player still chooses the attack, FE-style
         const u = s.battle.unit(s.selected);
-        const from = [{ x: u.x, y: u.y }, ...s.moveTiles].find((t) => s.battle!.targetsFrom(u.id, t).some((x) => x.id === enemy.id));
+        const kind: AttackKind = enemy.team === u.team ? "heal" : "attack";
+        const from = [s.pendingMove, { x: u.x, y: u.y }, ...s.moveTiles].filter((t): t is Pos => !!t).find((t) => s.battle!.targetsFrom(u.id, t, undefined, kind).some((x) => x.id === enemy.id));
         if (!from) return;
         placeAndOpenMenu(u.id, from);
-        get().commitTarget(enemy.id);
+        get().openAttacks(kind);
         return;
       }
       if (s.moveTiles.some((m) => m.x === p.x && m.y === p.y)) get().clickTile(p);
@@ -534,6 +543,19 @@ export const useGame = create<GameState>((set, get) => {
       commit({ kind, unit: u.id, moveTo: s.pendingMove, target: id, attack });
     },
 
+    endTurn: () => {
+      const s = get();
+      const b = s.battle;
+      if (!b || b.state.ended || b.state.activeTeam !== s.playerTeam || s.cursor < s.events.length) return;
+      for (const u of b.pending()) {
+        if (b.state.ended || b.state.activeTeam !== s.playerTeam) break;
+        b.act({ kind: "wait", unit: u.id, moveTo: { x: u.x, y: u.y } });
+      }
+      sync();
+      set({ selected: null });
+      clearManual();
+      startPlayback();
+    },
     endPhaseAI: () => {
       const s = get();
       if (!s.battle) return;
