@@ -1,7 +1,7 @@
 "use client";
 import { ThreeEvent } from "@react-three/fiber";
 import { useMemo } from "react";
-import { useGame } from "@/store/game";
+import { isFeature, useGame } from "@/store/game";
 import { TERRAIN } from "@/sim/types";
 import { dragged } from "./shared";
 import { planterMaterials, sceneMaterial, tileHash } from "./textures";
@@ -14,6 +14,7 @@ export default function Tiles() {
   const painting = useGame((s) => s.painting);
   const setPainting = useGame((s) => s.setPainting);
   const paintTile = useGame((s) => s.paintTile);
+  const beginDragFeature = useGame((s) => s.beginDragFeature);
   const tool = useGame((s) => s.tool);
   const mode = useGame((s) => s.mode);
   const boardView = useGame((s) => s.boardView);
@@ -49,10 +50,15 @@ export default function Tiles() {
               if (!dragged()) rightClickTile({ x, y });
             }}
             onPointerDown={(e: ThreeEvent<PointerEvent>) => {
-              if (mode === "editor" && tool.kind === "terrain") {
+              if (mode !== "editor" || e.button !== 0) return;
+              if (tool.kind === "terrain") {
                 e.stopPropagation();
                 setPainting(true);
                 paintTile({ x, y });
+              } else if (tool.kind === "select" && isFeature(t)) {
+                // shrines / objectives are objects sitting on the tile — pick one up (RTS drag)
+                e.stopPropagation();
+                beginDragFeature({ x, y });
               }
             }}
             onPointerUp={() => setPainting(false)}

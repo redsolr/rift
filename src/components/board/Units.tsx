@@ -3,11 +3,12 @@ import { useFrame } from "@react-three/fiber";
 import { Billboard, Html } from "@react-three/drei";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
-import { useGame } from "@/store/game";
+import { selectDropTarget, useGame } from "@/store/game";
 import { tileHeight } from "@/sim/grid";
 import { UnitDef } from "@/sim/types";
 import { RUNES } from "@/sim/runes";
 import { TIER, cardKey, renderCard, tierOf } from "../cards";
+import { usePortraitsVersion } from "../portraits";
 import { CardAura, CardFoil } from "./CardFoil";
 import SelectionRing, { HpArc } from "./SelectionRing";
 import { CARD_H3, CARD_W3, TEAM_GLOW, dragged } from "./shared";
@@ -46,17 +47,24 @@ function cutawayAlphaMap() {
   return cutawayAlpha;
 }
 
-function CardMesh({ def, dim, selected, ghost, cutaway }: { def: UnitDef; dim: boolean; selected: boolean; ghost: boolean; cutaway: boolean }) {
-  const texture = useMemo(() => cardTexture(def), [def]);
+/**
+ * The billboarded card. `opacity` < 1 = ghosted (invisible unit, or an editor card being carried / previewed);
+ * `tint` colours the whole card (acted = grey; editor drop preview = green / red).
+ */
+export function CardMesh({ def, dim, selected, opacity = 1, tint, cutaway = false, lift = 0 }: { def: UnitDef; dim: boolean; selected: boolean; opacity?: number; tint?: string; cutaway?: boolean; lift?: number }) {
+  // portraits load async: the version tick re-keys the texture (cardKey reads portraitsKey()) so the glyph card swaps for the art card
+  const artVersion = usePortraitsVersion();
+  const texture = useMemo(() => cardTexture(def), [def, artVersion]);
   const foil = TIER[tierOf(def)].foil;
   // foil sweep: tier intensity, plus a hero boost when selected (even base-tier cards get the sweep then); acted units stay flat
   const boost = selected ? 0.5 : 0;
+  const ghost = opacity < 1;
   return (
-    <Billboard follow lockX={false} lockY={false} lockZ={false} position={[0, CARD_H3 / 2 + 0.05, 0]}>
+    <Billboard follow lockX={false} lockY={false} lockZ={false} position={[0, CARD_H3 / 2 + 0.05 + lift, 0]}>
       <mesh>
         <planeGeometry args={[CARD_W3, CARD_H3]} />
         {/* cutaway: the top of the card fades so the unit standing right behind stays readable (Sims roof-off) */}
-        <meshBasicMaterial key={cutaway ? "cut" : "full"} map={texture} alphaMap={cutaway ? cutawayAlphaMap() : null} transparent alphaTest={0.05} opacity={ghost ? 0.38 : 1} color={dim ? "#6a6a72" : "#ffffff"} toneMapped={false} depthWrite={!cutaway} />
+        <meshBasicMaterial key={cutaway ? "cut" : "full"} map={texture} alphaMap={cutaway ? cutawayAlphaMap() : null} transparent alphaTest={0.05} opacity={opacity} color={tint ?? (dim ? "#6a6a72" : "#ffffff")} toneMapped={false} depthWrite={!cutaway && !ghost} />
       </mesh>
       {!dim && !ghost && !cutaway && (foil > 0 || selected) && <CardFoil mask={texture} foil={foil} boost={boost} w={CARD_W3} h={CARD_H3} />}
     </Billboard>
@@ -67,6 +75,7 @@ function Unit({ def }: { def: UnitDef }) {
   const vu = useGame((s) => s.view.units[def.id]);
   const map = useGame((s) => s.config.map);
   const clickUnit = useGame((s) => s.clickUnit);
+  const beginDragUnit = useGame((s) => s.beginDragUnit);
   const rightClickTile = useGame((s) => s.rightClickTile);
   const setHoverUnit = useGame((s) => s.setHoverUnit);
   const selected = useGame((s) => s.selected === def.id);
@@ -80,8 +89,12 @@ function Unit({ def }: { def: UnitDef }) {
   const target = useRef(new THREE.Vector3(def.x, 0, def.y));
 
   const pending = useGame((s) => (s.selected === def.id ? s.pendingMove : null));
-  const vx = pending?.x ?? vu?.x ?? def.x;
-  const vy = pending?.y ?? vu?.y ?? def.y;
+  // editor drag: the carried card rides the pointer's ground tile (RTS pick-up), snapping tile to tile
+  const dragging = useGame((s) => s.drag?.kind === "unit" && s.drag.id === def.id);
+  const dragTo = useGame((s) => (s.drag?.kind === "unit" && s.drag.id === def.id ? s.groundHover : null));
+  const dropOk = useGame((s) => (s.drag?.kind === "unit" && s.drag.id === def.id ? selectDropTarget(s)?.ok ?? null : null));
+  const vx = dragTo?.x ?? pending?.x ?? vu?.x ?? def.x;
+  const vy = dragTo?.y ?? pending?.y ?? vu?.y ?? def.y;
   // Sims-style cutaway, tile rule: whatever tile the pointer is over, the card standing on the tile directly IN FRONT
   // of it (y + 1, one step toward the camera) fades so the pointed-at tile/unit stays readable. Nothing else fades.
   // groundHover = the pointer measured against the ground, ignoring cards — so pointing at the upper part of a card
@@ -112,7 +125,8 @@ function Unit({ def }: { def: UnitDef }) {
   useFrame((_, dt) => {
     const g = group.current;
     if (!g) return;
-    g.position.lerp(target.current, Math.min(1, dt * 10));
+    // a carried card snaps faster so it feels attached to the pointer
+    g.position.lerp(target.current, Math.min(1, dt * (dragging ? 22 : 10)));
     let dy = 0,
       dx = 0;
     if (bump.current > 0) {
@@ -139,6 +153,13 @@ function Unit({ def }: { def: UnitDef }) {
             e.stopPropagation();
             clickUnit(def.id);
           }}
+          onPointerDown={(e) => {
+            // editor: left button on a card picks it up (drop = pointer up on the board, Esc = cancel)
+            if (mode === "editor" && e.button === 0) {
+              e.stopPropagation();
+              beginDragUnit(def.id);
+            }
+          }}
           onContextMenu={(e) => {
             e.stopPropagation();
             e.nativeEvent.preventDefault();
@@ -150,7 +171,15 @@ function Unit({ def }: { def: UnitDef }) {
           }}
           onPointerOut={() => setHoverUnit(null)}
         >
-          <CardMesh def={def} dim={!!acted} selected={selected} ghost={vu.buff?.kind === "invisibility"} cutaway={cutaway} />
+          <CardMesh
+            def={def}
+            dim={!!acted}
+            selected={selected}
+            opacity={dragging ? 0.82 : vu.buff?.kind === "invisibility" ? 0.38 : 1}
+            tint={dragging ? (dropOk === false ? "#ff9a8c" : "#d8ffe4") : undefined}
+            cutaway={cutaway && !dragging}
+            lift={dragging ? 0.28 : 0}
+          />
           <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
             <circleGeometry args={[0.34, 20]} />
             <meshBasicMaterial color="#000" transparent opacity={0.35} />

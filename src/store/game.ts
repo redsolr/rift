@@ -17,8 +17,10 @@ import {
   Stats,
   Team,
   Terrain,
+  TERRAIN,
   UnitDef,
 } from "@/sim/types";
+import { idx, inBounds, terrainAt } from "@/sim/grid";
 
 export type Mode = "manual" | "manager" | "editor";
 /** Board dressing: "scene" = textured city map (grid only while a unit is selected); "tiles" = flat coloured blocks with gaps (debug). */
@@ -56,6 +58,19 @@ const persistMaps = (maps: SavedMap[], activeMapId: string | null) => {
 };
 const newMapId = () => `m${Date.now().toString(36)}${Math.floor(Math.random() * 1e4).toString(36)}`;
 export type Tool = { kind: "select" } | { kind: "terrain"; terrain: Terrain } | { kind: "unit"; team: Team; archetype: Archetype } | { kind: "erase" };
+/** Terrain kinds that behave as OBJECTS sitting on a tile in the editor (drag them; the tile they leave becomes ground). */
+export type Feature = "shrine" | "objective";
+export const FEATURES: readonly Feature[] = ["shrine", "objective"];
+export const isFeature = (t: Terrain): t is Feature => (FEATURES as readonly string[]).includes(t);
+/** An RTS-style editor drag in flight: a unit card or a tile feature being carried; the drop target = groundHover. */
+export type Drag = { kind: "unit"; id: string; from: Pos } | { kind: "feature"; terrain: Feature; from: Pos };
+/** Where the carried / palette object would land and whether it may (drives the RTS placement ghost). */
+export interface DropTarget {
+  pos: Pos;
+  ok: boolean;
+  /** why not — shown in the editor hint */
+  reason: string | null;
+}
 
 let timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -114,6 +129,8 @@ interface GameState {
   activeMapId: string | null;
   tool: Tool;
   painting: boolean;
+  /** editor drag in flight (unit card or tile feature riding the cursor); null = none */
+  drag: Drag | null;
   simStats: SimStats | null;
   simProgress: number | null;
   shareCode: string | null;
@@ -180,6 +197,15 @@ interface GameState {
   setTool: (t: Tool) => void;
   setPainting: (b: boolean) => void;
   paintTile: (p: Pos) => void;
+  /** editor: pick up a unit card (left button on the card) — it rides the cursor until endDrag */
+  beginDragUnit: (id: string) => void;
+  /** editor: pick up a tile feature (shrine / objective) with the select tool */
+  beginDragFeature: (p: Pos) => void;
+  /** drop whatever is carried on the current ground-hover tile (snaps back when the drop is illegal) */
+  endDrag: () => void;
+  cancelDrag: () => void;
+  /** move a shrine / objective to another tile; the tile it leaves becomes ground */
+  moveFeature: (from: Pos, to: Pos) => void;
   setUnitStats: (id: string, patch: Partial<Stats>) => void;
   setUnitField: (id: string, patch: Partial<Pick<UnitDef, "name" | "team" | "archetype">>) => void;
   moveUnitTo: (id: string, p: Pos) => void;
@@ -195,6 +221,41 @@ interface GameState {
 
 /** True when the renderer has replayed every engine event — the only moment input is accepted. */
 export const selectCaughtUp = (s: Pick<GameState, "cursor" | "events">) => s.cursor >= s.events.length;
+
+/**
+ * RTS placement ghost: where the carried object (drag) or the palette tool (unit / terrain) would land under the
+ * pointer, and whether that drop is legal. Keyed off groundHover (the pointer vs the GROUND, ignoring cards).
+ * null when nothing is being placed or the pointer is off the board.
+ */
+export function selectDropTarget(s: Pick<GameState, "mode" | "drag" | "tool" | "groundHover" | "config">): DropTarget | null {
+  if (s.mode !== "editor") return null;
+  const pos = s.groundHover;
+  if (!pos) return null;
+  const map = s.config.map;
+  if (!inBounds(map, pos.x, pos.y)) return null;
+  const terrain = terrainAt(map, pos.x, pos.y);
+  const occupant = s.config.units.find((u) => u.x === pos.x && u.y === pos.y) ?? null;
+  const impassable = TERRAIN[terrain].moveCost === null;
+  const d = s.drag;
+  if (d?.kind === "unit") {
+    if (occupant && occupant.id !== d.id) return { pos, ok: false, reason: `${occupant.name} is standing here` };
+    if (impassable) return { pos, ok: false, reason: `${TERRAIN[terrain].label} — impassable` };
+    return { pos, ok: true, reason: null };
+  }
+  if (d?.kind === "feature") {
+    if (pos.x === d.from.x && pos.y === d.from.y) return { pos, ok: true, reason: null };
+    if (isFeature(terrain)) return { pos, ok: false, reason: `${TERRAIN[terrain].label} is already here` };
+    if (impassable) return { pos, ok: false, reason: `${TERRAIN[terrain].label} cannot hold a ${TERRAIN[d.terrain].label.toLowerCase()}` };
+    return { pos, ok: true, reason: null };
+  }
+  if (s.tool.kind === "unit") {
+    if (occupant) return { pos, ok: false, reason: `${occupant.name} is standing here` };
+    if (impassable) return { pos, ok: false, reason: `${TERRAIN[terrain].label} — impassable` };
+    return { pos, ok: true, reason: null };
+  }
+  if (s.tool.kind === "terrain") return { pos, ok: terrain !== s.tool.terrain, reason: null };
+  return null;
+}
 
 export const useGame = create<GameState>((set, get) => {
   const stopTimer = () => {
@@ -327,13 +388,14 @@ export const useGame = create<GameState>((set, get) => {
     phaseLen: 3,
     tool: { kind: "select" },
     painting: false,
+    drag: null,
     simStats: null,
     simProgress: null,
     shareCode: null,
 
     setMode: (mode) => {
       stopTimer();
-      set({ mode, ...resetPlayback(get().config, null), tool: { kind: "select" } });
+      set({ mode, ...resetPlayback(get().config, null), tool: { kind: "select" }, drag: null });
       clearManual();
     },
 
@@ -460,7 +522,8 @@ export const useGame = create<GameState>((set, get) => {
         const t = s.tool;
         if (t.kind === "terrain") return get().paintTile(p);
         if (t.kind === "unit") {
-          if (s.config.units.some((u) => u.x === p.x && u.y === p.y)) return;
+          // same legality as the placement ghost: free tile, passable terrain
+          if (s.config.units.some((u) => u.x === p.x && u.y === p.y) || TERRAIN[terrainAt(s.config.map, p.x, p.y)].moveCost === null) return;
           const cfg = s.config;
           const u = makeUnit(t.team, t.archetype, p.x, p.y);
           // unique even when several units land in the same millisecond
@@ -472,7 +535,8 @@ export const useGame = create<GameState>((set, get) => {
           return;
         }
         if (t.kind === "select" && s.selected) {
-          if (!s.config.units.some((u) => u.x === p.x && u.y === p.y)) get().moveUnitTo(s.selected, p);
+          // click-to-move (keyboard-free alternative to dragging the card): same legality as the ghost
+          if (!s.config.units.some((u) => u.x === p.x && u.y === p.y) && TERRAIN[terrainAt(s.config.map, p.x, p.y)].moveCost !== null) get().moveUnitTo(s.selected, p);
           return;
         }
         return;
@@ -698,8 +762,46 @@ export const useGame = create<GameState>((set, get) => {
     },
 
     // ---- editor ----
-    setTool: (tool) => set({ tool }),
+    setTool: (tool) => set({ tool, drag: null }),
     setPainting: (painting) => set({ painting }),
+    beginDragUnit: (id) => {
+      const s = get();
+      if (s.mode !== "editor" || s.tool.kind === "erase") return;
+      const u = s.config.units.find((x) => x.id === id);
+      if (!u) return;
+      set({ drag: { kind: "unit", id, from: { x: u.x, y: u.y } }, selected: id, tool: { kind: "select" }, painting: false });
+    },
+    beginDragFeature: (p) => {
+      const s = get();
+      if (s.mode !== "editor" || s.tool.kind !== "select") return;
+      const t = terrainAt(s.config.map, p.x, p.y);
+      if (!isFeature(t)) return;
+      // picking up a shrine / objective is a new focus: drop the unit selection so its range paint doesn't bury the ghost
+      set({ drag: { kind: "feature", terrain: t, from: p }, painting: false, selected: null });
+    },
+    endDrag: () => {
+      const s = get();
+      const d = s.drag;
+      if (!d) return;
+      const t = selectDropTarget(s);
+      set({ drag: null });
+      if (!t || !t.ok) return;
+      if (d.kind === "unit") get().moveUnitTo(d.id, t.pos);
+      else get().moveFeature(d.from, t.pos);
+    },
+    cancelDrag: () => {
+      if (get().drag) set({ drag: null });
+    },
+    moveFeature: (from, to) => {
+      const s = get();
+      const map = s.config.map;
+      const t = terrainAt(map, from.x, from.y);
+      if (!isFeature(t) || (from.x === to.x && from.y === to.y)) return;
+      const tiles = [...map.tiles];
+      tiles[idx(map, from.x, from.y)] = "ground";
+      tiles[idx(map, to.x, to.y)] = t;
+      set({ config: { ...s.config, map: { ...map, tiles } } });
+    },
     paintTile: (p) => {
       const s = get();
       if (s.tool.kind !== "terrain") return;

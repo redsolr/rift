@@ -17,12 +17,13 @@ export function EditorTools() {
     <div>
       <div className="tool-row">
         <button className={`tool ${tool.kind === "select" ? "active" : ""}`} onClick={() => setTool({ kind: "select" })}>
-          Select / move
+          Select / drag
         </button>
         <button className={`tool ${tool.kind === "erase" ? "active" : ""}`} onClick={() => setTool({ kind: "erase" })}>
           Erase unit
         </button>
       </div>
+      <p className="muted">Drag any card, shrine or objective onto a tile — the ghost under the pointer shows green (drop) or red (blocked). Esc drops it back.</p>
       <div className="tool-label">Terrain (click-drag to paint)</div>
       <div className="tool-row wrap">
         {TERRAINS.map((t) => (

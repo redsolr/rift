@@ -2,12 +2,14 @@
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
-import { useGame } from "@/store/game";
+import { selectDropTarget, useGame } from "@/store/game";
+import { TERRAIN } from "@/sim/types";
 import Effects from "./Effects";
 import Tiles from "./board/Tiles";
 import Scenery from "./board/Scenery";
 import Highlights from "./board/Highlights";
 import Units from "./board/Units";
+import EditorGhost from "./board/EditorGhost";
 import Runes from "./board/Runes";
 import Arcs from "./board/Arcs";
 import ActionMenu from "./board/ActionMenu";
@@ -15,15 +17,46 @@ import GroundHover from "./board/GroundHover";
 import AttackBand from "./board/AttackBand";
 import CameraRig from "./board/CameraRig";
 
+/** Editor placement hint: what the pointer is carrying / about to place and whether the tile under it allows it. */
+function EditorHint() {
+  const text = useGame((s) => {
+    const t = selectDropTarget(s);
+    if (!t) return null;
+    const d = s.drag;
+    const what = d?.kind === "unit" ? (s.config.units.find((u) => u.id === d.id)?.name ?? "unit") : d?.kind === "feature" ? TERRAIN[d.terrain].label : s.tool.kind === "unit" ? `${s.tool.team} ${s.tool.archetype}` : s.tool.kind === "terrain" ? TERRAIN[s.tool.terrain].label : null;
+    if (!what) return null;
+    if (s.tool.kind === "terrain" && !d) return t.ok ? `Paint ${what} · click-drag` : null;
+    return t.ok ? `${d ? "Drop" : "Place"} ${what} at ${t.pos.x},${t.pos.y}` : `✕ ${t.reason ?? "cannot place here"}`;
+  });
+  const bad = useGame((s) => (selectDropTarget(s)?.ok ?? true) === false);
+  if (!text) return null;
+  return <div className={`editor-hint ${bad ? "bad" : ""}`}>{text}</div>;
+}
+
 export default function Board() {
   const map = useGame((s) => s.config.map);
   const setPainting = useGame((s) => s.setPainting);
+  const endDrag = useGame((s) => s.endDrag);
+  const cancelDrag = useGame((s) => s.cancelDrag);
+  const dragging = useGame((s) => s.drag !== null);
   const targeting = useGame((s) => s.menuPage === "target");
   const cx = (map.width - 1) / 2;
   const cz = (map.height - 1) / 2;
   const span = Math.max(map.width, map.height);
   return (
-    <div className={`board ${targeting ? "targeting" : ""}`} onPointerUp={() => setPainting(false)} onPointerLeave={() => setPainting(false)} onContextMenu={(e) => e.preventDefault()}>
+    <div
+      className={`board ${targeting ? "targeting" : ""} ${dragging ? "dragging" : ""}`}
+      onPointerUp={() => {
+        setPainting(false);
+        endDrag();
+      }}
+      onPointerLeave={() => {
+        setPainting(false);
+        cancelDrag();
+      }}
+      onPointerCancel={cancelDrag}
+      onContextMenu={(e) => e.preventDefault()}
+    >
       <Canvas
         shadows
         dpr={[1, 2]}
@@ -42,6 +75,7 @@ export default function Board() {
           <Highlights />
           <Runes />
           <Units />
+          <EditorGhost />
           <ActionMenu />
           <AttackBand />
           <Arcs />
@@ -62,6 +96,7 @@ export default function Board() {
           makeDefault
         />
       </Canvas>
+      <EditorHint />
     </div>
   );
 }

@@ -47,7 +47,8 @@ export default function Home() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       const s = useGame.getState();
-      if (s.pendingMove) s.cancelPending();
+      if (s.drag) s.cancelDrag();
+      else if (s.pendingMove) s.cancelPending();
       else s.select(null);
     };
     window.addEventListener("keydown", onKey);

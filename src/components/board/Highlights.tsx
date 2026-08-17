@@ -6,6 +6,7 @@ import { selectCaughtUp, selectDropTarget, useGame } from "@/store/game";
 import { parseKey, pathTo, posKey, reachable, standable, terrainAt, tileHeight, tilesInRange } from "@/sim/grid";
 import { attackById, attackRange, tilesInAnyRange } from "@/sim/attacks";
 import { Pos, TERRAIN, UnitDef, UnitState, otherTeam } from "@/sim/types";
+import { makeUnit } from "@/sim/presets";
 
 /** A config unit as a fresh battle-start state (full HP, unbuffed) — the editor previews reach from setup data. */
 const asState = (u: UnitDef): UnitState => ({ ...u, hp: u.stats.hp, alive: true, acted: false, buff: null });
@@ -87,19 +88,28 @@ export default function Highlights() {
   const hovView = hoverUnit ? view.units[hoverUnit] : null;
   const focusEnemy = hovDef && hovView && hovView.alive && hovDef.team !== playerTeam ? hovView : null;
   const sel = selected ? view.units[selected] : null;
-  const selDef = selected ? config.units.find((u) => u.id === selected) : null;
-  const mine = !!selDef && selDef.team === playerTeam;
-  // Editor "potential" (RTS placement read): the selected unit's move field + attack band from where it stands — or,
-  // while its card is being carried, from the tile under the pointer, so you see what the spot would give it BEFORE dropping.
+  const selected0 = selected ? config.units.find((u) => u.id === selected) : null;
+  // Editor "potential" (RTS placement read): a unit's move field + attack band from where it stands — or, while a card
+  // is being carried / a palette unit is about to be placed, from the tile under the pointer, so you see what the spot
+  // would give it BEFORE committing. Subject = the carried card, else the palette unit, else the selected unit.
   const drag = useGame((s) => s.drag);
+  const tool = useGame((s) => s.tool);
   const groundHover = useGame((s) => s.groundHover);
-  const dropOk = useGame((s) => (s.drag ? (selectDropTarget(s)?.ok ?? false) : true));
-  const editorOrigin = useMemo<Pos | null>(() => {
-    if (mode !== "editor" || !selDef) return null;
-    // carried: preview from the pointer tile only where the drop is legal (nothing to show on an occupied / impassable tile)
-    if (drag?.kind === "unit" && drag.id === selDef.id) return dropOk ? groundHover : null;
-    return { x: selDef.x, y: selDef.y };
-  }, [mode, selDef, drag, groundHover, dropOk]);
+  const dropOk = useGame((s) => ((s.drag || s.tool.kind === "unit") && s.mode === "editor" ? (selectDropTarget(s)?.ok ?? false) : true));
+  const paletteDef = useMemo(() => (mode === "editor" && tool.kind === "unit" ? makeUnit(tool.team, tool.archetype, 0, 0) : null), [mode, tool]);
+  const editorSubject = useMemo<{ def: UnitDef; origin: Pos | null } | null>(() => {
+    if (mode !== "editor") return null;
+    if (drag?.kind === "unit") {
+      const def = config.units.find((u) => u.id === drag.id);
+      return def ? { def, origin: dropOk ? groundHover : null } : null;
+    }
+    if (!drag && paletteDef) return { def: paletteDef, origin: dropOk ? groundHover : null };
+    return selected0 ? { def: selected0, origin: { x: selected0.x, y: selected0.y } } : null;
+  }, [mode, drag, config.units, dropOk, groundHover, paletteDef, selected0]);
+  // in the editor the paint belongs to the subject (carried / palette / selected); elsewhere to the selected unit
+  const selDef = mode === "editor" ? (editorSubject?.def ?? null) : selected0;
+  const mine = !!selDef && selDef.team === playerTeam;
+  const editorOrigin = editorSubject?.origin ?? null;
   const editorPreview = useMemo(() => {
     const none = { movable: [] as Pos[], band: [] as Pos[] };
     if (!editorOrigin || !selDef) return none;

@@ -40,7 +40,7 @@ function runeGlyphTexture(kind: RuneKind): THREE.CanvasTexture {
 }
 
 let sigilTex: THREE.CanvasTexture | null = null;
-function sigilTexture(): THREE.CanvasTexture {
+export function sigilTexture(): THREE.CanvasTexture {
   if (sigilTex) return sigilTex;
   const S = 256;
   const c = document.createElement("canvas");
