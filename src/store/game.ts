@@ -88,6 +88,8 @@ interface GameState {
   effects: Effect[];
   selected: string | null;
   hover: Pos | null;
+  hoverUnit: string | null;
+  showDanger: boolean;
   // manual
   moveTiles: Pos[];
   pendingMove: Pos | null;
@@ -116,6 +118,8 @@ interface GameState {
   clickTile: (p: Pos) => void;
   clickUnit: (id: string) => void;
   setHover: (p: Pos | null) => void;
+  setHoverUnit: (id: string | null) => void;
+  toggleDanger: () => void;
   select: (id: string | null) => void;
   cancelPending: () => void;
   commitWait: () => void;
@@ -271,6 +275,8 @@ export const useGame = create<GameState>((set, get) => {
     effects: [],
     selected: null,
     hover: null,
+    hoverUnit: null,
+    showDanger: true,
     moveTiles: [],
     pendingMove: null,
     targets: [],
@@ -335,6 +341,8 @@ export const useGame = create<GameState>((set, get) => {
     setSpeed: (speed) => set({ speed }),
 
     setHover: (hover) => set({ hover }),
+    setHoverUnit: (hoverUnit) => set({ hoverUnit }),
+    toggleDanger: () => set({ showDanger: !get().showDanger }),
     select: (selected) => {
       if (selected && get().mode === "manual") return get().clickUnit(selected);
       set({ selected });

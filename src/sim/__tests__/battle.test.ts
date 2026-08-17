@@ -148,3 +148,45 @@ describe("share code", () => {
   });
 });
 
+
+describe("threat + forecast", () => {
+  it("threatTiles = reachable tiles expanded by range; threatsTo finds enemies that can hit a tile", () => {
+    const cfg: BattleConfig = {
+      map: { width: 8, height: 1, tiles: Array(8).fill("ground") },
+      units: [makeUnit("red", "knight", 0, 0), makeUnit("blue", "archer", 7, 0)],
+      doctrine: { red: { aggression: "balanced", objective: "advance" }, blue: { aggression: "balanced", objective: "advance" } },
+      maxTurns: 10,
+    };
+    const b = new Battle(cfg, 1);
+    const [knight, archer] = b.state.units;
+    // archer mov 4 (tiles 3..7), range 2-3 → can hit 0..6 (from 3 it hits 0,1)
+    const t = b.threatTiles(archer.id);
+    expect(t.has("0,0")).toBe(true);
+    expect(t.has("6,0")).toBe(true);
+    // knight mov 3 range 1 → tiles 0..4 (blocked beyond by nothing) → hits up to 4
+    const k = b.threatTiles(knight.id);
+    expect(k.has("4,0")).toBe(true);
+    expect(k.has("5,0")).toBe(false);
+    expect(b.threatsTo(knight.id).map((u) => u.id)).toEqual([archer.id]);
+    expect(b.threatsTo(archer.id, { x: 6, y: 0 })).toEqual([]);
+  });
+
+  it("forecast reports damage, kill, hp-after and retaliation only when the defender can reach the tile", () => {
+    const cfg = defaultConfig();
+    const b = new Battle(cfg, 1);
+    const knight = b.state.units.find((u) => u.archetype === "knight" && u.team === "red")!;
+    const archer = b.state.units.find((u) => u.archetype === "archer" && u.team === "blue")!;
+    // adjacent → archer (range 2-3) cannot retaliate
+    const f1 = b.forecast(knight.id, archer.id, { x: archer.x, y: archer.y - 1 });
+    expect(f1.inRange).toBe(true);
+    expect(f1.damage).toBe(8 - 2);
+    expect(f1.hpAfter).toBe(archer.hp - 6);
+    expect(f1.retaliation).toBeNull();
+    // archer attacking knight from range 2 → knight (range 1) cannot retaliate; from range 1 it can
+    const f2 = b.forecast(archer.id, knight.id, { x: knight.x, y: knight.y + 2 });
+    expect(f2.retaliation).toBeNull();
+    const f3 = b.forecast(archer.id, knight.id, { x: knight.x, y: knight.y + 1 });
+    expect(f3.inRange).toBe(false); // archer min range 2
+    expect(f3.retaliation).toBe(8 - 2);
+  });
+});

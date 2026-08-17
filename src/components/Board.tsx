@@ -1,11 +1,11 @@
 "use client";
 import { Canvas, ThreeEvent, useFrame, useThree } from "@react-three/fiber";
-import { Html, OrbitControls } from "@react-three/drei";
+import { Html, Line, OrbitControls } from "@react-three/drei";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useGame } from "@/store/game";
 import Effects from "./Effects";
-import { Archetype, TERRAIN, Team, UnitDef } from "@/sim/types";
+import { Archetype, Pos, TERRAIN, Team, UnitDef, otherTeam } from "@/sim/types";
 
 const TEAM_COLOR: Record<Team, string> = { red: "#e0554a", blue: "#4a86e0" };
 const TEAM_DARK: Record<Team, string> = { red: "#7a2a24", blue: "#233f75" };
@@ -85,6 +85,18 @@ function Highlights() {
   const battle = useGame((s) => s.battle);
   const cursor = useGame((s) => s.cursor);
   const events = useGame((s) => s.events);
+  const showDanger = useGame((s) => s.showDanger);
+  const playerTeam = useGame((s) => s.playerTeam);
+
+  // FE danger zone: every tile the enemy team could attack on its next activation
+  const danger = useMemo(() => {
+    if (!showDanger || !battle || cursor < events.length || mode === "editor") return [];
+    const me = selected ? battle.state.units.find((u) => u.id === selected)?.team ?? playerTeam : playerTeam;
+    return [...battle.threatZone(otherTeam(me))].map((k) => {
+      const [x, y] = k.split(",").map(Number);
+      return { x, y };
+    });
+  }, [showDanger, battle, cursor, events.length, mode, selected, playerTeam]);
 
   // In manager/editor, selecting a unit previews its reach (from the engine when live, from config otherwise)
   const preview = useMemo(() => {
@@ -116,11 +128,14 @@ function Highlights() {
   const unitAt = (x: number, y: number) => config.units.find((u) => view.units[u.id]?.alive !== false && view.units[u.id]?.x === x && view.units[u.id]?.y === y);
   return (
     <group>
+      {danger.map((p) => (
+        <Highlight key={`d${p.x},${p.y}`} x={p.x} y={p.y} color="#ff2d2d" opacity={0.14} />
+      ))}
       {preview.map((p) => (
         <Highlight key={`p${p.x},${p.y}`} x={p.x} y={p.y} color="#9ad0ff" opacity={0.22} />
       ))}
       {rangeTiles.map((p) => (
-        <Highlight key={`r${p.x},${p.y}`} x={p.x} y={p.y} color={selDef?.archetype === "healer" ? "#6cf58a" : "#ff6a5c"} opacity={0.16} />
+        <Highlight key={`r${p.x},${p.y}`} x={p.x} y={p.y} color={selDef?.archetype === "healer" ? "#6cf58a" : "#ffb347"} opacity={0.34} />
       ))}
       {moveTiles.map((p) => (
         <Highlight key={`m${p.x},${p.y}`} x={p.x} y={p.y} color="#4fa3ff" opacity={0.4} />
@@ -180,6 +195,7 @@ function Unit({ def }: { def: UnitDef }) {
   const vu = useGame((s) => s.view.units[def.id]);
   const map = useGame((s) => s.config.map);
   const clickUnit = useGame((s) => s.clickUnit);
+  const setHoverUnit = useGame((s) => s.setHoverUnit);
   const selected = useGame((s) => s.selected === def.id);
   const battle = useGame((s) => s.battle);
   const mode = useGame((s) => s.mode);
@@ -235,6 +251,11 @@ function Unit({ def }: { def: UnitDef }) {
             e.stopPropagation();
             clickUnit(def.id);
           }}
+          onPointerOver={(e) => {
+            e.stopPropagation();
+            setHoverUnit(def.id);
+          }}
+          onPointerOut={() => setHoverUnit(null)}
         >
           <UnitMesh archetype={def.archetype} color={acted ? TEAM_DARK[def.team] : TEAM_COLOR[def.team]} />
           {selected && (
@@ -272,6 +293,70 @@ function Unit({ def }: { def: UnitDef }) {
   );
 }
 
+function Arc({ from, to, color, width = 3, dashed = false }: { from: Pos; to: Pos; color: string; width?: number; dashed?: boolean }) {
+  const map = useGame((s) => s.config.map);
+  const pts = useMemo(() => {
+    const yOf = (p: Pos) => (TERRAIN[map.tiles[p.y * map.width + p.x]]?.height ?? 0.1) + 0.6;
+    const a = new THREE.Vector3(from.x, yOf(from), from.y);
+    const b = new THREE.Vector3(to.x, yOf(to), to.y);
+    const mid = a.clone().add(b).multiplyScalar(0.5);
+    mid.y += 0.9 + a.distanceTo(b) * 0.25;
+    return new THREE.QuadraticBezierCurve3(a, mid, b).getPoints(24);
+  }, [from, to, map]);
+  const end = pts[pts.length - 1];
+  const prev = pts[pts.length - 3];
+  const dir = end.clone().sub(prev).normalize();
+  const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+  return (
+    <group>
+      <Line points={pts} color={color} lineWidth={width} dashed={dashed} dashSize={0.25} gapSize={0.15} transparent opacity={0.95} depthTest={false} />
+      <mesh position={end.clone().sub(dir.clone().multiplyScalar(0.12))} quaternion={q}>
+        <coneGeometry args={[0.13, 0.32, 8]} />
+        <meshBasicMaterial color={color} depthTest={false} />
+      </mesh>
+    </group>
+  );
+}
+
+/** Red arcs from every enemy that can hit the selected unit where it stands (or will stand); yellow arc to the target being considered. */
+function Arcs() {
+  const battle = useGame((s) => s.battle);
+  const selected = useGame((s) => s.selected);
+  const pendingMove = useGame((s) => s.pendingMove);
+  const hoverUnit = useGame((s) => s.hoverUnit);
+  const targets = useGame((s) => s.targets);
+  const cursor = useGame((s) => s.cursor);
+  const events = useGame((s) => s.events);
+  const mode = useGame((s) => s.mode);
+  const showDanger = useGame((s) => s.showDanger);
+
+  const data = useMemo(() => {
+    if (!battle || !selected || cursor < events.length || mode === "editor") return null;
+    const u = battle.state.units.find((x) => x.id === selected);
+    if (!u || !u.alive) return null;
+    const at = pendingMove ?? { x: u.x, y: u.y };
+    const threats = showDanger ? battle.threatsTo(selected, at).map((e) => ({ id: e.id, from: { x: e.x, y: e.y } })) : [];
+    let target: { id: string; to: Pos } | null = null;
+    const hov = hoverUnit ? battle.state.units.find((x) => x.id === hoverUnit) : null;
+    if (hov && hov.alive && hov.team !== u.team) target = { id: hov.id, to: { x: hov.x, y: hov.y } };
+    else if (targets.length === 1) {
+      const t = battle.unit(targets[0]);
+      target = { id: t.id, to: { x: t.x, y: t.y } };
+    }
+    return { at, threats, target, team: u.team };
+  }, [battle, selected, pendingMove, hoverUnit, targets, cursor, events.length, mode, showDanger]);
+
+  if (!data) return null;
+  return (
+    <group>
+      {data.threats.map((t) => (
+        <Arc key={t.id} from={t.from} to={data.at} color="#ff3b3b" width={2.5} dashed />
+      ))}
+      {data.target && <Arc from={data.at} to={data.target.to} color="#ffd54f" width={4} />}
+    </group>
+  );
+}
+
 function Units() {
   const units = useGame((s) => s.config.units);
   return (
@@ -295,18 +380,26 @@ function CameraRig({ cx, cz, w, h }: { cx: number; cz: number; w: number; h: num
     const aspect = size.width / Math.max(1, size.height);
     const vFov = (cam.fov * Math.PI) / 180;
     const hFov = 2 * Math.atan(Math.tan(vFov / 2) * aspect);
-    // camera looks down at ~62° (portrait) / ~55° (landscape); footprint on screen ≈ map w × h*cos
+    // A tall map on a wide screen is viewed SIDEWAYS (red on the left, blue on the right)
+    // so the board fills the viewport; otherwise upright (red at the top).
+    const sideways = aspect > 1.15 && h > w * 1.15;
+    const spanAcross = sideways ? h : w; // extent along the screen x axis
+    const spanDeep = sideways ? w : h; // extent along the screen y axis (foreshortened by tilt)
     const tilt = aspect < 1 ? 1.08 : 0.95; // radians from horizontal
-    const needH = (h * 1.15) / 2 / Math.tan(vFov / 2);
-    const needW = (w * 1.15) / 2 / Math.tan(hFov / 2);
+    // The near edge sits (halfD·cos tilt) closer than the centre, so fit against it.
+    const halfA = (spanAcross / 2) * 1.1 + 0.5;
+    const halfD = (spanDeep / 2) * 1.1 + 0.5;
+    const nearOffset = halfD * Math.cos(tilt);
+    const needW = halfA / Math.tan(hFov / 2) + nearOffset;
+    const needH = (halfD * Math.max(Math.sin(tilt), 0.75)) / Math.tan(vFov / 2) + nearOffset;
     const dist = Math.max(needH, needW, 8);
-    // portrait: the bottom sheet covers the last ~56px, so aim a little below centre to lift the map
     const tz = aspect < 1 ? cz + h * 0.09 : cz;
-    cam.position.set(cx, Math.sin(tilt) * dist, tz + Math.cos(tilt) * dist);
-    cam.lookAt(cx, 0, tz);
+    if (sideways) cam.position.set(cx - Math.cos(tilt) * dist, Math.sin(tilt) * dist, cz);
+    else cam.position.set(cx, Math.sin(tilt) * dist, tz + Math.cos(tilt) * dist);
+    cam.lookAt(cx, 0, sideways ? cz : tz);
     cam.updateProjectionMatrix();
     if (controls) {
-      controls.target.set(cx, 0, tz);
+      controls.target.set(cx, 0, sideways ? cz : tz);
       controls.update();
     }
   }, [camera, controls, size.width, size.height, cx, cz, w, h]);
@@ -336,6 +429,7 @@ export default function Board() {
           <Tiles />
           <Highlights />
           <Units />
+          <Arcs />
           <Effects />
         </group>
         <OrbitControls

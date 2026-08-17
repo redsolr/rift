@@ -3,7 +3,8 @@ import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import Hud from "@/components/Hud";
 import Panel from "@/components/Panel";
-import Sheet from "@/components/Sheet";
+import Drawer from "@/components/Drawer";
+import Forecast from "@/components/Forecast";
 import { useGame } from "@/store/game";
 
 const Board = dynamic(() => import("@/components/Board"), { ssr: false });
@@ -11,8 +12,9 @@ const Board = dynamic(() => import("@/components/Board"), { ssr: false });
 export default function Home() {
   const loadShareCode = useGame((s) => s.loadShareCode);
   const [mobile, setMobile] = useState(false);
+  const [landscape, setLandscape] = useState(true);
   const selectedName = useGame((s) => s.config.units.find((u) => u.id === s.selected)?.name ?? null);
-  const sheetHint = useGame((s) => {
+  const hint = useGame((s) => {
     const b = s.battle;
     const caughtUp = s.cursor >= s.events.length;
     if (b && s.view.ended) return s.view.winner === "draw" ? "Draw — Rematch?" : `${s.view.winner!.toUpperCase()} wins — Rematch?`;
@@ -21,11 +23,20 @@ export default function Home() {
     return "Tools · simulate · squads";
   });
   useEffect(() => {
-    const mq = window.matchMedia("(max-width: 900px)");
-    const apply = () => setMobile(mq.matches);
+    // phone = coarse pointer and a short side under 900px (covers both orientations)
+    const mq = window.matchMedia("(pointer: coarse) and (max-height: 900px) and (max-width: 1100px)");
+    const or = window.matchMedia("(orientation: landscape)");
+    const apply = () => {
+      setMobile(mq.matches);
+      setLandscape(or.matches);
+    };
     apply();
     mq.addEventListener("change", apply);
-    return () => mq.removeEventListener("change", apply);
+    or.addEventListener("change", apply);
+    return () => {
+      mq.removeEventListener("change", apply);
+      or.removeEventListener("change", apply);
+    };
   }, []);
   useEffect(() => {
     const m = location.hash.match(/#c=([A-Za-z0-9_-]+)/);
@@ -37,15 +48,26 @@ export default function Home() {
     <main className="app">
       <Hud />
       <div className={mobile ? "stage mobile" : "stage"}>
-        <Board />
+        <div className="board-wrap">
+          <Board />
+          <Forecast />
+          {mobile && <div className="mobile-hint">{selectedName ?? hint}</div>}
+        </div>
         {mobile ? (
-          <Sheet title={selectedName ?? sheetHint}>
+          <Drawer title={selectedName ?? "Panel"}>
             <Panel />
-          </Sheet>
+          </Drawer>
         ) : (
           <Panel />
         )}
       </div>
+      {mobile && !landscape && (
+        <div className="rotate-gate" role="dialog" aria-label="Rotate your phone">
+          <div className="rotate-icon">⟳</div>
+          <div className="rotate-title">Turn your phone sideways</div>
+          <div className="rotate-sub">Tactician plays in landscape.</div>
+        </div>
+      )}
     </main>
   );
 }

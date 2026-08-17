@@ -6,6 +6,7 @@ import {
   Action,
   BattleConfig,
   BattleEvent,
+  Forecast,
   Pos,
   ScoredAction,
   Team,
@@ -83,6 +84,70 @@ export class Battle {
 
   candidates(id: string): ScoredAction[] {
     return scoreActions({ map: this.config.map, units: this.state.units, doctrine: this.config.doctrine, rng: this.rng }, this.unit(id));
+  }
+
+  /**
+   * Every tile `id` could attack on its next activation: move to any standable tile
+   * (or stay), then hit anything within [rangeMin, rangeMax]. Ignores whether a target
+   * is actually there — this is the FE "danger zone" primitive.
+   */
+  threatTiles(id: string): Set<string> {
+    const u = this.unit(id);
+    if (!u.alive) return new Set();
+    const map = this.config.map;
+    const out = new Set<string>();
+    const origins = [...this.standableFor(id), { x: u.x, y: u.y }];
+    for (const o of origins)
+      for (let dy = -u.stats.rangeMax; dy <= u.stats.rangeMax; dy++)
+        for (let dx = -u.stats.rangeMax; dx <= u.stats.rangeMax; dx++) {
+          const d = Math.abs(dx) + Math.abs(dy);
+          if (d < u.stats.rangeMin || d > u.stats.rangeMax) continue;
+          const x = o.x + dx,
+            y = o.y + dy;
+          if (x < 0 || y < 0 || x >= map.width || y >= map.height) continue;
+          out.add(`${x},${y}`);
+        }
+    return out;
+  }
+
+  /** Union of threatTiles for every living unit of `team`. */
+  threatZone(team: Team): Set<string> {
+    const out = new Set<string>();
+    for (const u of this.alive(team)) for (const k of this.threatTiles(u.id)) out.add(k);
+    return out;
+  }
+
+  /** Living enemies of `id` that could attack the given tile on their next activation. */
+  threatsTo(id: string, at?: Pos): UnitState[] {
+    const u = this.unit(id);
+    const p = at ?? { x: u.x, y: u.y };
+    const key = `${p.x},${p.y}`;
+    return this.alive(otherTeam(u.team)).filter((e) => this.threatTiles(e.id).has(key));
+  }
+
+  /**
+   * Combat forecast for attacker → defender with the attacker standing on `from`
+   * (defaults to its current tile). `retaliation` is what the defender would deal
+   * back on ITS turn if it can reach `from` from where it stands (no counterattacks
+   * exist in the engine yet — this is a next-turn threat number, labelled as such).
+   */
+  forecast(attackerId: string, defenderId: string, from?: Pos): Forecast {
+    const a = this.unit(attackerId);
+    const d = this.unit(defenderId);
+    const at = from ?? { x: a.x, y: a.y };
+    const map = this.config.map;
+    const inRangeNow = inRange(at, d, a.stats.rangeMin, a.stats.rangeMax);
+    const dmg = damage(map, a, d);
+    const kill = dmg >= d.hp;
+    const hpAfter = Math.max(0, d.hp - dmg);
+    let retaliation: number | null = null;
+    let retaliationKill = false;
+    if (!kill && inRange(d, at, d.stats.rangeMin, d.stats.rangeMax)) {
+      const probe: UnitState = { ...a, x: at.x, y: at.y };
+      retaliation = damage(map, d, probe);
+      retaliationKill = retaliation >= a.hp;
+    }
+    return { attacker: a.id, defender: d.id, from: at, inRange: inRangeNow, damage: dmg, kill, hpAfter, retaliation, retaliationKill };
   }
 
   // ---- mutations ----

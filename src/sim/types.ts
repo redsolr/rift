@@ -126,6 +126,19 @@ export interface ScoredAction {
   terms: ScoreTerm[];
 }
 
+export interface Forecast {
+  attacker: string;
+  defender: string;
+  from: Pos;
+  inRange: boolean;
+  damage: number;
+  kill: boolean;
+  hpAfter: number;
+  /** damage the defender would deal back on its own turn if it can reach `from`; null if it cannot */
+  retaliation: number | null;
+  retaliationKill: boolean;
+}
+
 // ---- Events (the only thing the renderer sees) ----
 
 export type BattleEvent =

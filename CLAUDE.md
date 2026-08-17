@@ -45,9 +45,9 @@ scripts/sim.ts  headless batch runner (npm run sim -- 1000)
 New-NetFirewallRule -DisplayName "Tactician dev 3030" -Direction Inbound -Protocol TCP -LocalPort 3030 -Action Allow -Profile Private,Domain
 ```
 
-Add to Home Screen on iOS gives a full-screen standalone window (`appleWebApp` metadata is set). Mobile layout kicks in at ≤900px (`page.tsx` matchMedia → `Sheet`).
+Add to Home Screen on iOS gives a full-screen standalone window (`appleWebApp` metadata is set). **Phones play in landscape**: `page.tsx` matches `(pointer: coarse) and (max-height: 900px) and (max-width: 1100px)` → right-side `Drawer`; portrait shows a rotate gate.
 
-**Headless caveat**: swiftshader Chromium mis-composites an opaque layer *overlapping* a WebGL canvas (the frame looks clipped even though DOM/camera are fine) — that is why the sheet is in flow, not an overlay. Do not reintroduce an overlay over the canvas without checking on a real device.
+**Headless caveat**: swiftshader Chromium mis-composited an opaque bottom sheet *overlapping* the WebGL canvas (frame looked clipped; DOM/camera were fine). The drawer is in flow; the semi-transparent forecast card overlays the canvas without triggering it. If a screenshot shows a clipped board, hide the overlay and re-shoot before assuming a camera bug.
 
 ## Zustand traps (already hit once)
 

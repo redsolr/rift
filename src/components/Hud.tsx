@@ -35,6 +35,8 @@ export default function Hud() {
   const endPhaseAI = useGame((s) => s.endPhaseAI);
   const playerTeam = useGame((s) => s.playerTeam);
   const seed = useGame((s) => s.seed);
+  const showDanger = useGame((s) => s.showDanger);
+  const toggleDanger = useGame((s) => s.toggleDanger);
 
   const caughtUp = cursor >= events.length;
   const live = !!battle && !battle.state.ended;
@@ -116,7 +118,7 @@ export default function Hud() {
         )}
         {mode === "manual" && yourTurn && (
           <button className="ghost" onClick={endPhaseAI} title="Let the AI finish your remaining units using their orders">
-            End turn (AI finishes)
+            End turn<span className="btn-text"> (AI finishes)</span>
           </button>
         )}
 
@@ -145,6 +147,11 @@ export default function Hud() {
           </button>
         )}
 
+        {battle && mode !== "editor" && (
+          <button className={`ghost danger-toggle ${showDanger ? "on" : ""}`} onClick={toggleDanger} title="Show every tile the enemy can attack next turn + who can hit your selected unit">
+            ◆<span className="btn-text"> Danger</span>
+          </button>
+        )}
         {ended && (
           <button className="primary" onClick={rematch} title={`Next seed (${seed + 1})`}>
             Rematch
@@ -152,7 +159,7 @@ export default function Hud() {
         )}
         {battle && (
           <button className="ghost" onClick={resetToSetup} title="Back to setup">
-            Reset
+            ↺<span className="btn-text"> Reset</span>
           </button>
         )}
       </div>
