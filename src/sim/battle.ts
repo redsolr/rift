@@ -38,14 +38,15 @@ export class Battle {
     this.config = config;
     this.seed = seed;
     this.rng = new Rng(seed);
+    const first = config.firstTeam ?? "red";
     this.state = {
       turn: 1,
-      activeTeam: "red",
+      activeTeam: first,
       units: config.units.map((u) => ({ ...u, hp: u.stats.hp, alive: true, acted: false })),
       ended: false,
       winner: null,
     };
-    this.emit({ type: "turn_start", turn: 1, team: "red" });
+    this.emit({ type: "turn_start", turn: 1, team: first });
   }
 
   private emit(e: BattleEvent) {
@@ -243,7 +244,7 @@ export class Battle {
   endTurn() {
     if (this.state.ended) return;
     for (const u of this.state.units) u.acted = false;
-    if (this.state.activeTeam === "blue") this.state.turn++;
+    if (this.state.activeTeam !== (this.config.firstTeam ?? "red")) this.state.turn++;
     this.state.activeTeam = otherTeam(this.state.activeTeam);
     if (this.state.turn > this.config.maxTurns) {
       this.finish("draw");

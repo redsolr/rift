@@ -100,6 +100,8 @@ export interface BattleConfig {
   units: UnitDef[];
   doctrine: Record<Team, Doctrine>;
   maxTurns: number;
+  /** which side acts first each turn (default red) */
+  firstTeam?: Team;
 }
 
 export interface Pos {

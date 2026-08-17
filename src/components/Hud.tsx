@@ -66,12 +66,12 @@ export default function Hud() {
             {ended && (
               <span className="result-pill">{view.winner === "draw" ? "DRAW" : `${view.winner!.toUpperCase()} WINS`}</span>
             )}
-            {yourTurn && !ended && <span className="hint-pill">Your move — click a red unit</span>}
+            {yourTurn && !ended && <span className="hint-pill">Your move — click a {playerTeam} unit</span>}
             {commandPhase && !ended && <span className="hint-pill">Command phase — adjust orders, then execute</span>}
           </>
         ) : (
           <span className="hint-pill">
-            {mode === "manual" && "Start a battle and control the red team"}
+            {mode === "manual" && `Start a battle and control the ${playerTeam} team`}
             {mode === "manager" && "Set orders in the panel, then execute turns"}
             {mode === "editor" && "Paint terrain, place units, tune sliders, simulate"}
           </span>

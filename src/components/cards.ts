@@ -11,6 +11,7 @@ export const CARD_W = 256;
 export const CARD_H = 352;
 
 export const POSITION: Record<Archetype, string> = { knight: "KNT", fighter: "FTR", archer: "ARC", mage: "MAG", healer: "HLR" };
+export const WEAPON: Record<Archetype, string> = { knight: "Iron Lance", fighter: "Iron Axe", archer: "Iron Bow", mage: "Fire", healer: "Heal" };
 export const GLYPH: Record<Archetype, string> = { knight: "♜", fighter: "⚔", archer: "➶", mage: "✦", healer: "✚" };
 
 const FRAME: Record<Team, { a: string; b: string; c: string; ink: string; trim: string }> = {

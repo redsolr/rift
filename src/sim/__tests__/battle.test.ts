@@ -76,22 +76,38 @@ describe("grid", () => {
 describe("engine rules", () => {
   it("rejects acting out of turn / unreachable tiles / already-acted", () => {
     const b = new Battle(defaultConfig(), 7);
-    const blue = b.alive("blue")[0];
-    expect(() => b.act({ kind: "wait", unit: blue.id, moveTo: { x: blue.x, y: blue.y } })).toThrow(/turn/);
-    const red = b.alive("red")[0];
-    expect(() => b.act({ kind: "wait", unit: red.id, moveTo: { x: 0, y: 15 } })).toThrow(/reach/);
-    b.act({ kind: "wait", unit: red.id, moveTo: { x: red.x, y: red.y } });
-    expect(() => b.act({ kind: "wait", unit: red.id, moveTo: { x: red.x, y: red.y } })).toThrow(/already/);
+    const first = b.state.activeTeam;
+    const other = b.alive(first === "red" ? "blue" : "red")[0];
+    expect(() => b.act({ kind: "wait", unit: other.id, moveTo: { x: other.x, y: other.y } })).toThrow(/turn/);
+    const mine = b.alive(first)[0];
+    expect(() => b.act({ kind: "wait", unit: mine.id, moveTo: { x: 0, y: 0 } })).toThrow(/reach/);
+    b.act({ kind: "wait", unit: mine.id, moveTo: { x: mine.x, y: mine.y } });
+    expect(() => b.act({ kind: "wait", unit: mine.id, moveTo: { x: mine.x, y: mine.y } })).toThrow(/already/);
   });
 
-  it("phase ends automatically when every unit has acted; turn increments after blue", () => {
-    const b = new Battle(defaultConfig(), 7);
+  it("phase ends automatically when every unit has acted; turn increments after the second team", () => {
+    const cfg = defaultConfig();
+    const b = new Battle(cfg, 7);
+    const first = cfg.firstTeam ?? "red";
+    const second = first === "red" ? "blue" : "red";
+    expect(b.state.activeTeam).toBe(first);
+    b.runPhaseAI();
+    expect(b.state.activeTeam).toBe(second);
+    expect(b.state.turn).toBe(1);
+    b.runPhaseAI();
+    expect(b.state.activeTeam).toBe(first);
+    expect(b.state.turn).toBe(2);
+  });
+
+  it("firstTeam decides who opens the battle and when the turn counter advances", () => {
+    const cfg = defaultConfig();
+    cfg.firstTeam = "red";
+    const b = new Battle(cfg, 7);
     expect(b.state.activeTeam).toBe("red");
     b.runPhaseAI();
     expect(b.state.activeTeam).toBe("blue");
     expect(b.state.turn).toBe(1);
     b.runPhaseAI();
-    expect(b.state.activeTeam).toBe("red");
     expect(b.state.turn).toBe(2);
   });
 

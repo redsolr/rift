@@ -47,8 +47,8 @@ export const DEFAULT_ORDERS: Orders = {
 export const DEFAULT_DOCTRINE: Doctrine = { aggression: "balanced", objective: "advance" };
 
 const NAMES: Record<Team, Record<Archetype, string>> = {
-  red: { knight: "Rook", fighter: "Brakka", archer: "Lys", mage: "Vael", healer: "Mina" },
-  blue: { knight: "Garrick", fighter: "Tusk", archer: "Wren", mage: "Ione", healer: "Selu" },
+  blue: { knight: "Rook", fighter: "Brakka", archer: "Lys", mage: "Vael", healer: "Mina" },
+  red: { knight: "Garrick", fighter: "Tusk", archer: "Wren", mage: "Ione", healer: "Selu" },
 };
 
 let counter = 0;
@@ -68,8 +68,8 @@ export function makeUnit(team: Team, archetype: Archetype, x: number, y: number,
 }
 
 /**
- * 16 wide × 12 tall (landscape). Blue holds the far bank (rows 0–1), red the near bank (rows 10–11) —
- * the player's army is always on the NEAR side of the camera, FE-style. A river with three crossings,
+ * 16 wide × 12 tall (landscape). Red (enemy) holds the far bank (rows 0–1), blue (you) the near bank
+ * (rows 10–11) — the player's army is always on the NEAR side of the camera, FE-style. A river with three crossings,
  * forests on the flanks, hills near the fords, two wall stubs.
  */
 export function defaultMap(): MapDef {
@@ -103,22 +103,23 @@ export function emptyMap(width = 16, height = 12): MapDef {
 export function defaultConfig(): BattleConfig {
   counter = 0;
   const units: UnitDef[] = [
-    makeUnit("red", "knight", 7, 10),
-    makeUnit("red", "fighter", 8, 10),
-    makeUnit("red", "archer", 6, 11),
-    makeUnit("red", "mage", 9, 11),
-    makeUnit("red", "healer", 8, 11),
-    makeUnit("blue", "knight", 8, 1),
-    makeUnit("blue", "fighter", 7, 1),
-    makeUnit("blue", "archer", 9, 0),
-    makeUnit("blue", "mage", 6, 0),
-    makeUnit("blue", "healer", 7, 0),
+    makeUnit("blue", "knight", 7, 10),
+    makeUnit("blue", "fighter", 8, 10),
+    makeUnit("blue", "archer", 6, 11),
+    makeUnit("blue", "mage", 9, 11),
+    makeUnit("blue", "healer", 8, 11),
+    makeUnit("red", "knight", 8, 1),
+    makeUnit("red", "fighter", 7, 1),
+    makeUnit("red", "archer", 9, 0),
+    makeUnit("red", "mage", 6, 0),
+    makeUnit("red", "healer", 7, 0),
   ];
   return {
     map: defaultMap(),
     units,
     doctrine: { red: { ...DEFAULT_DOCTRINE }, blue: { ...DEFAULT_DOCTRINE } },
     maxTurns: 30,
+    firstTeam: "blue",
   };
 }
 
@@ -130,6 +131,7 @@ export function encodeConfig(c: BattleConfig): string {
     u: c.units,
     d: c.doctrine,
     x: c.maxTurns,
+    f: c.firstTeam ?? "red",
   });
   const b64 = typeof btoa === "function" ? btoa(unescape(encodeURIComponent(json))) : Buffer.from(json, "utf8").toString("base64");
   return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -141,5 +143,5 @@ export function decodeConfig(code: string): BattleConfig {
   const raw = JSON.parse(json);
   const keys: Terrain[] = ["ground", "forest", "wall", "water", "hill", "objective"];
   const tiles = (raw.m.t as string).split("").map((ch: string) => keys["gfwvho".indexOf(ch)]);
-  return { map: { width: raw.m.w, height: raw.m.h, tiles }, units: raw.u, doctrine: raw.d, maxTurns: raw.x };
+  return { map: { width: raw.m.w, height: raw.m.h, tiles }, units: raw.u, doctrine: raw.d, maxTurns: raw.x, firstTeam: raw.f ?? "red" };
 }

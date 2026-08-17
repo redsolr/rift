@@ -6,6 +6,7 @@ import Panel from "@/components/Panel";
 import Drawer from "@/components/Drawer";
 import Forecast from "@/components/Forecast";
 import CameraWidget from "@/components/CameraWidget";
+import UnitBadge from "@/components/UnitBadge";
 import { useGame } from "@/store/game";
 
 const Board = dynamic(() => import("@/components/Board"), { ssr: false });
@@ -19,7 +20,7 @@ export default function Home() {
     const b = s.battle;
     const caughtUp = s.cursor >= s.events.length;
     if (b && s.view.ended) return s.view.winner === "draw" ? "Draw — Rematch?" : `${s.view.winner!.toUpperCase()} wins — Rematch?`;
-    if (s.mode === "manual") return b && caughtUp && b.state.activeTeam === s.playerTeam ? "Your move — tap a red unit" : b ? "Enemy turn…" : "Start a battle";
+    if (s.mode === "manual") return b && caughtUp && b.state.activeTeam === s.playerTeam ? `Your move — tap a ${s.playerTeam} unit` : b ? "Enemy turn…" : "Start a battle";
     if (s.mode === "manager") return b && caughtUp && !s.playing ? "Command phase — set orders, then Execute" : b ? "Executing…" : "Set orders, then Start";
     return "Tools · simulate · squads";
   });
@@ -63,6 +64,7 @@ export default function Home() {
           <Board />
           <Forecast />
           <CameraWidget />
+          <UnitBadge />
           {mobile && <div className="mobile-hint">{selectedName ?? hint}</div>}
         </div>
         {mobile ? (

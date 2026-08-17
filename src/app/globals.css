@@ -1126,3 +1126,133 @@ button.danger {
   color: var(--fg);
   font-weight: 600;
 }
+
+/* ---- FE-style character box (bottom-left) ---- */
+.unit-badge {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 3;
+  width: 290px;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(24, 27, 38, 0.94), rgba(14, 16, 24, 0.94));
+  border: 1px solid #5a4a24;
+  outline: 1px solid rgba(255, 213, 79, 0.25);
+  outline-offset: -4px;
+  border-radius: 6px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+  font-variant-numeric: tabular-nums;
+}
+.ub-name {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 5px 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #f1e5c2;
+  background: linear-gradient(90deg, #233f75, #17264a 70%, transparent);
+  clip-path: polygon(0 0, 100% 0, 92% 100%, 0 100%);
+}
+.ub-name.red {
+  background: linear-gradient(90deg, #7a2a24, #3a1d1d 70%, transparent);
+}
+.ub-ovr {
+  color: #f2c96b;
+  font-size: 12px;
+  margin-right: 24px;
+}
+.ub-body {
+  display: grid;
+  grid-template-columns: 1fr 58px;
+  gap: 8px;
+  padding: 6px 10px 8px 12px;
+}
+.ub-row {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+}
+.ub-lab {
+  color: #c9a24a;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+.ub-hp {
+  font-size: 16px;
+  font-weight: 800;
+}
+.ub-hp.low {
+  color: #ff5c5c;
+}
+.ub-hpbar {
+  height: 6px;
+  background: #1a1e2a;
+  border: 1px solid #3a3f52;
+  border-radius: 2px;
+  margin: 4px 0 6px;
+  overflow: hidden;
+}
+.ub-hpbar > div {
+  height: 100%;
+  background: linear-gradient(90deg, #6cf58a, #3fbf60);
+}
+.ub-weapon {
+  font-size: 12px;
+  color: #d8dbe6;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  background: #0f121a;
+  border: 1px solid #3a3f52;
+  border-radius: 3px;
+  padding: 3px 8px;
+}
+.ub-icon {
+  color: #c9a24a;
+}
+.ub-rng {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 11px;
+}
+.ub-portrait canvas {
+  width: 58px;
+  height: 80px;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.6));
+}
+.ub-terrain {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border-top: 1px solid #3a3f52;
+  font-size: 12px;
+  color: #d8dbe6;
+}
+.ub-terrain-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+.ub-terrain-mod {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 11px;
+}
+@media (pointer: coarse) and (max-height: 900px) and (max-width: 1100px) {
+  .unit-badge {
+    width: 220px;
+    left: 8px;
+    bottom: 8px;
+  }
+  .ub-portrait canvas {
+    width: 44px;
+    height: 60px;
+  }
+  .ub-body {
+    grid-template-columns: 1fr 44px;
+  }
+}

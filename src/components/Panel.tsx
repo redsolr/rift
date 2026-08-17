@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useGame } from "@/store/game";
-import { ARCHETYPES, DoctrineAggression, DoctrineObjective, Personality, ScoredAction, Stance, Stats, TERRAIN, TERRAINS, TargetPref, Team, UnitDef } from "@/sim/types";
+import { ARCHETYPES, DoctrineAggression, DoctrineObjective, Personality, ScoredAction, Stance, Stats, TERRAIN, TERRAINS, TargetPref, Team, UnitDef, otherTeam } from "@/sim/types";
 import { ARCHETYPE_LABEL } from "@/sim/presets";
 
 const STANCES: { id: Stance; label: string }[] = [
@@ -505,6 +505,7 @@ export default function Panel() {
   const lastDecision = useGame((s) => (s.selected ? s.view.lastDecision[s.selected] : undefined));
   const battle = useGame((s) => s.battle);
   const playerTeam = useGame((s) => s.playerTeam);
+  const enemyTeam = otherTeam(playerTeam);
 
   return (
     <aside className="panel">
@@ -546,7 +547,7 @@ export default function Panel() {
       ) : (
         <Section title="Selection">
           <p className="muted">
-            {mode === "manual" && "Click one of your units to move it. Blue tiles = reachable, red = attackable from the chosen tile."}
+            {mode === "manual" && "Click one of your units to move it. Blue tiles = where it can move, red = where it can attack into."}
             {mode === "manager" && "Click any unit to view and edit its orders, personality and last decision."}
             {mode === "editor" && "Pick a tool on the left, or click a unit to edit it."}
           </p>
@@ -559,9 +560,9 @@ export default function Panel() {
             <DoctrineEditor team={playerTeam} />
             <SquadList team={playerTeam} />
           </Section>
-          <Section title="Enemy squad (blue)" defaultOpen={false}>
-            <DoctrineEditor team="blue" />
-            <SquadList team="blue" />
+          <Section title={`Enemy squad (${enemyTeam})`} defaultOpen={false}>
+            <DoctrineEditor team={enemyTeam} />
+            <SquadList team={enemyTeam} />
           </Section>
         </>
       )}

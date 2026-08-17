@@ -133,34 +133,50 @@ function Highlights() {
 
   const sel = selected ? view.units[selected] : null;
   const selDef = selected ? config.units.find((u) => u.id === selected) : null;
-  const rangeTiles = useMemo(() => {
-    if (!sel || !selDef || !sel.alive) return [];
-    const origin = pendingMove ?? { x: sel.x, y: sel.y };
+  const mine = !!selDef && selDef.team === playerTeam;
+  // FE paint: blue = tiles this unit can move to; red = tiles it can attack into but not stand on.
+  const movable = mode === "manual" ? moveTiles : preview;
+  const attackBand = useMemo(() => {
+    if (!sel || !selDef || !sel.alive || !battle || cursor < events.length) return [];
+    if (!movable.length) return [];
+    const mv = new Set(movable.map((p) => `${p.x},${p.y}`));
+    mv.add(`${sel.x},${sel.y}`);
+    const out: { x: number; y: number }[] = [];
+    for (const k of battle.threatTiles(selDef.id)) {
+      if (mv.has(k)) continue;
+      const [x, y] = k.split(",").map(Number);
+      out.push({ x, y });
+    }
+    return out;
+  }, [sel, selDef, battle, cursor, events.length, movable]);
+  // attack range from the pending tile (manual)
+  const pendingRange = useMemo(() => {
+    if (!pendingMove || !selDef) return [];
     const out: { x: number; y: number }[] = [];
     const { rangeMin, rangeMax } = selDef.stats;
     for (let dy = -rangeMax; dy <= rangeMax; dy++)
       for (let dx = -rangeMax; dx <= rangeMax; dx++) {
         const d = Math.abs(dx) + Math.abs(dy);
         if (d < rangeMin || d > rangeMax) continue;
-        const x = origin.x + dx, y = origin.y + dy;
+        const x = pendingMove.x + dx, y = pendingMove.y + dy;
         if (x >= 0 && y >= 0 && x < config.map.width && y < config.map.height) out.push({ x, y });
       }
     return out;
-  }, [sel, selDef, pendingMove, config.map.width, config.map.height]);
+  }, [pendingMove, selDef, config.map.width, config.map.height]);
   const unitAt = (x: number, y: number) => config.units.find((u) => view.units[u.id]?.alive !== false && view.units[u.id]?.x === x && view.units[u.id]?.y === y);
   return (
     <group>
       {danger.map((p) => (
-        <Highlight key={`d${p.x},${p.y}`} x={p.x} y={p.y} color="#ff2d2d" opacity={0.14} />
+        <Highlight key={`d${p.x},${p.y}`} x={p.x} y={p.y} color="#c04cff" opacity={0.15} />
       ))}
-      {preview.map((p) => (
-        <Highlight key={`p${p.x},${p.y}`} x={p.x} y={p.y} color="#9ad0ff" opacity={0.22} />
+      {attackBand.map((p) => (
+        <Highlight key={`a${p.x},${p.y}`} x={p.x} y={p.y} color={mine ? "#ff4a4a" : "#ff2d2d"} opacity={mine ? 0.42 : 0.2} />
       ))}
-      {rangeTiles.map((p) => (
-        <Highlight key={`r${p.x},${p.y}`} x={p.x} y={p.y} color={selDef?.archetype === "healer" ? "#6cf58a" : "#ffb347"} opacity={0.34} />
+      {movable.map((p) => (
+        <Highlight key={`m${p.x},${p.y}`} x={p.x} y={p.y} color={mine ? "#3d8bff" : "#ff5a5a"} opacity={mine ? 0.5 : 0.32} />
       ))}
-      {moveTiles.map((p) => (
-        <Highlight key={`m${p.x},${p.y}`} x={p.x} y={p.y} color="#4fa3ff" opacity={0.4} />
+      {pendingRange.map((p) => (
+        <Highlight key={`q${p.x},${p.y}`} x={p.x} y={p.y} color={selDef?.archetype === "healer" ? "#6cf58a" : "#ff6a6a"} opacity={0.35} />
       ))}
       {targets.map((id) => {
         const u = view.units[id];

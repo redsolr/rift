@@ -1,17 +1,10 @@
 "use client";
 import { useEffect, useMemo, useRef } from "react";
 import { useGame } from "@/store/game";
-import { Archetype, TERRAIN, UnitDef, otherTeam } from "@/sim/types";
+import { TERRAIN, UnitDef, otherTeam } from "@/sim/types";
 import { ARCHETYPE_LABEL } from "@/sim/presets";
-import { CARD_H, CARD_W, overall, renderCard } from "./cards";
+import { CARD_H, CARD_W, WEAPON, overall, renderCard } from "./cards";
 
-const WEAPON: Record<Archetype, string> = {
-  knight: "Iron Lance",
-  fighter: "Iron Axe",
-  archer: "Iron Bow",
-  mage: "Fire",
-  healer: "Heal",
-};
 
 /**
  * FE-style combat forecast, docked to the left of the board. Left column = the selected
@@ -102,7 +95,7 @@ export default function Forecast() {
 }
 
 /** Blits the cached procedural card into a small canvas (same art as the board). */
-function CardThumb({ u }: { u: UnitDef }) {
+export function CardThumb({ u }: { u: UnitDef }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const c = ref.current;

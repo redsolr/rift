@@ -66,7 +66,7 @@ const EVENT_MS: Record<BattleEvent["type"], number> = {
 function initialView(cfg: BattleConfig): View {
   const units: Record<string, ViewUnit> = {};
   for (const u of cfg.units) units[u.id] = { id: u.id, x: u.x, y: u.y, hp: u.stats.hp, alive: true, actionSeq: 0, hitSeq: 0 };
-  return { units, turn: 1, activeTeam: "red", ended: false, winner: null, lastDecision: {} };
+  return { units, turn: 1, activeTeam: cfg.firstTeam ?? "red", ended: false, winner: null, lastDecision: {} };
 }
 
 let floatKey = 0;
@@ -287,7 +287,7 @@ export const useGame = create<GameState>((set, get) => {
   return {
     config: defaultConfig(),
     mode: "manager",
-    playerTeam: "red",
+    playerTeam: "blue",
     seed: 1,
     battle: null,
     events: [],
@@ -300,7 +300,7 @@ export const useGame = create<GameState>((set, get) => {
     selected: null,
     hover: null,
     hoverUnit: null,
-    showDanger: true,
+    showDanger: false,
     camFocus: { x: 0, y: 0, zoom: "out", seq: 0 },
     followCam: true,
     camTilt: typeof localStorage !== "undefined" && localStorage.getItem("tactician.camTilt") ? Number(localStorage.getItem("tactician.camTilt")) : (45 * Math.PI) / 180,
