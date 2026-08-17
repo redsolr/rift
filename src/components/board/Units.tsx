@@ -208,6 +208,31 @@ function Unit({ def }: { def: UnitDef }) {
   );
 }
 
+/**
+ * Manual mode "potential" ghost (the editor's placement read carried into play): with one of your units selected,
+ * hovering a reachable tile shows a translucent, team-tinted copy of its card standing THERE — next to the movement
+ * arrow — so you see the unit on the spot before committing. Clicking places the real card (pendingMove) and the
+ * ghost is gone; it never shows on the unit's own tile.
+ */
+function MoveGhost() {
+  const map = useGame((s) => s.config.map);
+  const def = useGame((s) => {
+    if (s.mode !== "manual" || !s.selected || s.pendingMove || !s.hover || !s.moveTiles.length) return null;
+    const h = s.hover;
+    if (!s.moveTiles.some((m) => m.x === h.x && m.y === h.y)) return null;
+    const v = s.view.units[s.selected];
+    if (!v || (v.x === h.x && v.y === h.y)) return null;
+    return s.config.units.find((u) => u.id === s.selected) ?? null;
+  });
+  const hover = useGame((s) => (def ? s.hover : null));
+  if (!def || !hover) return null;
+  return (
+    <group position={[hover.x, tileHeight(map, hover), hover.y]}>
+      <CardMesh def={def} dim={false} selected={false} opacity={0.55} tint={def.team === "blue" ? "#bff3ff" : "#ffc4bc"} lift={0.06} />
+    </group>
+  );
+}
+
 export default function Units() {
   const units = useGame((s) => s.config.units);
   return (
@@ -215,6 +240,7 @@ export default function Units() {
       {units.map((u) => (
         <Unit key={u.id} def={u} />
       ))}
+      <MoveGhost />
     </group>
   );
 }
