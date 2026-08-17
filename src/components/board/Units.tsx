@@ -86,7 +86,7 @@ function Unit({ def }: { def: UnitDef }) {
   });
 
   if (!vu || !vu.alive) return null;
-  const acted = mode !== "editor" && battle ? battle.state.units.find((u) => u.id === def.id)?.acted && battle.state.activeTeam === def.team : false;
+  const acted = mode !== "editor" && !!battle && vu.acted && vu.alive;
   const pct = Math.max(0, vu.hp / def.stats.hp);
   const myFloats = floats.filter((f) => f.unit === def.id);
 

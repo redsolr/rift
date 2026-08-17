@@ -103,7 +103,7 @@ export default function BattleBar() {
 function Side({ u, hp, terrain, side }: { u: UnitDef; hp: number; terrain: TerrainDef | null; side: "left" | "right" }) {
   return (
     <div className={`bb-side ${side} ${u.team}`}>
-      <CardThumb u={u} className="bb-portrait" scale={0.55} />
+      <CardThumb u={u} className="bb-portrait" scale={0.75} />
       <div className="bb-info">
         <div className="bb-name">
           <span>{u.name}</span>
@@ -118,6 +118,17 @@ function Side({ u, hp, terrain, side }: { u: UnitDef; hp: number; terrain: Terra
         <div className="bb-weapon">
           <span className="bb-wicon">⚔</span> {WEAPON[u.archetype]}
           <span className="bb-rng">rng {u.stats.rangeMin === u.stats.rangeMax ? u.stats.rangeMax : `${u.stats.rangeMin}–${u.stats.rangeMax}`}</span>
+        </div>
+        <div className="bb-hpbar">
+          <div style={{ width: `${(100 * hp) / u.stats.hp}%` }} />
+        </div>
+        <div className="bb-stats">
+          {(["atk", "def", "spd", "mov"] as const).map((k) => (
+            <span key={k} className="bb-stat">
+              <span className="bb-stat-l">{k.toUpperCase()}</span>
+              <span className="bb-stat-v">{u.stats[k]}</span>
+            </span>
+          ))}
         </div>
       </div>
       <div className="bb-terrain">

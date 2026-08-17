@@ -6,6 +6,7 @@ import Panel from "@/components/Panel";
 import Drawer from "@/components/Drawer";
 import BattleBar from "@/components/BattleBar";
 import Minimap from "@/components/Minimap";
+import TurnBar from "@/components/TurnBar";
 import CameraWidget from "@/components/CameraWidget";
 import PhaseBanner from "@/components/PhaseBanner";
 import { useGame } from "@/store/game";
@@ -67,6 +68,7 @@ export default function Home() {
             <Minimap />
             <CameraWidget />
           </div>
+          <TurnBar />
           <BattleBar />
           <PhaseBanner />
           {mobile && <div className="mobile-hint">{selectedName ?? hint}</div>}

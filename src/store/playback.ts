@@ -16,6 +16,8 @@ export interface ViewUnit {
   /** monotonically increasing per attack/heal so the renderer can trigger a bump */
   actionSeq: number;
   hitSeq: number;
+  /** finished its activation this phase (attack/heal/wait seen since the last turn_start) */
+  acted: boolean;
 }
 
 export interface Float {
@@ -74,7 +76,7 @@ let effectKey = 0;
 
 export function initialView(cfg: BattleConfig): View {
   const units: Record<string, ViewUnit> = {};
-  for (const u of cfg.units) units[u.id] = { id: u.id, x: u.x, y: u.y, hp: u.stats.hp, alive: true, actionSeq: 0, hitSeq: 0 };
+  for (const u of cfg.units) units[u.id] = { id: u.id, x: u.x, y: u.y, hp: u.stats.hp, alive: true, actionSeq: 0, hitSeq: 0, acted: false };
   return { units, turn: 1, activeTeam: cfg.firstTeam ?? "red", ended: false, winner: null, lastDecision: {} };
 }
 
@@ -100,6 +102,7 @@ export function applyEvent(prev: PlaybackState, e: BattleEvent, cfg: BattleConfi
     case "turn_start":
       v.turn = e.turn;
       v.activeTeam = e.team;
+      for (const id of Object.keys(v.units)) if (v.units[id].acted) v.units[id] = { ...v.units[id], acted: false };
       banner = { kind: "phase", team: e.team };
       break;
     case "decision":
@@ -109,14 +112,14 @@ export function applyEvent(prev: PlaybackState, e: BattleEvent, cfg: BattleConfi
       const end = e.path[e.path.length - 1];
       v.units[e.unit] = { ...v.units[e.unit], x: end.x, y: end.y };
       ms = 90 * Math.max(1, e.path.length - 1) + 120;
-      focus = { x: end.x, y: end.y, zoom: "in" };
+      focus = { x: end.x, y: end.y, zoom: "keep" };
       break;
     }
     case "attack": {
       const a = v.units[e.attacker];
       const t = v.units[e.target];
-      focus = { x: (a.x + t.x) / 2, y: (a.y + t.y) / 2, zoom: "in" };
-      v.units[e.attacker] = { ...a, actionSeq: a.actionSeq + 1 };
+      focus = { x: (a.x + t.x) / 2, y: (a.y + t.y) / 2, zoom: "keep" };
+      v.units[e.attacker] = { ...a, actionSeq: a.actionSeq + 1, acted: true };
       v.units[e.target] = { ...t, hp: e.targetHp, hitSeq: t.hitSeq + 1 };
       floats.push({ key: ++floatKey, unit: e.target, text: `-${e.damage}`, color: "#ff5c5c" });
       const style = effectStyleOf(cfg.units, e.attacker);
@@ -132,8 +135,8 @@ export function applyEvent(prev: PlaybackState, e: BattleEvent, cfg: BattleConfi
     case "heal": {
       const h = v.units[e.healer];
       const t = v.units[e.target];
-      focus = { x: (h.x + t.x) / 2, y: (h.y + t.y) / 2, zoom: "in" };
-      v.units[e.healer] = { ...h, actionSeq: h.actionSeq + 1 };
+      focus = { x: (h.x + t.x) / 2, y: (h.y + t.y) / 2, zoom: "keep" };
+      v.units[e.healer] = { ...h, actionSeq: h.actionSeq + 1, acted: true };
       v.units[e.target] = { ...t, hp: e.targetHp };
       floats.push({ key: ++floatKey, unit: e.target, text: `+${e.amount}`, color: "#6cf58a" });
       effects.push({ key: ++effectKey, kind: "burst", style: "heal", at: { x: h.x, y: h.y }, delay: 0 });
@@ -154,6 +157,7 @@ export function applyEvent(prev: PlaybackState, e: BattleEvent, cfg: BattleConfi
       break;
     case "wait": {
       const w = v.units[e.unit];
+      v.units[e.unit] = { ...w, acted: true };
       focus = { x: w.x, y: w.y, zoom: "keep" };
       break;
     }
