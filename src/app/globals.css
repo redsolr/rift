@@ -1427,7 +1427,8 @@ button.danger {
 }
 .ui-edit-label {
   position: absolute;
-  top: -22px;
+  bottom: 100%; /* always fully OUTSIDE the frame, never over its buttons */
+  margin-bottom: 3px;
   left: 0;
   display: flex;
   align-items: center;
@@ -1478,6 +1479,10 @@ button.danger {
   font-size: 12px;
   font-weight: 700;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  white-space: nowrap;
+}
+.ui-layout-bar button {
+  white-space: nowrap;
 }
 .ui-toggle.on {
   border-color: #f2c96b;
@@ -1937,6 +1942,10 @@ button.link {
   color: var(--muted);
   font-size: 12px;
   min-width: 0;
+  width: auto;
+  white-space: nowrap;
+  align-self: center;
+  padding: 0 24px;
 }
 .bb-prompt {
   font-size: 13px;

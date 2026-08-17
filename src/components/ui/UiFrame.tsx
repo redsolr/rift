@@ -1,5 +1,5 @@
 "use client";
-import { CSSProperties, PointerEvent as RPointerEvent, ReactNode, useCallback, useRef } from "react";
+import { CSSProperties, PointerEvent as RPointerEvent, ReactNode, useCallback, useEffect, useRef } from "react";
 import { create } from "zustand";
 
 /**
@@ -31,13 +31,21 @@ export interface FrameLayout {
 const DEFAULT: FrameLayout = { dx: 0, dy: 0, scale: 1 };
 const KEY = "tactician.ui";
 
+type Frames = Partial<Record<UiFrameId, FrameLayout>>;
 interface UiLayoutState {
   editing: boolean;
-  frames: Partial<Record<UiFrameId, FrameLayout>>;
+  frames: Frames;
+  /** undo / redo stacks of whole layouts — one entry per gesture (drag, resize, reset), not per pointer move */
+  past: Frames[];
+  future: Frames[];
   toggleEditing: () => void;
+  /** call once at the START of a gesture so undo restores the pre-gesture layout */
+  beginChange: () => void;
   setFrame: (id: UiFrameId, patch: Partial<FrameLayout>) => void;
   resetFrame: (id: UiFrameId) => void;
   resetAll: () => void;
+  undo: () => void;
+  redo: () => void;
   hydrate: () => void;
 }
 
@@ -52,7 +60,24 @@ const persist = (frames: UiLayoutState["frames"]) => {
 export const useUiLayout = create<UiLayoutState>((set, get) => ({
   editing: false,
   frames: {},
+  past: [],
+  future: [],
   toggleEditing: () => set({ editing: !get().editing }),
+  beginChange: () => set({ past: [...get().past.slice(-49), get().frames], future: [] }),
+  undo: () => {
+    const { past, frames, future } = get();
+    if (!past.length) return;
+    const prev = past[past.length - 1];
+    set({ frames: prev, past: past.slice(0, -1), future: [frames, ...future] });
+    persist(prev);
+  },
+  redo: () => {
+    const { past, frames, future } = get();
+    if (!future.length) return;
+    const next = future[0];
+    set({ frames: next, past: [...past, frames], future: future.slice(1) });
+    persist(next);
+  },
   setFrame: (id, patch) => {
     const cur = get().frames[id] ?? DEFAULT;
     const next = { ...cur, ...patch };
@@ -62,12 +87,14 @@ export const useUiLayout = create<UiLayoutState>((set, get) => ({
     persist(frames);
   },
   resetFrame: (id) => {
+    get().beginChange();
     const frames = { ...get().frames };
     delete frames[id];
     set({ frames });
     persist(frames);
   },
   resetAll: () => {
+    get().beginChange();
     set({ frames: {} });
     persist({});
   },
@@ -90,6 +117,7 @@ export function useUiFrame(id: UiFrameId): { style: CSSProperties; overlay: Reac
   const layout = useUiLayout((s) => s.frames[id]) ?? DEFAULT;
   const setFrame = useUiLayout((s) => s.setFrame);
   const resetFrame = useUiLayout((s) => s.resetFrame);
+  const beginChange = useUiLayout((s) => s.beginChange);
   const drag = useRef<{ x: number; y: number; dx: number; dy: number; scale: number; mode: "move" | "scale" } | null>(null);
 
   const start = useCallback(
@@ -97,9 +125,10 @@ export function useUiFrame(id: UiFrameId): { style: CSSProperties; overlay: Reac
       e.preventDefault();
       e.stopPropagation();
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      beginChange();
       drag.current = { x: e.clientX, y: e.clientY, dx: layout.dx, dy: layout.dy, scale: layout.scale, mode };
     },
-    [layout],
+    [layout, beginChange],
   );
   const move = useCallback(
     (e: RPointerEvent<HTMLElement>) => {
@@ -145,12 +174,42 @@ export function UiLayoutBar() {
   const editing = useUiLayout((s) => s.editing);
   const toggle = useUiLayout((s) => s.toggleEditing);
   const resetAll = useUiLayout((s) => s.resetAll);
+  const undo = useUiLayout((s) => s.undo);
+  const redo = useUiLayout((s) => s.redo);
+  const canUndo = useUiLayout((s) => s.past.length > 0);
+  const canRedo = useUiLayout((s) => s.future.length > 0);
+  // Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z while laying out
+  useEffect(() => {
+    if (!editing) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const k = e.key.toLowerCase();
+      if (k === "z" && e.shiftKey) {
+        e.preventDefault();
+        redo();
+      } else if (k === "z") {
+        e.preventDefault();
+        undo();
+      } else if (k === "y") {
+        e.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [editing, undo, redo]);
   if (!editing) return null;
   return (
     <div className="ui-layout-bar">
       <span>UI layout — drag a frame to move it, drag its corner grip to resize</span>
-      <button className="ghost" onClick={resetAll}>
-        Reset all
+      <button className="ghost" onClick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)">
+        ↶ Undo
+      </button>
+      <button className="ghost" onClick={redo} disabled={!canRedo} title="Redo (Ctrl+Y / Ctrl+Shift+Z)">
+        ↷ Redo
+      </button>
+      <button className="ghost" onClick={resetAll} title="Every frame back to its default place and size">
+        Set to default
       </button>
       <button className="primary" onClick={toggle}>
         Done
