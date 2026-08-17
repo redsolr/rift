@@ -2,10 +2,13 @@
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { selectCaughtUp, useGame } from "@/store/game";
-import { parseKey, pathTo, tileHeight, tilesInRange } from "@/sim/grid";
+import { selectCaughtUp, selectDropTarget, useGame } from "@/store/game";
+import { parseKey, pathTo, posKey, reachable, standable, terrainAt, tileHeight, tilesInRange } from "@/sim/grid";
 import { attackById, attackRange, tilesInAnyRange } from "@/sim/attacks";
-import { Pos, otherTeam } from "@/sim/types";
+import { Pos, TERRAIN, UnitDef, UnitState, otherTeam } from "@/sim/types";
+
+/** A config unit as a fresh battle-start state (full HP, unbuffed) — the editor previews reach from setup data. */
+const asState = (u: UnitDef): UnitState => ({ ...u, hp: u.stats.hp, alive: true, acted: false, buff: null });
 
 /** Hollow square frame (outer 0.98, inner 0.93) — the thin FE tile edge. Built once. */
 const FRAME_GEO = (() => {
@@ -86,9 +89,40 @@ export default function Highlights() {
   const sel = selected ? view.units[selected] : null;
   const selDef = selected ? config.units.find((u) => u.id === selected) : null;
   const mine = !!selDef && selDef.team === playerTeam;
+  // Editor "potential" (RTS placement read): the selected unit's move field + attack band from where it stands — or,
+  // while its card is being carried, from the tile under the pointer, so you see what the spot would give it BEFORE dropping.
+  const drag = useGame((s) => s.drag);
+  const groundHover = useGame((s) => s.groundHover);
+  const dropOk = useGame((s) => (s.drag ? (selectDropTarget(s)?.ok ?? false) : true));
+  const editorOrigin = useMemo<Pos | null>(() => {
+    if (mode !== "editor" || !selDef) return null;
+    // carried: preview from the pointer tile only where the drop is legal (nothing to show on an occupied / impassable tile)
+    if (drag?.kind === "unit" && drag.id === selDef.id) return dropOk ? groundHover : null;
+    return { x: selDef.x, y: selDef.y };
+  }, [mode, selDef, drag, groundHover, dropOk]);
+  const editorPreview = useMemo(() => {
+    const none = { movable: [] as Pos[], band: [] as Pos[] };
+    if (!editorOrigin || !selDef) return none;
+    if (TERRAIN[terrainAt(config.map, editorOrigin.x, editorOrigin.y)].moveCost === null) return none;
+    const me = { ...asState(selDef), x: editorOrigin.x, y: editorOrigin.y };
+    const others = config.units.filter((u) => u.id !== selDef.id).map(asState);
+    const reach = reachable(config.map, me, others);
+    const movable = standable(reach, me, others);
+    const mv = new Set([...movable.map(posKey), posKey(me)]);
+    const seen = new Set<string>();
+    const band: Pos[] = [];
+    for (const k of reach.cost.keys())
+      for (const p of tilesInAnyRange(config.map, me, parseKey(k))) {
+        const pk = posKey(p);
+        if (mv.has(pk) || seen.has(pk)) continue;
+        seen.add(pk);
+        band.push(p);
+      }
+    return { movable, band };
+  }, [editorOrigin, selDef, config.map, config.units]);
   // FE paint: blue = tiles this unit can move to; red = tiles it can attack into but not stand on.
-  const movable = mode === "manual" ? moveTiles : preview;
-  const attackBand = useMemo(() => {
+  const movable = mode === "manual" ? moveTiles : mode === "editor" ? editorPreview.movable : preview;
+  const liveBand = useMemo(() => {
     if (!sel || !selDef || !sel.alive || !battle || !caughtUp) return [];
     if (!movable.length) return [];
     const mv = new Set(movable.map((p) => `${p.x},${p.y}`));
@@ -97,14 +131,15 @@ export default function Highlights() {
     for (const k of battle.threatTiles(selDef.id)) if (!mv.has(k)) out.push(parseKey(k));
     return out;
   }, [sel, selDef, battle, caughtUp, movable]);
+  const attackBand = mode === "editor" ? editorPreview.band : liveBand;
   // hovering a reachable tile previews the destination (FE cursor): path + attack squares + arcs
   const hoverPreview = useMemo(() => {
-    if (pendingMove || !hover || !movable.length || !selDef || !mine) return null;
+    if (mode === "editor" || pendingMove || !hover || !movable.length || !selDef || !mine) return null;
     return movable.some((m) => m.x === hover.x && m.y === hover.y) ? hover : null;
-  }, [pendingMove, hover, movable, selDef, mine]);
+  }, [mode, pendingMove, hover, movable, selDef, mine]);
   const previewFrom = pendingMove ?? hoverPreview;
   // FE Three Hopes: the attack range from where the unit STANDS (or will stand) is drawn over the move field
-  const attackOrigin = useMemo(() => previewFrom ?? (sel && sel.alive && mine ? { x: sel.x, y: sel.y } : null), [previewFrom, sel, mine]);
+  const attackOrigin = useMemo(() => (mode === "editor" ? editorOrigin : (previewFrom ?? (sel && sel.alive && mine ? { x: sel.x, y: sel.y } : null))), [mode, editorOrigin, previewFrom, sel, mine]);
   // attack range from the pending / hovered tile: the chosen (or hovered) attack's range, else the union of all four
   const focusAttack = pendingAttack ?? hoverAttack;
   // healing range (green) when a heal is focused / the Heal picker is open / a healer idles; else damage range
@@ -195,7 +230,7 @@ function FocusTile({ x, y, color }: { x: number; y: number; color: string }) {
  * FE Three Hopes movement path: a slim WHITE ribbon on the ground with ROUNDED turns (quarter arcs) and a swept, notched
  * arrowhead, over a soft glow. Built as ONE mitred triangle strip (no overlapping pieces — overlaps double-blend into
  * visible dots on a transparent mesh). Each triangle knows its distance along the path, so the visible length can be
- * animated: it EXTENDS / RETRACTS at constant speed toward the current path length whenever the path changes.
+ * animated: it EXTENDS / RETRACTS toward the current path length in a fixed ~0.1 s (longer distance → faster tip).
  */
 interface PathGeo {
   geo: THREE.BufferGeometry;
