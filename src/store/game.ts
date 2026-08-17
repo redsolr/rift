@@ -103,7 +103,7 @@ interface GameState {
   /** Camera focus request: where to glide the camera; zoom in/out/keep; seq bumps on every request. */
   camFocus: { x: number; y: number; zoom: "in" | "out" | "keep"; seq: number };
   /** phase banner request: which team's phase just began (or a result), seq bumps per show */
-  banner: { kind: "phase" | "victory" | "defeat" | "draw"; team: Team; seq: number };
+  banner: { kind: "phase" | "planning" | "victory" | "defeat" | "draw"; team: Team; seq: number };
   followCam: boolean;
   /** viewing angle from horizontal, radians (30°–70°) */
   camTilt: number;
@@ -444,7 +444,8 @@ export const useGame = create<GameState>((set, get) => {
       const cfg = get().config;
       const s = seed ?? get().seed;
       if (get().mode !== "editor") {
-        set({ ...resetPlayback(cfg, null), seed: s, simStats: null, planning: true, drag: null });
+        // the planning phase gets the same rune-circle banner as PLAYER / ENEMY PHASE
+        set({ ...resetPlayback(cfg, null), seed: s, simStats: null, planning: true, drag: null, banner: { kind: "planning", team: get().playerTeam, seq: get().banner.seq + 1 } });
         clearManual();
         return;
       }

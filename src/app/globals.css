@@ -1669,6 +1669,11 @@ button.link {
   --pb: #ff5a4a;
   --pb-glow: rgba(255, 90, 74, 0.55);
 }
+/* planning = deployment, before either side moves: gold, like the FE preparations screen */
+.phase-banner.planning {
+  --pb: #f2c96b;
+  --pb-glow: rgba(242, 201, 107, 0.55);
+}
 .phase-banner.victory {
   --pb: #ffd54f;
   --pb-glow: rgba(255, 213, 79, 0.55);

@@ -47,7 +47,7 @@ export interface View {
 }
 
 export type CamFocus = { x: number; y: number; zoom: "in" | "out" | "keep" };
-export type Banner = { kind: "phase" | "victory" | "defeat" | "draw"; team: Team };
+export type Banner = { kind: "phase" | "planning" | "victory" | "defeat" | "draw"; team: Team };
 
 export interface PlaybackState {
   view: View;

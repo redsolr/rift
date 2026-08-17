@@ -4,7 +4,7 @@ import { useGame } from "@/store/game";
 
 /**
  * FE3H-style phase banner: a rotating rune circle with a star lattice and big text
- * ("PLAYER PHASE" / "ENEMY PHASE" / "VICTORY" / "DEFEAT" / "DRAW"). Driven by store.banner.seq.
+ * ("PLANNING PHASE" / "PLAYER PHASE" / "ENEMY PHASE" / "VICTORY" / "DEFEAT" / "DRAW"). Driven by store.banner.seq.
  */
 export default function PhaseBanner() {
   const banner = useGame((s) => s.banner);
@@ -13,15 +13,15 @@ export default function PhaseBanner() {
   const [hiddenSeq, setHiddenSeq] = useState(0);
   useEffect(() => {
     if (banner.seq === 0) return;
-    const ms = (banner.kind === "phase" ? 1250 : 1800) / Math.max(0.5, speed);
+    const ms = (banner.kind === "phase" || banner.kind === "planning" ? 1250 : 1800) / Math.max(0.5, speed);
     const t = setTimeout(() => setHiddenSeq(banner.seq), ms);
     return () => clearTimeout(t);
   }, [banner, speed]);
   if (banner.seq === 0 || hiddenSeq >= banner.seq) return null;
   const shown = banner;
   const mine = shown.team === playerTeam;
-  const text = shown.kind === "phase" ? (mine ? "PLAYER PHASE" : "ENEMY PHASE") : shown.kind === "victory" ? "VICTORY" : shown.kind === "defeat" ? "DEFEAT" : "DRAW";
-  const cls = shown.kind === "phase" ? (mine ? "player" : "enemy") : shown.kind;
+  const text = shown.kind === "planning" ? "PLANNING PHASE" : shown.kind === "phase" ? (mine ? "PLAYER PHASE" : "ENEMY PHASE") : shown.kind === "victory" ? "VICTORY" : shown.kind === "defeat" ? "DEFEAT" : "DRAW";
+  const cls = shown.kind === "planning" ? "planning" : shown.kind === "phase" ? (mine ? "player" : "enemy") : shown.kind;
   const runes = "ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛊᛏᛒᛖᛗᛚᛜᛞᛟ".split("");
   return (
     <div className={`phase-banner ${cls}`} key={shown.seq} aria-live="polite">
