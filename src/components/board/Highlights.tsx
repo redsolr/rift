@@ -195,7 +195,7 @@ function FocusTile({ x, y, color }: { x: number; y: number; color: string }) {
  * FE Three Hopes movement path: a slim WHITE ribbon on the ground with ROUNDED turns (quarter arcs) and a swept, notched
  * arrowhead, over a soft glow. Built as ONE mitred triangle strip (no overlapping pieces — overlaps double-blend into
  * visible dots on a transparent mesh). Each triangle knows its distance along the path, so the visible length can be
- * animated: it EASES toward the current path length whenever the path changes — grows out, or shrinks back — never snaps.
+ * animated: it EXTENDS / RETRACTS at constant speed toward the current path length whenever the path changes.
  */
 interface PathGeo {
   geo: THREE.BufferGeometry;
@@ -268,7 +268,8 @@ function buildPathGeometry(raw: THREE.Vector3[], W: number, headScale: number): 
   const b0 = pos.length / 3;
   pos.push(headTip.x, y, headTip.z, r.x, y, r.z, headNotch.x, y, headNotch.z, l.x, y, l.z);
   idx.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3);
-  triEnd.push(total, total);
+  // the head shows once the tip is within a head-length of the destination — it rides in with the line, not after it
+  triEnd.push(Math.max(0, total - headLen), Math.max(0, total - headLen));
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
   geo.setIndex(idx);
@@ -296,9 +297,11 @@ function PathLine({ path }: { path: Pos[] }) {
   useFrame((_, dt) => {
     if (!geos) return;
     const target = geos.core.total;
-    // exponential ease toward the target length: grows out / shrinks back smoothly, frame-rate independent
-    shown.current += (target - shown.current) * (1 - Math.exp(-dt * 14));
-    if (Math.abs(target - shown.current) < 0.005) shown.current = target;
+    // constant-speed extend / retract (tiles per second) — brisk and linear, so the tip visibly travels; snaps the last sliver
+    const SPEED = 14;
+    const step = SPEED * dt;
+    if (Math.abs(target - shown.current) <= step) shown.current = target;
+    else shown.current += Math.sign(target - shown.current) * step;
     core.current?.geometry.setDrawRange(0, drawCountFor(geos.core, shown.current));
     glow.current?.geometry.setDrawRange(0, drawCountFor(geos.glow, shown.current));
   });
