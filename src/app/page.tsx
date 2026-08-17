@@ -7,8 +7,8 @@ import Drawer from "@/components/Drawer";
 import BattleBar from "@/components/BattleBar";
 import TurnControls from "@/components/TurnControls";
 import SkillPanel from "@/components/SkillPanel";
-import Minimap from "@/components/Minimap";
-import CameraWidget from "@/components/CameraWidget";
+import HudTopRight from "@/components/HudTopRight";
+import { UiLayoutBar, useUiLayout } from "@/components/ui/UiFrame";
 import PhaseBanner from "@/components/PhaseBanner";
 import { useGame } from "@/store/game";
 
@@ -55,6 +55,7 @@ export default function Home() {
   }, []);
   useEffect(() => {
     useGame.getState().hydrateMaps();
+    useUiLayout.getState().hydrate();
   }, []);
   useEffect(() => {
     const m = location.hash.match(/#c=([A-Za-z0-9_-]+)/);
@@ -68,13 +69,11 @@ export default function Home() {
       <div className={mobile ? "stage mobile" : "stage"}>
         <div className="board-wrap">
           <Board />
-          <div className="hud-tr">
-            <Minimap />
-            <CameraWidget />
-          </div>
+          <HudTopRight />
           <BattleBar />
           <TurnControls />
           <SkillPanel />
+          <UiLayoutBar />
           <PhaseBanner />
           {mobile && <div className="mobile-hint">{selectedName ?? hint}</div>}
         </div>

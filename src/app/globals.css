@@ -1414,6 +1414,81 @@ button.danger {
   }
 }
 
+/* ---- UI layout mode (WoW-addon style frames) ---- */
+.ui-edit {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  border: 2px dashed rgba(242, 201, 107, 0.9);
+  background: rgba(242, 201, 107, 0.08);
+  cursor: move;
+  pointer-events: auto;
+  border-radius: 4px;
+}
+.ui-edit-label {
+  position: absolute;
+  top: -22px;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 4px 4px 0 0;
+  background: #f2c96b;
+  color: #111;
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: move;
+}
+.ui-edit-reset {
+  background: #111;
+  color: #f2c96b;
+  border-radius: 3px;
+  padding: 0 5px;
+  font-size: 11px;
+  line-height: 16px;
+}
+.ui-edit-grip {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  background: #f2c96b;
+  border: 2px solid #111;
+  cursor: nwse-resize;
+}
+.ui-layout-bar {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(20, 24, 33, 0.95);
+  border: 1px solid #f2c96b;
+  color: var(--fg);
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+.ui-toggle.on {
+  border-color: #f2c96b;
+  color: #f2c96b;
+}
+/* frames stay put (no auto-hide) while laying out */
+.board-wrap:has(.ui-layout-bar) .hud-tr,
+.board-wrap:has(.ui-layout-bar) .turn-controls {
+  display: flex !important;
+}
+
 /* ---- turn controls (bottom-right of the board, above the battle bar) ---- */
 .turn-controls {
   position: absolute;
@@ -1853,9 +1928,10 @@ button.link {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  min-width: 340px;
-  padding: 0 16px 4px;
+  gap: 6px;
+  min-width: 460px;
+  width: 38%;
+  padding: 0 16px 6px;
 }
 .bb-center.solo-hint {
   color: var(--muted);
@@ -1876,7 +1952,7 @@ button.link {
 }
 .bb-grid {
   display: grid;
-  grid-template-columns: 52px 52px 60px 32px 60px 52px 52px;
+  grid-template-columns: 58px 58px 76px 40px 76px 58px 58px;
   align-items: center;
   text-align: center;
   row-gap: 2px;
@@ -1918,16 +1994,16 @@ button.link {
 }
 .bb-bars {
   display: grid;
-  grid-template-columns: 1fr 64px 64px 1fr;
+  grid-template-columns: 1fr 78px 78px 1fr; /* FE: the gauges take the width, the numbers sit tight in the middle */
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
-  margin-top: 4px;
+  margin-top: 6px;
 }
 /* FE Engage gauge: parchment-light track (= what will be missing), solid colour = HP left, anchored to the centre */
 .bb-bar {
   position: relative;
-  height: 16px;
+  height: 20px;
   background: linear-gradient(180deg, #efe9dc, #d9d2c2);
   border: 1px solid #0f1116;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35), 0 1px 0 rgba(0, 0, 0, 0.6);
@@ -1962,7 +2038,7 @@ button.link {
 .bb-big {
   font-family: Georgia, "Times New Roman", serif;
   font-style: italic;
-  font-size: 40px;
+  font-size: 48px;
   font-weight: 700;
   color: #fff;
   text-align: center;

@@ -1,5 +1,6 @@
 "use client";
 import { Mode, useGame } from "@/store/game";
+import { useUiLayout } from "./ui/UiFrame";
 
 const MODES: { id: Mode; label: string; hint: string }[] = [
   { id: "manual", label: "Manual", hint: "You move every unit" },
@@ -36,6 +37,8 @@ export default function Hud() {
   const seed = useGame((s) => s.seed);
   const showDanger = useGame((s) => s.showDanger);
   const toggleDanger = useGame((s) => s.toggleDanger);
+  const uiEditing = useUiLayout((s) => s.editing);
+  const toggleUiEdit = useUiLayout((s) => s.toggleEditing);
   const boardView = useGame((s) => s.boardView);
   const toggleBoardView = useGame((s) => s.toggleBoardView);
   const showGrid = useGame((s) => s.showGrid);
@@ -145,6 +148,9 @@ export default function Hud() {
           </button>
         )}
 
+        <button className={`ghost ui-toggle ${uiEditing ? "on" : ""}`} onClick={toggleUiEdit} title="UI layout: move and resize the HUD frames (WoW-addon style)">
+          ⧉<span className="btn-text"> UI</span>
+        </button>
         {battle && mode !== "editor" && (
           <button className={`ghost danger-toggle ${showDanger ? "on" : ""}`} onClick={toggleDanger} title="Show every tile the enemy can attack next turn + who can hit your selected unit">
             ◆<span className="btn-text"> Danger</span>

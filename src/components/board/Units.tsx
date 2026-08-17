@@ -26,7 +26,27 @@ function cardTexture(def: UnitDef): THREE.CanvasTexture {
   return t;
 }
 
-function CardMesh({ def, dim, selected, ghost }: { def: UnitDef; dim: boolean; selected: boolean; ghost: boolean }) {
+/** Sims-style cutaway: alpha ramp that keeps the bottom of the card and fades the top ~60% out. Built once. */
+let cutawayAlpha: THREE.CanvasTexture | null = null;
+function cutawayAlphaMap() {
+  if (cutawayAlpha) return cutawayAlpha;
+  const c = document.createElement("canvas");
+  c.width = 4;
+  c.height = 128;
+  const ctx = c.getContext("2d")!;
+  const g = ctx.createLinearGradient(0, 0, 0, 128);
+  // alphaMap samples the GREEN channel → an opaque black→white ramp (not white-with-alpha)
+  g.addColorStop(0, "#141414");
+  g.addColorStop(0.55, "#2e2e2e");
+  g.addColorStop(0.8, "#ffffff");
+  g.addColorStop(1, "#ffffff");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 4, 128);
+  cutawayAlpha = new THREE.CanvasTexture(c);
+  return cutawayAlpha;
+}
+
+function CardMesh({ def, dim, selected, ghost, cutaway }: { def: UnitDef; dim: boolean; selected: boolean; ghost: boolean; cutaway: boolean }) {
   const texture = useMemo(() => cardTexture(def), [def]);
   const foil = TIER[tierOf(def)].foil;
   // foil sweep: tier intensity, plus a hero boost when selected (even base-tier cards get the sweep then); acted units stay flat
@@ -35,9 +55,10 @@ function CardMesh({ def, dim, selected, ghost }: { def: UnitDef; dim: boolean; s
     <Billboard follow lockX={false} lockY={false} lockZ={false} position={[0, CARD_H3 / 2 + 0.05, 0]}>
       <mesh>
         <planeGeometry args={[CARD_W3, CARD_H3]} />
-        <meshBasicMaterial map={texture} transparent alphaTest={0.05} opacity={ghost ? 0.38 : 1} color={dim ? "#6a6a72" : "#ffffff"} toneMapped={false} />
+        {/* cutaway: the top of the card fades so the unit standing right behind stays readable (Sims roof-off) */}
+        <meshBasicMaterial key={cutaway ? "cut" : "full"} map={texture} alphaMap={cutaway ? cutawayAlphaMap() : null} transparent alphaTest={0.05} opacity={ghost ? 0.38 : 1} color={dim ? "#6a6a72" : "#ffffff"} toneMapped={false} depthWrite={!cutaway} />
       </mesh>
-      {!dim && !ghost && (foil > 0 || selected) && <CardFoil mask={texture} foil={foil} boost={boost} w={CARD_W3} h={CARD_H3} />}
+      {!dim && !ghost && !cutaway && (foil > 0 || selected) && <CardFoil mask={texture} foil={foil} boost={boost} w={CARD_W3} h={CARD_H3} />}
     </Billboard>
   );
 }
@@ -61,6 +82,14 @@ function Unit({ def }: { def: UnitDef }) {
   const pending = useGame((s) => (s.selected === def.id ? s.pendingMove : null));
   const vx = pending?.x ?? vu?.x ?? def.x;
   const vy = pending?.y ?? vu?.y ?? def.y;
+  // Sims-style cutaway, tile rule: whatever tile the pointer is over, the card standing on the tile directly IN FRONT
+  // of it (y + 1, one step toward the camera) fades so the pointed-at tile/unit stays readable. Nothing else fades.
+  const cutaway = useGame((s) => {
+    // a hovered unit's card swallows the tile hover, so the unit under the pointer wins over the (possibly stale) tile
+    const hv = s.hoverUnit ? s.view.units[s.hoverUnit] : null;
+    const p = hv ? { x: hv.x, y: hv.y } : s.hover;
+    return !!p && p.x === vx && p.y === vy - 1;
+  });
   const actionSeq = vu?.actionSeq ?? 0;
   const hitSeq = vu?.hitSeq ?? 0;
   const th = tileHeight(map, { x: vx, y: vy });
@@ -116,7 +145,7 @@ function Unit({ def }: { def: UnitDef }) {
           }}
           onPointerOut={() => setHoverUnit(null)}
         >
-          <CardMesh def={def} dim={!!acted} selected={selected} ghost={vu.buff?.kind === "invisibility"} />
+          <CardMesh def={def} dim={!!acted} selected={selected} ghost={vu.buff?.kind === "invisibility"} cutaway={cutaway} />
           <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
             <circleGeometry args={[0.34, 20]} />
             <meshBasicMaterial color="#000" transparent opacity={0.35} />

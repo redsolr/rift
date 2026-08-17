@@ -7,6 +7,7 @@ import { ARCHETYPE_LABEL } from "@/sim/presets";
 import { WEAPON, overall } from "./cards";
 import { attackById, attackRange } from "@/sim/attacks";
 import CardThumb from "./CardThumb";
+import { useUiFrame } from "./ui/UiFrame";
 
 /**
  * FE Engage / Three Hopes style battle bar across the bottom of the board.
@@ -44,7 +45,10 @@ export default function BattleBar() {
   });
   const byId = (id: string | null) => (id ? units.find((u) => u.id === id) ?? null : null);
   const hov = byId(hoverUnit);
-  const sel = byId(selected);
+  const ui = useUiFrame("battle-bar");
+  const playerTeam = useGame((s) => s.playerTeam);
+  // UI-layout mode: show the bar with the first of your units so it can be placed
+  const sel = byId(selected) ?? (ui.editing ? units.find((u) => u.team === playerTeam) ?? units[0] ?? null : null);
   // Only a SELECTED unit opens the bar (hover alone would flicker). Right = the enemy under the
   // pointer while a unit is selected, else the only target in range.
   const left = sel;
@@ -67,19 +71,14 @@ export default function BattleBar() {
   const lv = left ? view.units[left.id] : null;
   const rv = right ? view.units[right.id] : null;
   const duel = !!(fc && left && right && lv && rv);
-  const coarse = typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches;
   const myHpAfter = duel && fc!.retaliation != null ? Math.max(0, lv!.hp - fc!.retaliation) : lv?.hp ?? 0;
 
   return (
-    <div ref={ref} className={`battle-bar ${duel ? "duel" : "solo"}`} aria-label="Battle forecast">
+    <div ref={ref} className={`battle-bar ${duel ? "duel" : "solo"}`} aria-label="Battle forecast" style={ui.style}>
       {lv && <Side u={left} hp={lv.hp} terrain={leftTerr} side="left" attack={fc?.attack ?? null} buff={lv.buff} />}
 
       {duel && (
         <div className="bb-center">
-          <div className="bb-prompt">
-            {fc!.attack && <span className="bb-attack">{fc!.attack.name} · </span>}
-            {fc!.inRange ? (coarse ? "Tap target ▸ Attack" : "Right-click ▸ Attack") : fc!.attack ? "Out of range from here" : "Nothing reaches from here"}
-          </div>
           <div className="bb-grid">
             <span className="bb-h">Crit</span>
             <span className="bb-h">Hit</span>
@@ -97,16 +96,16 @@ export default function BattleBar() {
             <span className="bb-v">{fc!.retaliation != null ? "100" : <span className="bb-x">✕</span>}</span>
             <span className="bb-v">{fc!.retaliation != null ? "—" : ""}</span>
           </div>
+          {/* FE Engage bars: light track = missing HP after the exchange; solid colour = HP left, anchored toward the
+              centre — yours drains from its LEFT end, the enemy's from its RIGHT end. Plain numbers, no animation. */}
           <div className="bb-bars">
             <div className="bb-bar left">
               <div className="bb-bar-fill" style={{ width: `${(100 * myHpAfter) / left!.stats.hp}%` }} />
-              {fc!.retaliation != null && <div className="bb-bar-loss" style={{ left: `${(100 * myHpAfter) / left!.stats.hp}%`, width: `${(100 * (lv!.hp - myHpAfter)) / left!.stats.hp}%` }} />}
             </div>
-            <span className={`bb-big ${fc!.retaliationKill ? "dead" : fc!.retaliation != null ? "hurt" : ""}`}>{myHpAfter}</span>
-            <span className={`bb-big ${fc!.kill ? "dead" : "hurt"}`}>{fc!.hpAfter}</span>
+            <span className={`bb-big ${fc!.retaliationKill ? "dead" : ""}`}>{myHpAfter}</span>
+            <span className={`bb-big ${fc!.kill ? "dead" : ""}`}>{fc!.hpAfter}</span>
             <div className="bb-bar right">
               <div className="bb-bar-fill" style={{ width: `${(100 * fc!.hpAfter) / right!.stats.hp}%` }} />
-              <div className="bb-bar-loss" style={{ right: `${(100 * fc!.hpAfter) / right!.stats.hp}%`, width: `${(100 * (rv!.hp - fc!.hpAfter)) / right!.stats.hp}%` }} />
             </div>
           </div>
         </div>
@@ -114,6 +113,7 @@ export default function BattleBar() {
       {!duel && <div className="bb-center solo-hint">Hover an enemy to forecast</div>}
 
       {right && rv && <Side u={right} hp={rv.hp} terrain={rightTerr} side="right" />}
+      {ui.overlay}
     </div>
   );
 }

@@ -2,6 +2,7 @@
 import { useMemo } from "react";
 import { useGame } from "@/store/game";
 import { AttackDef, Element, attackRange } from "@/sim/attacks";
+import { useUiFrame } from "./ui/UiFrame";
 
 const ELEMENT_GLYPH: Record<Element, string> = { physical: "⚔", fire: "🔥", ice: "❄", thunder: "⚡", holy: "✚" };
 const ELEMENT_LABEL: Record<Element, string> = { physical: "Physical", fire: "Fire", ice: "Ice", thunder: "Thunder", holy: "Holy" };
@@ -26,6 +27,7 @@ export default function SkillPanel() {
   const chooseAttack = useGame((s) => s.chooseAttack);
   const cancelPending = useGame((s) => s.cancelPending);
   const selectedDef = useGame((s) => s.config.units.find((u) => u.id === s.selected) ?? null);
+  const ui = useUiFrame("skill-panel");
 
   const options = useMemo(
     () => (battle && selected && pendingMove && (menuPage === "attacks" || menuPage === "target") ? battle.attackOptions(selected, pendingMove, menuKind) : []),
@@ -47,7 +49,7 @@ export default function SkillPanel() {
   const cond = (a: AttackDef) => (a.cond === "none" ? "Any time" : a.cond === "stationary" ? "Only without moving" : "Only after moving");
 
   return (
-    <aside className="skill-panel" onPointerLeave={() => setHoverAttack(null)}>
+    <aside className="skill-panel" style={ui.style} onPointerLeave={() => setHoverAttack(null)}>
       <div className={`sp-frame sp-list ${targeting ? "targeting" : ""}`}>
         <div className="sp-title">{heal ? "Heal" : "Attack"}</div>
         <div className="sp-sub">{targeting ? "Choose a target" : "Skills"}</div>
@@ -120,6 +122,7 @@ export default function SkillPanel() {
         </div>
         <div className={`sp-status ${!focus.usable || !focus.targets.length ? "off" : ""}`}>{why(focus)}</div>
       </div>
+      {ui.overlay}
     </aside>
   );
 }
