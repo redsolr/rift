@@ -1,13 +1,31 @@
 "use client";
 import { Line } from "@react-three/drei";
-import { useMemo } from "react";
+import { useFrame } from "@react-three/fiber";
+import { useMemo, useRef } from "react";
 import * as THREE from "three";
+import type { Line2 } from "three-stdlib";
 import { selectCaughtUp, useGame } from "@/store/game";
 import { tileHeight } from "@/sim/grid";
 import { Pos } from "@/sim/types";
 
-function Arc({ from, to, color, width = 3, dashed = false }: { from: Pos; to: Pos; color: string; width?: number; dashed?: boolean }) {
+/**
+ * FE-style indicator arc: a soft glow ribbon under a thin core line whose dashes flow toward the
+ * target, and a pulsing tip. Threat arcs are thin red; the target arc is gold and a little bolder.
+ */
+function Arc({ from, to, color, width = 2, dashed = false }: { from: Pos; to: Pos; color: string; width?: number; dashed?: boolean }) {
   const map = useGame((s) => s.config.map);
+  const core = useRef<Line2>(null);
+  const tip = useRef<THREE.Mesh>(null);
+  const t = useRef(0);
+  useFrame((_, dt) => {
+    t.current += dt;
+    const m = core.current?.material as { dashOffset?: number } | undefined;
+    if (m && dashed) m.dashOffset = -t.current * 1.6;
+    if (tip.current) {
+      const k = 1 + 0.25 * Math.sin(t.current * 7);
+      tip.current.scale.setScalar(k);
+    }
+  });
   const pts = useMemo(() => {
     const yOf = (p: Pos) => tileHeight(map, p) + 0.6;
     const a = new THREE.Vector3(from.x, yOf(from), from.y);
@@ -22,10 +40,15 @@ function Arc({ from, to, color, width = 3, dashed = false }: { from: Pos; to: Po
   const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
   return (
     <group>
-      <Line points={pts} color={color} lineWidth={width} dashed={dashed} dashSize={0.25} gapSize={0.15} transparent opacity={0.95} depthTest={false} />
-      <mesh position={end.clone().sub(dir.clone().multiplyScalar(0.12))} quaternion={q}>
-        <coneGeometry args={[0.13, 0.32, 8]} />
-        <meshBasicMaterial color={color} depthTest={false} />
+      <Line points={pts} color={color} lineWidth={width * 4} transparent opacity={0.16} depthTest={false} />
+      <Line ref={core} points={pts} color={color} lineWidth={width} dashed={dashed} dashSize={0.22} gapSize={0.16} transparent opacity={0.95} depthTest={false} />
+      <mesh ref={tip} position={end.clone().sub(dir.clone().multiplyScalar(0.12))} quaternion={q}>
+        <coneGeometry args={[0.11, 0.3, 8]} />
+        <meshBasicMaterial color={color} depthTest={false} transparent opacity={0.95} />
+      </mesh>
+      <mesh position={end}>
+        <sphereGeometry args={[0.09, 10, 8]} />
+        <meshBasicMaterial color="#ffffff" depthTest={false} transparent opacity={0.8} />
       </mesh>
     </group>
   );
@@ -73,9 +96,9 @@ export default function Arcs() {
   return (
     <group>
       {data.threats.map((t) => (
-        <Arc key={t.id} from={t.from} to={data.at} color="#ff3b3b" width={2.5} dashed />
+        <Arc key={t.id} from={t.from} to={data.at} color="#ff3b3b" width={1.8} dashed />
       ))}
-      {data.target && <Arc from={data.at} to={data.target.to} color="#ffd54f" width={4} />}
+      {data.target && <Arc from={data.at} to={data.target.to} color="#ffd54f" width={3} dashed />}
     </group>
   );
 }

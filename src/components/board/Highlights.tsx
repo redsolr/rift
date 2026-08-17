@@ -7,13 +7,39 @@ import { selectCaughtUp, useGame } from "@/store/game";
 import { parseKey, pathTo, tileHeight, tilesInRange } from "@/sim/grid";
 import { Pos, otherTeam } from "@/sim/types";
 
-function Highlight({ x, y, color, opacity = 0.45, y0 }: { x: number; y: number; color: string; opacity?: number; y0?: number }) {
+/** Hollow square frame (outer 0.98, inner 0.86) — the FE tile edge. Built once. */
+const FRAME_GEO = (() => {
+  const shape = new THREE.Shape();
+  shape.moveTo(-0.49, -0.49);
+  shape.lineTo(0.49, -0.49);
+  shape.lineTo(0.49, 0.49);
+  shape.lineTo(-0.49, 0.49);
+  shape.closePath();
+  const hole = new THREE.Path();
+  hole.moveTo(-0.43, -0.43);
+  hole.lineTo(0.43, -0.43);
+  hole.lineTo(0.43, 0.43);
+  hole.lineTo(-0.43, 0.43);
+  hole.closePath();
+  shape.holes.push(hole);
+  return new THREE.ShapeGeometry(shape);
+})();
+
+function Highlight({ x, y, color, opacity = 0.45, y0, border, borderOpacity = 0.9, lift = 0.02 }: { x: number; y: number; color: string; opacity?: number; y0?: number; border?: string; borderOpacity?: number; lift?: number }) {
   const map = useGame((s) => s.config.map);
+  const h = (y0 ?? tileHeight(map, { x, y })) + lift;
   return (
-    <mesh position={[x, (y0 ?? tileHeight(map, { x, y })) + 0.02, y]} rotation={[-Math.PI / 2, 0, 0]}>
-      <planeGeometry args={[0.92, 0.92]} />
-      <meshBasicMaterial color={color} transparent opacity={opacity} depthWrite={false} />
-    </mesh>
+    <group position={[x, h, y]} rotation={[-Math.PI / 2, 0, 0]}>
+      {border && (
+        <mesh geometry={FRAME_GEO}>
+          <meshBasicMaterial color={border} transparent opacity={borderOpacity} depthWrite={false} />
+        </mesh>
+      )}
+      <mesh position={[0, 0, 0.001]}>
+        <planeGeometry args={border ? [0.86, 0.86] : [0.92, 0.92]} />
+        <meshBasicMaterial color={color} transparent opacity={opacity} depthWrite={false} />
+      </mesh>
+    </group>
   );
 }
 
@@ -73,10 +99,12 @@ export default function Highlights() {
     return movable.some((m) => m.x === hover.x && m.y === hover.y) ? hover : null;
   }, [pendingMove, hover, movable, selDef, mine]);
   const previewFrom = pendingMove ?? hoverPreview;
+  // FE Three Hopes: the attack range from where the unit STANDS (or will stand) is drawn over the move field
+  const attackOrigin = useMemo(() => previewFrom ?? (sel && sel.alive && mine ? { x: sel.x, y: sel.y } : null), [previewFrom, sel, mine]);
   // attack range from the pending / hovered tile
   const pendingRange = useMemo(
-    () => (previewFrom && selDef ? tilesInRange(config.map, previewFrom, selDef.stats.rangeMin, selDef.stats.rangeMax) : []),
-    [previewFrom, selDef, config.map],
+    () => (attackOrigin && selDef ? tilesInRange(config.map, attackOrigin, selDef.stats.rangeMin, selDef.stats.rangeMax) : []),
+    [attackOrigin, selDef, config.map],
   );
   // movement path to the previewed tile
   const path = useMemo(() => {
@@ -94,13 +122,13 @@ export default function Highlights() {
         <Highlight key={`d${p.x},${p.y}`} x={p.x} y={p.y} color="#c04cff" opacity={0.15} />
       ))}
       {attackBand.map((p) => (
-        <Highlight key={`a${p.x},${p.y}`} x={p.x} y={p.y} color={mine ? "#ff4a4a" : "#ff2d2d"} opacity={mine ? 0.42 : 0.2} />
+        <Highlight key={`a${p.x},${p.y}`} x={p.x} y={p.y} color={mine ? "#ff4a4a" : "#ff2d2d"} opacity={mine ? 0.4 : 0.2} border={mine ? "#ff8a80" : undefined} borderOpacity={0.35} />
       ))}
       {movable.map((p) => (
-        <Highlight key={`m${p.x},${p.y}`} x={p.x} y={p.y} color={mine ? "#3d8bff" : "#ff5a5a"} opacity={mine ? 0.5 : 0.32} />
+        <Highlight key={`m${p.x},${p.y}`} x={p.x} y={p.y} color={mine ? "#3d8bff" : "#ff5a5a"} opacity={mine ? 0.55 : 0.32} border={mine ? "#dcecff" : undefined} borderOpacity={0.35} />
       ))}
       {pendingRange.map((p) => (
-        <Highlight key={`q${p.x},${p.y}`} x={p.x} y={p.y} color={selDef?.archetype === "healer" ? "#6cf58a" : "#ff6a6a"} opacity={0.35} />
+        <Highlight key={`q${p.x},${p.y}`} x={p.x} y={p.y} color={selDef?.archetype === "healer" ? "#6cf58a" : "#e26bd0"} opacity={0.5} border={selDef?.archetype === "healer" ? "#9cffb0" : "#ff8a3c"} borderOpacity={0.9} lift={0.03} />
       ))}
       {targets.map((id) => {
         const u = view.units[id];
