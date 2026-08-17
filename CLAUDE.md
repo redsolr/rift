@@ -37,6 +37,18 @@ scripts/sim.ts  headless batch runner (npm run sim -- 1000)
 
 `npm run verify` exits clean. Any feature-visible change also updates `FEATURES.md` in the same commit. New engine rules get a vitest that asserts the *promise* (e.g. "hold units move less than pursue units"), not the implementation. UI/pixel claims get a headless Playwright screenshot probe before being reported (the store is exposed as `window.__tactician` for exactly this; classroom's Playwright install can drive it — see `docs/concept.md` § probe).
 
+## Testing on a phone (LAN, no tunnel)
+
+`npm run dev` binds `0.0.0.0:3030`. On the phone (same Wi-Fi) open `http://<PC-LAN-IP>:3030` — find the IP with `Get-NetIPAddress -AddressFamily IPv4` (this PC: Ethernet 192.168.1.3; Tailscale 100.70.14.13 works from anywhere if the phone runs Tailscale). One-time, in an **elevated** PowerShell:
+
+```powershell
+New-NetFirewallRule -DisplayName "Tactician dev 3030" -Direction Inbound -Protocol TCP -LocalPort 3030 -Action Allow -Profile Private,Domain
+```
+
+Add to Home Screen on iOS gives a full-screen standalone window (`appleWebApp` metadata is set). Mobile layout kicks in at ≤900px (`page.tsx` matchMedia → `Sheet`).
+
+**Headless caveat**: swiftshader Chromium mis-composites an opaque layer *overlapping* a WebGL canvas (the frame looks clipped even though DOM/camera are fine) — that is why the sheet is in flow, not an overlay. Do not reintroduce an overlay over the canvas without checking on a real device.
+
 ## Zustand traps (already hit once)
 
 Selectors must return stable references — never `useGame((s) => s.config.units.filter(...))`; select the array and `useMemo` the filter. React-compiler lint forbids reading refs during render; use `useEffect` keyed on the value.

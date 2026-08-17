@@ -483,7 +483,8 @@ function BattleLog() {
     return out.slice(-80);
   }, [events, cursor, units]);
   useEffect(() => {
-    bottom.current?.scrollIntoView({ block: "nearest" });
+    const el = bottom.current?.parentElement;
+    if (el) el.scrollTop = el.scrollHeight;
   }, [rows.length]);
   if (!events.length) return <p className="muted">No battle yet.</p>;
   return (

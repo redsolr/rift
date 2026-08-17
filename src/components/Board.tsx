@@ -1,5 +1,5 @@
 "use client";
-import { Canvas, ThreeEvent, useFrame } from "@react-three/fiber";
+import { Canvas, ThreeEvent, useFrame, useThree } from "@react-three/fiber";
 import { Html, OrbitControls } from "@react-three/drei";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
@@ -255,13 +255,13 @@ function Unit({ def }: { def: UnitDef }) {
             <meshBasicMaterial color={pct > 0.5 ? "#6cf58a" : pct > 0.25 ? "#ffd54f" : "#ff5c5c"} side={THREE.DoubleSide} />
           </mesh>
         </group>
-        <Html position={[0, 1.15, 0]} center distanceFactor={12} style={{ pointerEvents: "none" }}>
+        <Html position={[0, 1.15, 0]} center distanceFactor={12} zIndexRange={[10, 0]} style={{ pointerEvents: "none" }}>
           <div className="unit-label" style={{ color: TEAM_COLOR[def.team] }}>
             {def.name}
           </div>
         </Html>
         {myFloats.map((f) => (
-          <Html key={f.key} position={[0, 1.3, 0]} center distanceFactor={12} style={{ pointerEvents: "none" }}>
+          <Html key={f.key} position={[0, 1.3, 0]} center distanceFactor={12} zIndexRange={[10, 0]} style={{ pointerEvents: "none" }}>
             <div className="dmg-float" style={{ color: f.color }}>
               {f.text}
             </div>
@@ -283,6 +283,36 @@ function Units() {
   );
 }
 
+/** Frames the whole map for the current viewport (portrait phones need a much farther, steeper camera). */
+function CameraRig({ cx, cz, w, h }: { cx: number; cz: number; w: number; h: number }) {
+  const camera = useThree((s) => s.camera);
+  const size = useThree((s) => s.size);
+  const controls = useThree((s) => s.controls) as { target: THREE.Vector3; update: () => void } | null;
+  useEffect(() => {
+    (window as unknown as { __cam?: unknown; __controls?: unknown }).__cam = camera;
+    (window as unknown as { __cam?: unknown; __controls?: unknown }).__controls = controls;
+    const cam = camera as THREE.PerspectiveCamera;
+    const aspect = size.width / Math.max(1, size.height);
+    const vFov = (cam.fov * Math.PI) / 180;
+    const hFov = 2 * Math.atan(Math.tan(vFov / 2) * aspect);
+    // camera looks down at ~62° (portrait) / ~55° (landscape); footprint on screen ≈ map w × h*cos
+    const tilt = aspect < 1 ? 1.08 : 0.95; // radians from horizontal
+    const needH = (h * 1.15) / 2 / Math.tan(vFov / 2);
+    const needW = (w * 1.15) / 2 / Math.tan(hFov / 2);
+    const dist = Math.max(needH, needW, 8);
+    // portrait: the bottom sheet covers the last ~56px, so aim a little below centre to lift the map
+    const tz = aspect < 1 ? cz + h * 0.09 : cz;
+    cam.position.set(cx, Math.sin(tilt) * dist, tz + Math.cos(tilt) * dist);
+    cam.lookAt(cx, 0, tz);
+    cam.updateProjectionMatrix();
+    if (controls) {
+      controls.target.set(cx, 0, tz);
+      controls.update();
+    }
+  }, [camera, controls, size.width, size.height, cx, cz, w, h]);
+  return null;
+}
+
 export default function Board() {
   const map = useGame((s) => s.config.map);
   const setPainting = useGame((s) => s.setPainting);
@@ -291,7 +321,14 @@ export default function Board() {
   const span = Math.max(map.width, map.height);
   return (
     <div className="board" onPointerUp={() => setPainting(false)} onPointerLeave={() => setPainting(false)}>
-      <Canvas shadows camera={{ position: [cx, span * 1.25, cz + span * 0.7], fov: 42, near: 0.1, far: 200 }} onPointerMissed={() => useGame.getState().select(null)}>
+      <Canvas
+        shadows
+        dpr={[1, 2]}
+        camera={{ position: [cx, span * 1.25, cz + span * 0.7], fov: 42, near: 0.1, far: 200 }}
+        onPointerMissed={() => useGame.getState().select(null)}
+        style={{ touchAction: "none" }}
+      >
+        <CameraRig cx={cx} cz={cz} w={map.width} h={map.height} />
         <color attach="background" args={["#0d0f14"]} />
         <ambientLight intensity={0.6} />
         <directionalLight position={[cx - 6, 14, cz - 4]} intensity={1.4} castShadow shadow-mapSize={[1024, 1024]} />
@@ -301,7 +338,16 @@ export default function Board() {
           <Units />
           <Effects />
         </group>
-        <OrbitControls target={[cx, 0, cz]} minPolarAngle={0.2} maxPolarAngle={1.25} minDistance={6} maxDistance={40} enablePan />
+        <OrbitControls
+          target={[cx, 0, cz]}
+          minPolarAngle={0.2}
+          maxPolarAngle={1.25}
+          minDistance={6}
+          maxDistance={60}
+          enablePan
+          touches={{ ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE }}
+          makeDefault
+        />
       </Canvas>
     </div>
   );
