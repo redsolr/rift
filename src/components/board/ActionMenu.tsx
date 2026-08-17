@@ -36,7 +36,7 @@ export default function ActionMenu() {
 
   return (
     // FE: the menu hangs about two tiles to the RIGHT of the unit, level with its card, never over it
-    <Html position={[pendingMove.x + 2.1, th + CARD_H3 * 0.6, pendingMove.y]} zIndexRange={[2, 0]} style={{ pointerEvents: "auto", transform: "translate(0, -50%)" }}>
+    <Html position={[pendingMove.x + 2.1, th + CARD_H3 * 1.15, pendingMove.y]} zIndexRange={[2, 0]} style={{ pointerEvents: "auto", transform: "translate(0, -70%)" }}>
       <div className="action-menu-wrap">
         {/* FE ink/smoke edge: blurred blobs displaced by turbulence, behind the panel */}
         <svg width="0" height="0" style={{ position: "absolute" }} aria-hidden>

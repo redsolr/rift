@@ -20,19 +20,23 @@ export default function SkillPanel() {
   const selected = useGame((s) => s.selected);
   const pendingMove = useGame((s) => s.pendingMove);
   const hoverAttack = useGame((s) => s.hoverAttack);
+  const pendingAttack = useGame((s) => s.pendingAttack);
+  const targets = useGame((s) => s.targets);
   const setHoverAttack = useGame((s) => s.setHoverAttack);
   const chooseAttack = useGame((s) => s.chooseAttack);
   const cancelPending = useGame((s) => s.cancelPending);
   const selectedDef = useGame((s) => s.config.units.find((u) => u.id === s.selected) ?? null);
 
   const options = useMemo(
-    () => (battle && selected && pendingMove && menuPage === "attacks" ? battle.attackOptions(selected, pendingMove, menuKind) : []),
+    () => (battle && selected && pendingMove && (menuPage === "attacks" || menuPage === "target") ? battle.attackOptions(selected, pendingMove, menuKind) : []),
     [battle, selected, pendingMove, menuPage, menuKind],
   );
-  if (menuPage !== "attacks" || !selectedDef || !options.length) return null;
+  if ((menuPage !== "attacks" && menuPage !== "target") || !selectedDef || !options.length) return null;
 
   const heal = menuKind === "heal";
-  const focus = options.find((o) => o.attack.id === hoverAttack) ?? options.find((o) => o.usable && o.targets.length) ?? options[0];
+  const targeting = menuPage === "target";
+  // target step: the panel keeps showing the CHOSEN skill's details (list collapses to a "choose a target" frame)
+  const focus = (targeting ? options.find((o) => o.attack.id === pendingAttack) : options.find((o) => o.attack.id === hoverAttack)) ?? options.find((o) => o.usable && o.targets.length) ?? options[0];
   const why = (o: { attack: AttackDef; usable: boolean; targets: string[] }) =>
     !o.usable ? (o.attack.cond === "moved" ? "after a move only" : "standing still only") : o.targets.length === 0 ? "nothing in reach" : `${o.targets.length} in reach`;
   const might = (a: AttackDef) => Math.max(1, selectedDef.stats.atk + a.power);
@@ -44,10 +48,21 @@ export default function SkillPanel() {
 
   return (
     <aside className="skill-panel" onPointerLeave={() => setHoverAttack(null)}>
-      <div className="sp-frame sp-list">
+      <div className={`sp-frame sp-list ${targeting ? "targeting" : ""}`}>
         <div className="sp-title">{heal ? "Heal" : "Attack"}</div>
-        <div className="sp-sub">Skills</div>
-        {options.map((o) => {
+        <div className="sp-sub">{targeting ? "Choose a target" : "Skills"}</div>
+        {targeting && (
+          <div className="sp-targeting">
+            <div className="sp-tname">
+              <span className={`sp-glyph el-${focus.attack.element}`}>{ELEMENT_GLYPH[focus.attack.element]}</span> {focus.attack.name}
+            </div>
+            <div className="sp-tline">
+              {heal ? "Click a green ally" : "Click a red enemy"} — {targets.length} in reach
+            </div>
+            <div className="sp-tline dim">Right-click a target to confirm · right-click elsewhere to go back</div>
+          </div>
+        )}
+        {!targeting && options.map((o) => {
           const off = !o.usable || o.targets.length === 0;
           const active = focus.attack.id === o.attack.id;
           return (

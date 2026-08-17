@@ -502,6 +502,9 @@ button.danger {
 .log-row.heal {
   color: var(--green);
 }
+.log-row.rune {
+  color: #d9b8ff;
+}
 .log-row.dim {
   opacity: 0.6;
 }
@@ -1215,6 +1218,31 @@ button.danger {
 .sp-fill {
   flex: 1;
 }
+.sp-list.targeting {
+  flex: 0 0 auto;
+}
+.sp-targeting {
+  padding: 4px 4px 2px;
+}
+.sp-tname {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 19px;
+  color: #fff;
+  margin-bottom: 6px;
+}
+.sp-tline {
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 12px;
+  font-weight: 700;
+  color: #f2c96b;
+  margin-bottom: 4px;
+}
+.sp-tline.dim {
+  color: #b9b2a3;
+  font-weight: 600;
+}
 .sp-back {
   align-self: flex-start;
   margin-top: 8px;
@@ -1720,6 +1748,12 @@ button.link {
   height: 100%;
   background: linear-gradient(90deg, #6cf58a, #3fbf60);
 }
+.bb-buff {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-shadow: 0 0 8px currentColor;
+}
 .bb-stats {
   display: flex;
   gap: 6px;
@@ -1869,17 +1903,44 @@ button.link {
   position: absolute;
   inset: 0 auto 0 0;
   background: linear-gradient(90deg, #5aa0ff, #2f5fc0);
+  transition: width 0.25s ease;
 }
 .bb-bar.right .bb-bar-fill {
   inset: 0 0 0 auto;
   background: linear-gradient(90deg, #b8392e, #ff5a4a);
 }
+/* FE Engage read: the part you are about to lose keeps DRAINING toward the predicted mark, then refills */
 .bb-bar-loss {
   position: absolute;
   top: 0;
   bottom: 0;
-  background: repeating-linear-gradient(135deg, #ffd54f 0 3px, #b58c1c 3px 6px);
-  animation: fc-blink 0.9s steps(2) infinite;
+  background: linear-gradient(90deg, #fff4d6, #ffb347 40%, #ff5a4a);
+  box-shadow: 0 0 10px rgba(255, 140, 80, 0.8);
+  transform-origin: left center;
+  animation: bb-drain 1.15s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  transition: width 0.25s ease, left 0.25s ease, right 0.25s ease;
+}
+.bb-bar.right .bb-bar-loss {
+  transform-origin: right center;
+  background: linear-gradient(270deg, #fff4d6, #ffb347 40%, #ff5a4a);
+}
+@keyframes bb-drain {
+  0% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+  70% {
+    transform: scaleX(0);
+    opacity: 0.9;
+  }
+  71% {
+    transform: scaleX(1);
+    opacity: 0;
+  }
+  100% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
 }
 .bb-big {
   font-size: 34px;
@@ -1888,6 +1949,20 @@ button.link {
   text-align: center;
   text-shadow: 0 2px 6px #000;
   line-height: 1;
+}
+.bb-big.hurt {
+  color: #ffd2b0;
+  animation: bb-num 1.15s ease-in-out infinite;
+}
+@keyframes bb-num {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  70% {
+    transform: scale(1.12);
+    color: #ff8a6a;
+  }
 }
 .bb-big.dead {
   color: #ff2d2d;
