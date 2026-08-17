@@ -211,6 +211,10 @@
    small dark tab under its own white smear. The tear filter lives ONLY on the paint layers so the text stays crisp. */
 .cd-slab {
   position: relative;
+  /* FIXED height (Metaphor): always three lines tall, however long the line — the box never jumps between lines */
+  height: 156px;
+  box-sizing: border-box;
+  overflow: hidden;
   padding: 24px 44px 28px 48px;
   color: #f4f1ea;
   font-family: Georgia, "Times New Roman", serif;
