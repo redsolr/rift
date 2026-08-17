@@ -22,6 +22,8 @@ export default function Hud() {
   const pause = useGame((s) => s.pause);
   const step = useGame((s) => s.step);
   const startBattle = useGame((s) => s.startBattle);
+  const planning = useGame((s) => s.planning);
+  const beginBattle = useGame((s) => s.beginBattle);
   const rematch = useGame((s) => s.rematch);
   const runOnce = useGame((s) => s.runOnce);
   const resetToSetup = useGame((s) => s.resetToSetup);
@@ -78,6 +80,11 @@ export default function Hud() {
             {yourTurn && !ended && <span className="hint-pill">Your move — click a {playerTeam} unit</span>}
             {commandPhase && !ended && <span className="hint-pill">Command phase — adjust orders, then execute</span>}
           </>
+        ) : planning ? (
+          <>
+            <span className={`turn-pill ${playerTeam}`}>PLANNING</span>
+            <span className="hint-pill">Deploy — drag your units inside the highlighted zone (drop on an ally to swap), then Begin battle</span>
+          </>
         ) : (
           <span className="hint-pill">
             {mode === "manual" && `Start a battle and control the ${playerTeam} team`}
@@ -108,10 +115,20 @@ export default function Hud() {
           </div>
         )}
 
-        {mode === "manual" && !battle && (
+        {mode === "manual" && !battle && !planning && (
           <button className="primary" onClick={() => startBattle()}>
             Start battle
           </button>
+        )}
+        {planning && (
+          <>
+            <button className="primary" onClick={beginBattle} title="End the planning phase — the battle opens with your deployment">
+              Begin battle
+            </button>
+            <button className="ghost" onClick={resetToSetup} title="Back to setup">
+              ↺<span className="btn-text"> Back</span>
+            </button>
+          </>
         )}
         {mode === "manual" && yourTurn && selected && moveTiles.length > 0 && (
           <>
@@ -126,7 +143,7 @@ export default function Hud() {
           </>
         )}
 
-        {mode === "manager" && !battle && (
+        {mode === "manager" && !battle && !planning && (
           <button className="primary" onClick={() => startBattle()}>
             Start battle
           </button>

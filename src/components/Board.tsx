@@ -26,7 +26,7 @@ function EditorHint() {
     const what = d?.kind === "unit" ? (s.config.units.find((u) => u.id === d.id)?.name ?? "unit") : d?.kind === "feature" ? TERRAIN[d.terrain].label : s.tool.kind === "unit" ? `${s.tool.team} ${s.tool.archetype}` : s.tool.kind === "terrain" ? TERRAIN[s.tool.terrain].label : null;
     if (!what) return null;
     if (s.tool.kind === "terrain" && !d) return t.ok ? `Paint ${what} · click-drag` : null;
-    return t.ok ? `${d ? "Drop" : "Place"} ${what} at ${t.pos.x},${t.pos.y}` : `✕ ${t.reason ?? "cannot place here"}`;
+    return t.ok ? (t.reason ?? `${d ? "Drop" : "Place"} ${what} at ${t.pos.x},${t.pos.y}`) : `✕ ${t.reason ?? "cannot place here"}`;
   });
   const bad = useGame((s) => (selectDropTarget(s)?.ok ?? true) === false);
   if (!text) return null;

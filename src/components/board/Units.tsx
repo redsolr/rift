@@ -84,6 +84,7 @@ function Unit({ def }: { def: UnitDef }) {
   const hovered = useGame((s) => s.hoverUnit === def.id);
   const battle = useGame((s) => s.battle);
   const mode = useGame((s) => s.mode);
+  const planning = useGame((s) => s.planning);
   const floats = useGame((s) => s.floats);
   const group = useRef<THREE.Group>(null);
   const bump = useRef(0);
@@ -156,8 +157,8 @@ function Unit({ def }: { def: UnitDef }) {
             clickUnit(def.id);
           }}
           onPointerDown={(e) => {
-            // editor: left button on a card picks it up (drop = pointer up on the board, Esc = cancel)
-            if (mode === "editor" && e.button === 0) {
+            // editor / planning phase: left button on a card picks it up (drop = pointer up on the board, Esc = cancel)
+            if ((mode === "editor" || planning) && e.button === 0) {
               e.stopPropagation();
               beginDragUnit(def.id);
             }

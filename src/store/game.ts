@@ -131,6 +131,9 @@ interface GameState {
   painting: boolean;
   /** editor drag in flight (unit card or tile feature riding the cursor); null = none */
   drag: Drag | null;
+  /** FE deployment: Start battle opens a PLANNING phase (battle not yet built) where you rearrange your own units inside
+   *  the deploy zone; Begin battle ends it. Rematch keeps the deployment and skips it. */
+  planning: boolean;
   simStats: SimStats | null;
   simProgress: number | null;
   shareCode: string | null;
@@ -204,6 +207,10 @@ interface GameState {
   /** drop whatever is carried on the current ground-hover tile (snaps back when the drop is illegal) */
   endDrag: () => void;
   cancelDrag: () => void;
+  /** planning phase → build the battle and play the opening (the old Start battle) */
+  beginBattle: () => void;
+  /** planning: swap two of your units' tiles (drop a card onto an ally) */
+  swapUnits: (a: string, b: string) => void;
   /** move a shrine / objective to another tile; the tile it leaves becomes ground */
   moveFeature: (from: Pos, to: Pos) => void;
   setUnitStats: (id: string, patch: Partial<Stats>) => void;
@@ -227,8 +234,30 @@ export const selectCaughtUp = (s: Pick<GameState, "cursor" | "events">) => s.cur
  * pointer, and whether that drop is legal. Keyed off groundHover (the pointer vs the GROUND, ignoring cards).
  * null when nothing is being placed or the pointer is off the board.
  */
-export function selectDropTarget(s: Pick<GameState, "mode" | "drag" | "tool" | "groundHover" | "config">): DropTarget | null {
-  if (s.mode !== "editor") return null;
+/** Planning phase deploy zone: every passable tile within DEPLOY_REACH steps of any of `team`'s units (their tiles included). */
+export const DEPLOY_REACH = 2;
+export function deployZone(config: BattleConfig, team: Team): Pos[] {
+  const map = config.map;
+  const seen = new Set<string>();
+  const out: Pos[] = [];
+  for (const u of config.units) {
+    if (u.team !== team) continue;
+    for (let dy = -DEPLOY_REACH; dy <= DEPLOY_REACH; dy++)
+      for (let dx = -DEPLOY_REACH + Math.abs(dy); dx <= DEPLOY_REACH - Math.abs(dy); dx++) {
+        const x = u.x + dx;
+        const y = u.y + dy;
+        if (!inBounds(map, x, y) || TERRAIN[terrainAt(map, x, y)].moveCost === null) continue;
+        const k = `${x},${y}`;
+        if (seen.has(k)) continue;
+        seen.add(k);
+        out.push({ x, y });
+      }
+  }
+  return out;
+}
+
+export function selectDropTarget(s: Pick<GameState, "mode" | "drag" | "tool" | "groundHover" | "config" | "planning" | "playerTeam">): DropTarget | null {
+  if (s.mode !== "editor" && !s.planning) return null;
   const pos = s.groundHover;
   if (!pos) return null;
   const map = s.config.map;
@@ -237,6 +266,15 @@ export function selectDropTarget(s: Pick<GameState, "mode" | "drag" | "tool" | "
   const occupant = s.config.units.find((u) => u.x === pos.x && u.y === pos.y) ?? null;
   const impassable = TERRAIN[terrain].moveCost === null;
   const d = s.drag;
+  if (s.planning) {
+    // deployment: your own units only, inside the deploy zone; dropping on an ally swaps the two
+    if (d?.kind !== "unit") return null;
+    if (occupant && occupant.id === d.id) return { pos, ok: true, reason: null };
+    if (!deployZone(s.config, s.playerTeam).some((z) => z.x === pos.x && z.y === pos.y)) return { pos, ok: false, reason: "Outside your deploy zone" };
+    if (occupant && occupant.team !== s.playerTeam) return { pos, ok: false, reason: `${occupant.name} is standing here` };
+    if (impassable) return { pos, ok: false, reason: `${TERRAIN[terrain].label} — impassable` };
+    return { pos, ok: true, reason: occupant ? `Swap with ${occupant.name}` : null };
+  }
   if (d?.kind === "unit") {
     if (occupant && occupant.id !== d.id) return { pos, ok: false, reason: `${occupant.name} is standing here` };
     if (impassable) return { pos, ok: false, reason: `${TERRAIN[terrain].label} — impassable` };
@@ -389,24 +427,47 @@ export const useGame = create<GameState>((set, get) => {
     tool: { kind: "select" },
     painting: false,
     drag: null,
+    planning: false,
     simStats: null,
     simProgress: null,
     shareCode: null,
 
     setMode: (mode) => {
       stopTimer();
-      set({ mode, ...resetPlayback(get().config, null), tool: { kind: "select" }, drag: null });
+      set({ mode, ...resetPlayback(get().config, null), tool: { kind: "select" }, drag: null, planning: false });
       clearManual();
     },
 
+    // Start battle: in Manual / Manager open the PLANNING phase first (FE deployment); the battle is built by beginBattle.
     startBattle: (seed) => {
       stopTimer();
       const cfg = get().config;
       const s = seed ?? get().seed;
+      if (get().mode !== "editor") {
+        set({ ...resetPlayback(cfg, null), seed: s, simStats: null, planning: true, drag: null });
+        clearManual();
+        return;
+      }
+      set({ seed: s });
+      get().beginBattle();
+    },
+    beginBattle: () => {
+      stopTimer();
+      const cfg = get().config;
+      const s = get().seed;
       const battle = new Battle(cfg, s);
-      set({ ...resetPlayback(cfg, battle), seed: s, simStats: null });
+      set({ ...resetPlayback(cfg, battle), seed: s, simStats: null, planning: false, drag: null });
       clearManual();
       startPlayback();
+    },
+    swapUnits: (a, b) => {
+      const s = get();
+      const ua = s.config.units.find((u) => u.id === a);
+      const ub = s.config.units.find((u) => u.id === b);
+      if (!ua || !ub) return;
+      const units = s.config.units.map((u) => (u.id === a ? { ...u, x: ub.x, y: ub.y } : u.id === b ? { ...u, x: ua.x, y: ua.y } : u));
+      const config = { ...s.config, units };
+      set({ config, view: initialView(config) });
     },
 
     rematch: () => {
@@ -414,7 +475,11 @@ export const useGame = create<GameState>((set, get) => {
       if (s.mode === "editor") {
         set({ seed: s.seed + 1 });
         get().runOnce();
-      } else get().startBattle(s.seed + 1);
+      } else {
+        // rematch keeps your deployment — straight into the next seed, no planning stop
+        set({ seed: s.seed + 1 });
+        get().beginBattle();
+      }
     },
 
     runOnce: () => {
@@ -429,7 +494,7 @@ export const useGame = create<GameState>((set, get) => {
 
     resetToSetup: () => {
       stopTimer();
-      set(resetPlayback(get().config, null));
+      set({ ...resetPlayback(get().config, null), planning: false, drag: null });
       clearManual();
     },
 
@@ -544,6 +609,16 @@ export const useGame = create<GameState>((set, get) => {
           if (!s.config.units.some((u) => u.x === p.x && u.y === p.y) && TERRAIN[terrainAt(s.config.map, p.x, p.y)].moveCost !== null) get().moveUnitTo(s.selected, p);
           return;
         }
+        return;
+      }
+      // planning: click-to-move your selected unit inside the deploy zone (the no-drag alternative)
+      if (s.planning) {
+        const occupant = s.config.units.find((u) => u.x === p.x && u.y === p.y);
+        if (occupant) return get().clickUnit(occupant.id);
+        const sel = s.selected ? s.config.units.find((u) => u.id === s.selected) : null;
+        if (!sel || sel.team !== s.playerTeam) return;
+        const t = selectDropTarget({ ...s, drag: { kind: "unit", id: sel.id, from: { x: sel.x, y: sel.y } }, groundHover: p });
+        if (t?.ok) get().moveUnitTo(sel.id, p);
         return;
       }
       // a tile with a living unit on it IS that unit (the ray may land on the tile beside a card's foot)
@@ -776,9 +851,14 @@ export const useGame = create<GameState>((set, get) => {
     setPainting: (painting) => set({ painting }),
     beginDragUnit: (id) => {
       const s = get();
-      if (s.mode !== "editor" || s.tool.kind === "erase") return;
       const u = s.config.units.find((x) => x.id === id);
       if (!u) return;
+      if (s.planning) {
+        if (u.team !== s.playerTeam) return; // deployment: only your own units move
+        set({ drag: { kind: "unit", id, from: { x: u.x, y: u.y } }, selected: id });
+        return;
+      }
+      if (s.mode !== "editor" || s.tool.kind === "erase") return;
       set({ drag: { kind: "unit", id, from: { x: u.x, y: u.y } }, selected: id, tool: { kind: "select" }, painting: false });
     },
     beginDragFeature: (p) => {
@@ -796,8 +876,11 @@ export const useGame = create<GameState>((set, get) => {
       const t = selectDropTarget(s);
       set({ drag: null });
       if (!t || !t.ok) return;
-      if (d.kind === "unit") get().moveUnitTo(d.id, t.pos);
-      else get().moveFeature(d.from, t.pos);
+      if (d.kind === "unit") {
+        const occupant = s.config.units.find((u) => u.x === t.pos.x && u.y === t.pos.y);
+        if (occupant && occupant.id !== d.id) get().swapUnits(d.id, occupant.id);
+        else get().moveUnitTo(d.id, t.pos);
+      } else get().moveFeature(d.from, t.pos);
     },
     cancelDrag: () => {
       if (get().drag) set({ drag: null });

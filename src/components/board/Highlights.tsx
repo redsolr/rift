@@ -2,7 +2,7 @@
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { selectCaughtUp, selectDropTarget, useGame } from "@/store/game";
+import { deployZone, selectCaughtUp, selectDropTarget, useGame } from "@/store/game";
 import { parseKey, pathTo, posKey, reachable, standable, terrainAt, tileHeight, tilesInRange } from "@/sim/grid";
 import { attackById, attackRange, tilesInAnyRange } from "@/sim/attacks";
 import { Pos, TERRAIN, UnitDef, UnitState, otherTeam } from "@/sim/types";
@@ -95,19 +95,24 @@ export default function Highlights() {
   const drag = useGame((s) => s.drag);
   const tool = useGame((s) => s.tool);
   const groundHover = useGame((s) => s.groundHover);
-  const dropOk = useGame((s) => ((s.drag || s.tool.kind === "unit") && s.mode === "editor" ? (selectDropTarget(s)?.ok ?? false) : true));
+  const planning = useGame((s) => s.planning);
+  // the placement read applies in the editor and in the planning (deployment) phase alike
+  const placing = mode === "editor" || planning;
+  const dropOk = useGame((s) => ((s.drag || s.tool.kind === "unit") && (s.mode === "editor" || s.planning) ? (selectDropTarget(s)?.ok ?? false) : true));
   const paletteDef = useMemo(() => (mode === "editor" && tool.kind === "unit" ? makeUnit(tool.team, tool.archetype, 0, 0) : null), [mode, tool]);
+  // planning phase: the deploy zone (soft team wash) — where your units may stand before the battle
+  const zone = useMemo(() => (planning ? deployZone(config, playerTeam) : []), [planning, config, playerTeam]);
   const editorSubject = useMemo<{ def: UnitDef; origin: Pos | null } | null>(() => {
-    if (mode !== "editor") return null;
+    if (!placing) return null;
     if (drag?.kind === "unit") {
       const def = config.units.find((u) => u.id === drag.id);
       return def ? { def, origin: dropOk ? groundHover : null } : null;
     }
     if (!drag && paletteDef) return { def: paletteDef, origin: dropOk ? groundHover : null };
     return selected0 ? { def: selected0, origin: { x: selected0.x, y: selected0.y } } : null;
-  }, [mode, drag, config.units, dropOk, groundHover, paletteDef, selected0]);
-  // in the editor the paint belongs to the subject (carried / palette / selected); elsewhere to the selected unit
-  const selDef = mode === "editor" ? (editorSubject?.def ?? null) : selected0;
+  }, [placing, drag, config.units, dropOk, groundHover, paletteDef, selected0]);
+  // in the editor / planning the paint belongs to the subject (carried / palette / selected); elsewhere to the selected unit
+  const selDef = placing ? (editorSubject?.def ?? null) : selected0;
   const mine = !!selDef && selDef.team === playerTeam;
   const editorOrigin = editorSubject?.origin ?? null;
   const editorPreview = useMemo(() => {
@@ -131,7 +136,7 @@ export default function Highlights() {
     return { movable, band };
   }, [editorOrigin, selDef, config.map, config.units]);
   // FE paint: blue = tiles this unit can move to; red = tiles it can attack into but not stand on.
-  const movable = mode === "manual" ? moveTiles : mode === "editor" ? editorPreview.movable : preview;
+  const movable = placing ? editorPreview.movable : mode === "manual" ? moveTiles : preview;
   const liveBand = useMemo(() => {
     if (!sel || !selDef || !sel.alive || !battle || !caughtUp) return [];
     if (!movable.length) return [];
@@ -141,15 +146,15 @@ export default function Highlights() {
     for (const k of battle.threatTiles(selDef.id)) if (!mv.has(k)) out.push(parseKey(k));
     return out;
   }, [sel, selDef, battle, caughtUp, movable]);
-  const attackBand = mode === "editor" ? editorPreview.band : liveBand;
+  const attackBand = placing ? editorPreview.band : liveBand;
   // hovering a reachable tile previews the destination (FE cursor): path + attack squares + arcs
   const hoverPreview = useMemo(() => {
-    if (mode === "editor" || pendingMove || !hover || !movable.length || !selDef || !mine) return null;
+    if (placing || pendingMove || !hover || !movable.length || !selDef || !mine) return null;
     return movable.some((m) => m.x === hover.x && m.y === hover.y) ? hover : null;
-  }, [mode, pendingMove, hover, movable, selDef, mine]);
+  }, [placing, pendingMove, hover, movable, selDef, mine]);
   const previewFrom = pendingMove ?? hoverPreview;
   // FE Three Hopes: the attack range from where the unit STANDS (or will stand) is drawn over the move field
-  const attackOrigin = useMemo(() => (mode === "editor" ? editorOrigin : (previewFrom ?? (sel && sel.alive && mine ? { x: sel.x, y: sel.y } : null))), [mode, editorOrigin, previewFrom, sel, mine]);
+  const attackOrigin = useMemo(() => (placing ? editorOrigin : (previewFrom ?? (sel && sel.alive && mine ? { x: sel.x, y: sel.y } : null))), [placing, editorOrigin, previewFrom, sel, mine]);
   // attack range from the pending / hovered tile: the chosen (or hovered) attack's range, else the union of all four
   const focusAttack = pendingAttack ?? hoverAttack;
   // healing range (green) when a heal is focused / the Heal picker is open / a healer idles; else damage range
@@ -173,6 +178,9 @@ export default function Highlights() {
     <group>
       {danger.map((p) => (
         <Highlight key={`d${p.x},${p.y}`} x={p.x} y={p.y} color="#c04cff" opacity={0.15} />
+      ))}
+      {zone.map((p) => (
+        <Highlight key={`z${p.x},${p.y}`} x={p.x} y={p.y} color={playerTeam === "blue" ? "#4fd8ff" : "#ff7a6a"} opacity={0.16} border={playerTeam === "blue" ? "#9fe9ff" : "#ffb0a6"} borderOpacity={0.45} lift={0.015} />
       ))}
       {attackBand.map((p) => (
         <Highlight key={`a${p.x},${p.y}`} x={p.x} y={p.y} color={mine ? "#ff7a8a" : "#ff5a5a"} opacity={mine ? 0.34 : 0.22} border={mine ? "#ff4a5e" : undefined} borderOpacity={0.8} />

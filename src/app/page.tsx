@@ -26,6 +26,7 @@ export default function Home() {
     const b = s.battle;
     const caughtUp = s.cursor >= s.events.length;
     if (b && s.view.ended) return s.view.winner === "draw" ? "Draw — Rematch?" : `${s.view.winner!.toUpperCase()} wins — Rematch?`;
+    if (s.planning) return "Planning — drag your units, then Begin battle";
     if (s.mode === "manual") return b && caughtUp && b.state.activeTeam === s.playerTeam ? `Your move — tap a ${s.playerTeam} unit` : b ? "Enemy turn…" : "Start a battle";
     if (s.mode === "manager") return b && caughtUp && !s.playing ? "Command phase — set orders, then Execute" : b ? "Executing…" : "Set orders, then Start";
     return "Tools · simulate · squads";
