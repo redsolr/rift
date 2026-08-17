@@ -36,6 +36,10 @@ export default function Hud() {
   const seed = useGame((s) => s.seed);
   const showDanger = useGame((s) => s.showDanger);
   const toggleDanger = useGame((s) => s.toggleDanger);
+  const boardView = useGame((s) => s.boardView);
+  const toggleBoardView = useGame((s) => s.toggleBoardView);
+  const showGrid = useGame((s) => s.showGrid);
+  const toggleGrid = useGame((s) => s.toggleGrid);
 
   const caughtUp = cursor >= events.length;
   const live = !!battle && !battle.state.ended;
@@ -146,6 +150,12 @@ export default function Hud() {
             ◆<span className="btn-text"> Danger</span>
           </button>
         )}
+        <button className={`ghost view-toggle ${showGrid ? "on" : ""}`} onClick={toggleGrid} title="Debug: always draw the tile grid (normally it shows only while a unit is selected)">
+          ▦<span className="btn-text"> Grid</span>
+        </button>
+        <button className={`ghost view-toggle ${boardView === "tiles" ? "on" : ""}`} onClick={toggleBoardView} title="Debug: flat coloured terrain blocks instead of the dressed city map">
+          ▤<span className="btn-text"> Tiles</span>
+        </button>
         {ended && (
           <button className="primary" onClick={rematch} title={`Next seed (${seed + 1})`}>
             Rematch

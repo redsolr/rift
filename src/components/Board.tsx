@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { useGame } from "@/store/game";
 import Effects from "./Effects";
 import Tiles from "./board/Tiles";
+import Scenery from "./board/Scenery";
 import Highlights from "./board/Highlights";
 import Units from "./board/Units";
 import Runes from "./board/Runes";
@@ -34,6 +35,7 @@ export default function Board() {
         <directionalLight position={[cx - 6, 14, cz - 4]} intensity={1.4} castShadow shadow-mapSize={[1024, 1024]} />
         <group>
           <Tiles />
+          <Scenery />
           <Highlights />
           <Runes />
           <Units />

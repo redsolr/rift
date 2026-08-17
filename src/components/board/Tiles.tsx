@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { useGame } from "@/store/game";
 import { TERRAIN } from "@/sim/types";
 import { dragged } from "./shared";
+import { sceneMaterial, tileHash } from "./textures";
 
 export default function Tiles() {
   const map = useGame((s) => s.config.map);
@@ -15,6 +16,8 @@ export default function Tiles() {
   const paintTile = useGame((s) => s.paintTile);
   const tool = useGame((s) => s.tool);
   const mode = useGame((s) => s.mode);
+  const boardView = useGame((s) => s.boardView);
+  const scene = boardView === "scene";
 
   const tiles = useMemo(() => {
     const out: { x: number; y: number; t: keyof typeof TERRAIN }[] = [];
@@ -26,10 +29,16 @@ export default function Tiles() {
     <group>
       {tiles.map(({ x, y, t }) => {
         const d = TERRAIN[t];
+        // scene: gapless textured tiles, quarter-turned per tile so the shared texture stops repeating;
+        // tiles (debug): the flat coloured blocks with gaps — the grid IS the gaps
         return (
           <mesh
-            key={`${x},${y}`}
+            key={`${x},${y},${boardView}`}
             position={[x, d.height / 2, y]}
+            rotation={scene ? [0, Math.floor(tileHash(x, y, 99) * 4) * (Math.PI / 2), 0] : undefined}
+            material={scene ? sceneMaterial(t) : undefined}
+            receiveShadow
+            castShadow={scene && d.height > 0.2}
             onClick={(e: ThreeEvent<MouseEvent>) => {
               e.stopPropagation();
               clickTile({ x, y });
@@ -54,8 +63,8 @@ export default function Tiles() {
             }}
             onPointerOut={() => setHover(null)}
           >
-            <boxGeometry args={[0.96, d.height, 0.96]} />
-            <meshStandardMaterial color={d.color} roughness={0.9} />
+            <boxGeometry args={scene ? [1, d.height, 1] : [0.96, d.height, 0.96]} />
+            {!scene && <meshStandardMaterial color={d.color} roughness={0.9} />}
           </mesh>
         );
       })}

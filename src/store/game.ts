@@ -21,6 +21,8 @@ import {
 } from "@/sim/types";
 
 export type Mode = "manual" | "manager" | "editor";
+/** Board dressing: "scene" = textured city map (grid only while a unit is selected); "tiles" = flat coloured blocks with gaps (debug). */
+export type BoardView = "scene" | "tiles";
 /** FE command flow after a unit is placed: command list → attack picker → target select. */
 export type MenuPage = "command" | "attacks" | "target";
 
@@ -74,6 +76,10 @@ interface GameState {
   hover: Pos | null;
   hoverUnit: string | null;
   showDanger: boolean;
+  /** board dressing — see BoardView; persisted in localStorage */
+  boardView: BoardView;
+  /** debug: draw the tile grid overlay always, not just while a unit is selected */
+  showGrid: boolean;
   /** Manual mode: when on, the AI plays YOUR phases too (orders/doctrine drive your units) until you turn it off */
   autoPlay: boolean;
   /** Camera focus request: where to glide the camera; zoom in/out/keep; seq bumps on every request. */
@@ -127,6 +133,8 @@ interface GameState {
   setHover: (p: Pos | null) => void;
   setHoverUnit: (id: string | null) => void;
   toggleDanger: () => void;
+  toggleBoardView: () => void;
+  toggleGrid: () => void;
   toggleAuto: () => void;
   toggleFollow: () => void;
   focusCam: (p: Pos, zoom?: "in" | "out" | "keep") => void;
@@ -295,6 +303,8 @@ export const useGame = create<GameState>((set, get) => {
     hover: null,
     hoverUnit: null,
     showDanger: false,
+    boardView: "scene", // hydrateMaps() reads the persisted choice on mount (SSR-safe)
+    showGrid: false,
     autoPlay: false,
     camFocus: { x: 0, y: 0, zoom: "out", seq: 0 },
     banner: { kind: "phase", team: "blue", seq: 0 },
@@ -372,6 +382,12 @@ export const useGame = create<GameState>((set, get) => {
     setHover: (hover) => set({ hover }),
     setHoverUnit: (hoverUnit) => set({ hoverUnit }),
     toggleDanger: () => set({ showDanger: !get().showDanger }),
+    toggleBoardView: () => {
+      const boardView: BoardView = get().boardView === "scene" ? "tiles" : "scene";
+      set({ boardView });
+      if (typeof localStorage !== "undefined") localStorage.setItem("tactician.boardView", boardView);
+    },
+    toggleGrid: () => set({ showGrid: !get().showGrid }),
     toggleAuto: () => {
       const on = !get().autoPlay;
       set({ autoPlay: on });
@@ -607,7 +623,8 @@ export const useGame = create<GameState>((set, get) => {
       const active = lib.maps.find((m) => m.id === lib.activeMapId) ?? null;
       const config = active?.config ?? get().config;
       stopTimer();
-      set({ maps: lib.maps, activeMapId: active?.id ?? null, config, ...resetPlayback(config, null) });
+      const bv = typeof localStorage !== "undefined" ? localStorage.getItem("tactician.boardView") : null;
+      set({ maps: lib.maps, activeMapId: active?.id ?? null, config, ...resetPlayback(config, null), ...(bv === "tiles" ? { boardView: "tiles" as BoardView } : {}) });
       clearManual();
     },
     selectMap: (id) => {
