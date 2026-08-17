@@ -6,8 +6,9 @@ import { currentLine, useCampaign } from "./store";
 
 /**
  * Atlus / Metaphor-style conversation overlay: a white slab with torn ink edges low on the screen, the speaker's
- * name on a small tab, serif typewriter text, ▼ blink when it is your turn to click, an Atlus choice list when the
- * line has choices, ONE bust — the speaker's — large on the left (Metaphor never shows a second one; the right side is
+ * name on a small tab, serif typewriter text, ▼ blink when it is your turn to click, Persona 3 Reload choices when the
+ * line has choices (slanted ink ribbons fanned on the RIGHT over the scene — the focused one big and hot pink with white
+ * text, the others small, dark and dim; ↑↓ / hover moves focus, Enter / click confirms), ONE bust — the speaker's — large on the left (Metaphor never shows a second one; the right side is
  * only the button hints), and Skip / button hints bottom-right. Click / Space / Enter: finish the typewriter, then advance.
  */
 const CPS = 46; // typewriter characters per second
@@ -35,6 +36,10 @@ export default function Dialogue() {
   const shown = tw.seq === seq ? tw.n : 0;
   const setShown = (n: number) => setTw({ seq, n });
   const done = !!line && shown >= line.text.length;
+  // focused choice (P3R: one option is always the loud one), keyed by line seq so a new line starts on the first option
+  const [focusSt, setFocusSt] = useState({ seq: -1, i: 0 });
+  const focus = focusSt.seq === seq ? focusSt.i : 0;
+  const setFocus = (i: number) => setFocusSt({ seq, i });
   const lineRef = useRef(line);
   useEffect(() => {
     lineRef.current = line;
@@ -66,11 +71,16 @@ export default function Dialogue() {
   useEffect(() => {
     if (!dialogue) return;
     const onKey = (e: KeyboardEvent) => {
+      const l = lineRef.current;
+      const choosing = !!l?.choices && shown >= l.text.length;
       if (e.key === " " || e.key === "Enter") {
         e.preventDefault();
-        onNext();
+        if (choosing) advance(focus);
+        else onNext();
       } else if (e.key === "Escape") close();
-      else if (/^[1-3]$/.test(e.key) && lineRef.current?.choices && shown >= lineRef.current.text.length) advance(Number(e.key) - 1);
+      else if (choosing && (e.key === "ArrowDown" || e.key === "s" || e.key === "S")) setFocus((focus + 1) % l!.choices!.length);
+      else if (choosing && (e.key === "ArrowUp" || e.key === "w" || e.key === "W")) setFocus((focus - 1 + l!.choices!.length) % l!.choices!.length);
+      else if (/^[1-3]$/.test(e.key) && choosing && Number(e.key) - 1 < l!.choices!.length) advance(Number(e.key) - 1);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -97,19 +107,20 @@ export default function Dialogue() {
             {done && !line.choices && <span className="cd-caret">▼</span>}
           </p>
         </div>
-        {done && line.choices && (
-          <ol className="cd-choices" onClick={(e) => e.stopPropagation()}>
-            {line.choices.map((c, i) => (
-              <li key={i}>
-                <button onClick={() => advance(i)}>
-                  <span className="cd-choice-idx">{i + 1}</span>
-                  {c.label}
-                </button>
-              </li>
-            ))}
-          </ol>
-        )}
       </div>
+      {/* P3R choices: fanned slanted ribbons on the right, over the scene — never inside the slab */}
+      {done && line.choices && (
+        <ol className="cd-choices" onClick={(e) => e.stopPropagation()}>
+          {line.choices.map((c, i) => (
+            <li key={i} className={i === focus ? "focus" : ""} style={{ "--i": i } as React.CSSProperties}>
+              <button onMouseEnter={() => setFocus(i)} onFocus={() => setFocus(i)} onClick={() => advance(i)}>
+                <span className="cd-choice-band" aria-hidden />
+                <span className="cd-choice-label">{c.label}</span>
+              </button>
+            </li>
+          ))}
+        </ol>
+      )}
       <div className="cd-hints" onClick={(e) => e.stopPropagation()}>
         <button className="cd-hint" onClick={close}>
           <span className="cd-key">≡</span> Skip
