@@ -1828,11 +1828,17 @@ button.link {
   text-align: right;
 }
 .bb-portrait {
-  width: 150px;
-  height: 206px;
+  width: 190px;
+  height: 232px;
   grid-row: 1 / 3;
-  filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.75));
-  transform: translateY(8px);
+  align-self: end;
+  transform: translateY(6px);
+}
+.bb-portrait .portrait-img {
+  background-size: 150%;
+}
+.bb-side.right .bb-portrait .portrait-img {
+  transform: scaleX(-1); /* the enemy faces INWARD, toward the exchange (FE mirrors the right bust) */
 }
 .bb-side.right .bb-portrait {
   grid-column: 2;
@@ -2100,8 +2106,8 @@ button.link {
     padding: 0 8px 6px;
   }
   .bb-portrait {
-    width: 56px;
-    height: 77px;
+    width: 64px;
+    height: 72px;
     transform: none;
   }
   .bb-side {
@@ -2157,3 +2163,310 @@ button.link {
   }
 }
 
+
+/* ---- Character portraits (busts) — shared by the character panel and the battle bar ---- */
+.portrait {
+  position: relative;
+  overflow: hidden;
+  /* the bust hangs in the frame: fully opaque above, melting away toward the bottom edge (FE) */
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 68%, rgba(0, 0, 0, 0.55) 86%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 0%, #000 68%, rgba(0, 0, 0, 0.55) 86%, transparent 100%);
+}
+.portrait-glow {
+  position: absolute;
+  inset: 12% 8% 0;
+  border-radius: 50% 50% 0 0;
+  background: radial-gradient(ellipse at 50% 35%, rgba(120, 190, 255, 0.35), rgba(120, 190, 255, 0.08) 55%, transparent 72%);
+  filter: blur(6px);
+}
+.portrait.red .portrait-glow {
+  background: radial-gradient(ellipse at 50% 35%, rgba(255, 130, 110, 0.35), rgba(255, 130, 110, 0.08) 55%, transparent 72%);
+}
+.portrait-img {
+  position: absolute;
+  inset: 0;
+  background-repeat: no-repeat;
+  background-size: 150%;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.6));
+}
+.portrait-glyph {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 64px;
+  color: #fff;
+  text-shadow: 0 4px 12px #000;
+  font-family: "Segoe UI Symbol", "Apple Symbols", "Noto Sans Symbols 2", serif;
+}
+
+/* ---- FE Three Hopes-style character panel, top-left of the board ---- */
+.char-panel {
+  position: absolute;
+  top: 52px; /* room for the bust's head, which rises above the frame */
+  left: 12px;
+  z-index: 3;
+  width: 380px;
+  pointer-events: none;
+  --cp-team: #2ea3c8;
+  --cp-team-2: #0d5b74;
+  --cp-ink: #f4efe4;
+  font-variant-numeric: tabular-nums;
+}
+.char-panel.red {
+  --cp-team: #d0473b;
+  --cp-team-2: #6d1a14;
+}
+.cp-frame {
+  position: relative;
+  padding: 0 0 8px;
+  background: linear-gradient(160deg, rgba(16, 19, 28, 0.94), rgba(28, 32, 46, 0.86) 60%, rgba(16, 19, 28, 0.94));
+  border: 1px solid rgba(214, 178, 96, 0.35);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+/* thin team stripe down the left edge */
+.cp-frame::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(180deg, var(--cp-team), var(--cp-team-2) 70%, transparent);
+}
+.cp-banner {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px 6px 18px;
+  /* brush-stroke name band: team colour that tears off toward the right (FE) */
+  background: linear-gradient(90deg, var(--cp-team-2) 0%, var(--cp-team) 18%, var(--cp-team) 62%, rgba(0, 0, 0, 0) 100%);
+  -webkit-mask-image: linear-gradient(90deg, #000 70%, rgba(0, 0, 0, 0.6) 84%, rgba(0, 0, 0, 0.9) 90%, transparent 100%);
+  mask-image: linear-gradient(90deg, #000 70%, rgba(0, 0, 0, 0.6) 84%, rgba(0, 0, 0, 0.9) 90%, transparent 100%);
+}
+.cp-name {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 27px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--cp-ink);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.7);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cp-ovr {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: #ffd98a;
+  text-shadow: 0 1px 3px #000;
+  margin-right: 118px; /* leaves the banner's tail under the portrait head */
+}
+.cp-ovr-l {
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: #e6c877;
+  opacity: 0.9;
+}
+.cp-body {
+  display: grid;
+  grid-template-columns: 1fr 150px;
+  align-items: start;
+}
+.cp-info {
+  padding: 8px 6px 4px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.cp-class {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 15px;
+  color: #dfe3ee;
+  letter-spacing: 0.02em;
+}
+.cp-crest {
+  color: #f2c96b;
+}
+.cp-tier {
+  font-size: 11px;
+  color: #f2c96b;
+  letter-spacing: 0.1em;
+  text-shadow: 0 0 6px rgba(242, 201, 107, 0.6);
+}
+.cp-hp {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 2px;
+}
+.cp-hp-l {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: #c9a24a;
+}
+.cp-hp-v {
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
+  font-size: 40px;
+  line-height: 0.95;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 2px 6px #000;
+}
+.cp-hp-v.low {
+  color: #ffb14a;
+}
+.cp-hp-max {
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
+  font-size: 18px;
+  color: #cfd3de;
+}
+.cp-gauge {
+  height: 7px;
+  width: 100%;
+  max-width: 190px;
+  background: linear-gradient(180deg, #efe9dc, #d9d2c2);
+  border: 1px solid #0f1116;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+  overflow: hidden;
+}
+.cp-gauge > div {
+  height: 100%;
+  background: linear-gradient(180deg, #6cf58a, #2fae52);
+}
+.char-panel.red .cp-gauge > div {
+  background: linear-gradient(180deg, #ff8a7a, #d63d30);
+}
+.cp-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 14px;
+  margin-top: 6px;
+  max-width: 190px;
+}
+.cp-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 1px 0;
+}
+.cp-stat-l {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 13px;
+  color: #cfd3de;
+}
+.cp-stat-v {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+}
+.cp-portrait {
+  width: 150px;
+  height: 200px;
+  margin-top: -44px; /* the head rises above the banner — the bust hangs over the frame, FE style */
+  justify-self: end;
+}
+.cp-portrait .portrait-img {
+  background-size: 175%;
+}
+.cp-weapon {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 12px 0 12px;
+  padding: 5px 8px;
+  font-size: 14px;
+  color: #f4efe4;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.3));
+  border: 1px solid rgba(214, 178, 96, 0.35);
+  border-radius: 2px;
+  position: relative;
+  z-index: 1;
+}
+.cp-arrow {
+  color: #8a93a8;
+  font-size: 13px;
+}
+.cp-arrow:last-child {
+  margin-left: auto;
+}
+.cp-wicon {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  background: #1a1e2a;
+  border: 1px solid #3a3f52;
+  color: #f2c96b;
+  font-size: 12px;
+}
+.cp-wname {
+  font-weight: 700;
+}
+.cp-rng {
+  font-size: 11px;
+  color: var(--muted);
+}
+.cp-buff {
+  margin: 6px 12px 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-shadow: 0 0 8px currentColor;
+}
+.cp-terrain {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 3px 12px 3px 14px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 15px;
+  color: #f4efe4;
+  background: linear-gradient(90deg, rgba(16, 19, 28, 0.9), rgba(16, 19, 28, 0.55));
+  border-left: 3px solid #d6b260;
+  min-height: 24px;
+}
+.cp-terrain-def {
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 11px;
+  color: #6cf58a;
+}
+/* narrow boards: compact panel */
+@container (max-width: 900px) {
+  .char-panel {
+    width: 300px;
+  }
+  .cp-portrait {
+    width: 110px;
+    height: 150px;
+    margin-top: -30px;
+  }
+  .cp-body {
+    grid-template-columns: 1fr 110px;
+  }
+  .cp-name {
+    font-size: 21px;
+  }
+  .cp-hp-v {
+    font-size: 30px;
+  }
+  .cp-ovr {
+    margin-right: 84px;
+  }
+}

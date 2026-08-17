@@ -8,9 +8,10 @@ import { create } from "zustand";
  * (drag anywhere = move, corner grip = scale, ↺ = reset). Nothing here touches the game store.
  */
 
-export type UiFrameId = "battle-bar" | "hud-tr" | "turn-controls" | "skill-panel";
+export type UiFrameId = "battle-bar" | "char-panel" | "hud-tr" | "turn-controls" | "skill-panel";
 export const UI_FRAME_LABEL: Record<UiFrameId, string> = {
   "battle-bar": "Battle forecast",
+  "char-panel": "Character panel",
   "hud-tr": "Minimap & camera",
   "turn-controls": "Turn buttons",
   "skill-panel": "Skill panel",
@@ -18,6 +19,7 @@ export const UI_FRAME_LABEL: Record<UiFrameId, string> = {
 /** which corner the frame is anchored to — scaling grows away from it so the frame stays put */
 const ORIGIN: Record<UiFrameId, string> = {
   "battle-bar": "bottom center",
+  "char-panel": "top left",
   "hud-tr": "top right",
   "turn-controls": "bottom right",
   "skill-panel": "top right",

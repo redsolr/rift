@@ -1,6 +1,7 @@
 "use client";
 import { Archetype, Team, UnitDef } from "@/sim/types";
 import { ARCHETYPE_LABEL } from "@/sim/presets";
+import { PORTRAIT_FOCUS, portraitCanvas, portraitsKey } from "./portraits";
 
 /**
  * Procedural FUT-style unit cards, drawn to a canvas. Used as a billboard texture on the
@@ -45,7 +46,7 @@ const cache = new Map<string, HTMLCanvasElement>();
 
 export function cardKey(u: UnitDef): string {
   const s = u.stats;
-  return `${u.team}|${u.archetype}|${u.name}|${s.hp}|${s.atk}|${s.def}|${s.spd}|${s.mov}|${s.rangeMin}|${s.rangeMax}`;
+  return `${u.team}|${u.archetype}|${u.name}|${s.hp}|${s.atk}|${s.def}|${s.spd}|${s.mov}|${s.rangeMin}|${s.rangeMax}|p${portraitsKey()}`;
 }
 
 function shieldPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
@@ -123,16 +124,53 @@ export function renderCard(u: UnitDef): HTMLCanvasElement {
     ctx.fillRect(px, py, 3 + (i % 3), 3 + ((i * 7) % 3));
   }
   ctx.globalAlpha = 1;
-  ctx.font = "bold 132px 'Segoe UI Symbol', 'Apple Symbols', 'Noto Sans Symbols 2', serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.shadowColor = "rgba(0,0,0,0.75)";
-  ctx.shadowBlur = 16;
-  ctx.shadowOffsetY = 6;
-  ctx.fillStyle = f.ink;
-  ctx.fillText(GLYPH[u.archetype], W * 0.6, H * 0.36);
-  ctx.shadowBlur = 0;
-  ctx.shadowOffsetY = 0;
+  const art = portraitCanvas(u.archetype);
+  if (art) {
+    // character bust: cover-fit into the portrait window (right of the rating column, above the name band),
+    // cropped around the face, faded out at the bottom so it melts into the frame instead of ending in a hard line
+    const win = { x: 44, y: 16, w: W - 58, h: H * 0.6 - 30 };
+    const focus = PORTRAIT_FOCUS[u.archetype];
+    const k = Math.max(win.w / art.width, win.h / art.height) * 1.08;
+    const dw = art.width * k;
+    const dh = art.height * k;
+    const dx = Math.min(win.x, Math.max(win.x + win.w - dw, win.x + win.w * 0.5 - focus.x * dw));
+    const dy = Math.min(win.y, Math.max(win.y + win.h - dh, win.y + win.h * 0.38 - focus.y * dh));
+    const pc = document.createElement("canvas");
+    pc.width = W;
+    pc.height = H;
+    const px = pc.getContext("2d")!;
+    px.drawImage(art, dx, dy, dw, dh);
+    px.globalCompositeOperation = "destination-in";
+    const fade = px.createLinearGradient(0, win.y + win.h - 46, 0, win.y + win.h + 6);
+    fade.addColorStop(0, "rgba(0,0,0,1)");
+    fade.addColorStop(1, "rgba(0,0,0,0)");
+    px.fillStyle = fade;
+    px.fillRect(0, 0, W, H);
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.6)";
+    ctx.shadowBlur = 14;
+    ctx.shadowOffsetY = 4;
+    ctx.drawImage(pc, 0, 0);
+    ctx.restore();
+    // ink wash behind the rating column so the numbers stay readable over the art
+    const col = ctx.createLinearGradient(0, 0, 118, 0);
+    col.addColorStop(0, f.a + "e6");
+    col.addColorStop(0.55, f.a + "88");
+    col.addColorStop(1, f.a + "00");
+    ctx.fillStyle = col;
+    ctx.fillRect(6, 6, 118, H * 0.6 - 30);
+  } else {
+    ctx.font = "bold 132px 'Segoe UI Symbol', 'Apple Symbols', 'Noto Sans Symbols 2', serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.shadowColor = "rgba(0,0,0,0.75)";
+    ctx.shadowBlur = 16;
+    ctx.shadowOffsetY = 6;
+    ctx.fillStyle = f.ink;
+    ctx.fillText(GLYPH[u.archetype], W * 0.6, H * 0.36);
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
+  }
   ctx.restore();
 
   // baked holo band (foil tiers): a diagonal prismatic stripe under everything, the animated sweep rides on top

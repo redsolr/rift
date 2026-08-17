@@ -6,22 +6,35 @@ import { TERRAIN, TerrainDef, UnitDef } from "@/sim/types";
 import { ARCHETYPE_LABEL } from "@/sim/presets";
 import { WEAPON, overall } from "./cards";
 import { attackById, attackRange } from "@/sim/attacks";
-import CardThumb from "./CardThumb";
+import Portrait from "./Portrait";
 import { useUiFrame } from "./ui/UiFrame";
 
 /**
- * FE Engage / Three Hopes style battle bar across the bottom of the board.
- * Left = your unit (selected, else the unit under the pointer). Right = the enemy under the
- * pointer (or the only target in range). Middle = the forecast: Crit · Hit · HP | HP · Hit · Crit,
- * damage shown on the RECEIVER's side, predicted HP bars, and the confirm prompt.
+ * FE Engage / Three Hopes style battle bar across the bottom of the board — the EXCHANGE view.
+ * Left = your selected unit, right = the enemy under the pointer (or the only target in range); each end carries the
+ * character bust (portrait) + name / class / HP / weapon. Middle = the forecast: Crit · Hit · HP | HP · Hit · Crit,
+ * damage shown on the RECEIVER's side, predicted HP gauges. Opens only for a duel (selected unit + enemy) — the
+ * solo character read lives in the top-left CharacterPanel, which yields to this bar while it is up (FE).
  * All numbers come from Battle.forecast — nothing is recomputed here.
  */
-export default function BattleBar() {
-  const battle = useGame((s) => s.battle);
+
+/** The pair the bar would show: your selected unit and the enemy being considered (null = no duel on screen). */
+export function useDuelPair(): { left: UnitDef | null; right: UnitDef | null } {
   const selected = useGame((s) => s.selected);
   const hoverUnit = useGame((s) => s.hoverUnit);
-  const pendingMove = useGame((s) => s.pendingMove);
   const targets = useGame((s) => s.targets);
+  const units = useGame((s) => s.config.units);
+  const mode = useGame((s) => s.mode);
+  const byId = (id: string | null) => (id ? units.find((u) => u.id === id) ?? null : null);
+  const left = mode === "editor" ? null : byId(selected);
+  const hov = byId(hoverUnit);
+  const right = left ? (hov && hov.team !== left.team ? hov : targets.length === 1 ? byId(targets[0]) : null) : null;
+  return { left, right };
+}
+
+export default function BattleBar() {
+  const battle = useGame((s) => s.battle);
+  const pendingMove = useGame((s) => s.pendingMove);
   const pendingAttack = useGame((s) => s.pendingAttack);
   const hoverAttack = useGame((s) => s.hoverAttack);
   const caughtUp = useGame(selectCaughtUp);
@@ -43,16 +56,12 @@ export default function BattleBar() {
       host.style.setProperty("--bb-h", "0px");
     };
   });
-  const byId = (id: string | null) => (id ? units.find((u) => u.id === id) ?? null : null);
-  const hov = byId(hoverUnit);
   const ui = useUiFrame("battle-bar");
   const playerTeam = useGame((s) => s.playerTeam);
-  // UI-layout mode: show the bar with the first of your units so it can be placed
-  const sel = byId(selected) ?? (ui.editing ? units.find((u) => u.team === playerTeam) ?? units[0] ?? null : null);
-  // Only a SELECTED unit opens the bar (hover alone would flicker). Right = the enemy under the
-  // pointer while a unit is selected, else the only target in range.
-  const left = sel;
-  const right = left ? (hov && hov.team !== left.team ? hov : targets.length === 1 ? byId(targets[0]) : null) : null;
+  const pair = useDuelPair();
+  // UI-layout mode: stand-in pair (your first unit vs the first enemy) so the frame can be placed
+  const left = pair.left ?? (ui.editing ? units.find((u) => u.team === playerTeam) ?? units[0] ?? null : null);
+  const right = pair.right ?? (ui.editing && left ? units.find((u) => u.team !== left.team) ?? null : null);
 
   const fc = useMemo(() => {
     if (!battle || !caughtUp || !left || !right) return null;
@@ -67,7 +76,8 @@ export default function BattleBar() {
   const leftTerr = leftPos ? terrainOf(leftPos.x, leftPos.y) : null;
   const rightTerr = rightPos ? terrainOf(rightPos.x, rightPos.y) : null;
 
-  if (mode === "editor" || !left) return null;
+  // duel only — the solo read is the CharacterPanel's job (the frame stays up in layout mode with the stand-in pair)
+  if (mode === "editor" || !left || (!right && !ui.editing)) return null;
   const lv = left ? view.units[left.id] : null;
   const rv = right ? view.units[right.id] : null;
   const duel = !!(fc && left && right && lv && rv);
@@ -110,7 +120,7 @@ export default function BattleBar() {
           </div>
         </div>
       )}
-      {!duel && <div className="bb-center solo-hint">Hover an enemy to forecast</div>}
+      {!duel && <div className="bb-center solo-hint">Forecast</div>}
 
       {right && rv && <Side u={right} hp={rv.hp} terrain={rightTerr} side="right" />}
       {ui.overlay}
@@ -123,7 +133,7 @@ function Side({ u, hp, terrain, side, attack = null, buff = null }: { u: UnitDef
   const [lo, hi] = attack ? attackRange(u, attackById(u, attack.id)) : [u.stats.rangeMin, u.stats.rangeMax];
   return (
     <div className={`bb-side ${side} ${u.team}`}>
-      <CardThumb u={u} className="bb-portrait" scale={0.75} />
+      <Portrait u={u} className="bb-portrait" />
       <div className="bb-info">
         <div className="bb-name">
           <span>{u.name}</span>

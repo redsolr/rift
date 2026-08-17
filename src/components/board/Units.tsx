@@ -15,8 +15,9 @@ import { CARD_H3, CARD_W3, TEAM_GLOW, dragged } from "./shared";
 
 /** Billboarded FUT-style card. Texture is a cached canvas from cards.ts; `dim` marks an acted unit. */
 const textureCache = new Map<string, THREE.CanvasTexture>();
-function cardTexture(def: UnitDef): THREE.CanvasTexture {
-  const key = cardKey(def);
+/** `art` = the portraits-loaded signal — part of the cache key so the glyph texture is dropped once the art is in. */
+function cardTexture(def: UnitDef, art: number): THREE.CanvasTexture {
+  const key = `${art}|${cardKey(def)}`;
   let t = textureCache.get(key);
   if (!t) {
     t = new THREE.CanvasTexture(renderCard(def));
@@ -52,9 +53,9 @@ function cutawayAlphaMap() {
  * `tint` colours the whole card (acted = grey; editor drop preview = green / red).
  */
 export function CardMesh({ def, dim, selected, opacity = 1, tint, cutaway = false, lift = 0 }: { def: UnitDef; dim: boolean; selected: boolean; opacity?: number; tint?: string; cutaway?: boolean; lift?: number }) {
-  // portraits load async: the version tick re-keys the texture (cardKey reads portraitsKey()) so the glyph card swaps for the art card
+  // portraits load async: the version tick re-keys the texture so the glyph card swaps for the art card
   const artVersion = usePortraitsVersion();
-  const texture = useMemo(() => cardTexture(def), [def, artVersion]);
+  const texture = useMemo(() => cardTexture(def, artVersion), [def, artVersion]);
   const foil = TIER[tierOf(def)].foil;
   // foil sweep: tier intensity, plus a hero boost when selected (even base-tier cards get the sweep then); acted units stay flat
   const boost = selected ? 0.5 : 0;

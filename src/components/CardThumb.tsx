@@ -2,6 +2,7 @@
 import { useEffect, useRef } from "react";
 import { UnitDef } from "@/sim/types";
 import { CARD_H, CARD_W, TIER, drawFoilSweep, renderCard, tierOf } from "./cards";
+import { usePortraitsVersion } from "./portraits";
 
 /**
  * Blits the cached procedural card into a small canvas (same art as the board). Foil tiers (gold/silver)
@@ -9,6 +10,7 @@ import { CARD_H, CARD_W, TIER, drawFoilSweep, renderCard, tierOf } from "./cards
  */
 export default function CardThumb({ u, className = "card-thumb", scale = 0.5 }: { u: UnitDef; className?: string; scale?: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const artVersion = usePortraitsVersion();
   useEffect(() => {
     const c = ref.current;
     if (!c) return;
@@ -32,6 +34,6 @@ export default function CardThumb({ u, className = "card-thumb", scale = 0.5 }: 
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [u]);
+  }, [u, artVersion]);
   return <canvas ref={ref} className={className} width={CARD_W * scale} height={CARD_H * scale} aria-hidden />;
 }

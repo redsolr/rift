@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import Hud from "@/components/Hud";
 import Panel from "@/components/Panel";
 import Drawer from "@/components/Drawer";
-import BattleBar from "@/components/BattleBar";
+import BattleBar, { useDuelPair } from "@/components/BattleBar";
+import CharacterPanel from "@/components/CharacterPanel";
 import TurnControls from "@/components/TurnControls";
 import SkillPanel from "@/components/SkillPanel";
 import HudTopRight from "@/components/HudTopRight";
@@ -18,6 +19,8 @@ export default function Home() {
   const loadShareCode = useGame((s) => s.loadShareCode);
   const [mobile, setMobile] = useState(false);
   const [landscape, setLandscape] = useState(true);
+  // FE: the character panel yields to the battle bar while an exchange is being forecast
+  const dueling = useDuelPair().right !== null;
   const selectedName = useGame((s) => s.config.units.find((u) => u.id === s.selected)?.name ?? null);
   const hint = useGame((s) => {
     const b = s.battle;
@@ -72,6 +75,7 @@ export default function Home() {
           <Board />
           <HudTopRight />
           <BattleBar />
+          {!mobile && <CharacterPanel hidden={dueling} />}
           <TurnControls />
           <SkillPanel />
           <UiLayoutBar />
