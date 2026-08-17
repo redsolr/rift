@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { selectCaughtUp, useGame } from "@/store/game";
@@ -191,91 +191,118 @@ function FocusTile({ x, y, color }: { x: number; y: number; color: string }) {
   );
 }
 
-/** FE Three Hopes movement path: a slim WHITE ribbon on the ground with ROUNDED turns (quarter arcs) and a swept, notched arrowhead. */
+/**
+ * FE Three Hopes movement path: a slim WHITE ribbon on the ground with ROUNDED turns (quarter arcs) and a swept, notched
+ * arrowhead, over a soft glow. It DRAWS ON from the unit to the destination (~0.2 s) whenever the path changes —
+ * geometry triangles are ordered along the path (head last) so a draw-range sweep is the whole animation.
+ */
+function buildPathGeometry(raw: THREE.Vector3[], W: number, headScale: number): THREE.BufferGeometry {
+  const R = 0.32; // corner radius (tiles)
+  const last = raw.length - 1;
+  const dir = raw[last].clone().sub(raw[last - 1]).normalize();
+  const side = new THREE.Vector3(-dir.z, 0, dir.x);
+  const headLen = 0.3 * headScale;
+  const headHalf = 0.15 * headScale;
+  const notch = 0.09 * headScale;
+  const headTip = raw[last].clone().add(dir.clone().multiplyScalar(0.12));
+  const headBack = headTip.clone().sub(dir.clone().multiplyScalar(headLen));
+  const headNotch = headBack.clone().add(dir.clone().multiplyScalar(notch));
+  const line: THREE.Vector3[] = [raw[0].clone()];
+  for (let i = 1; i < last; i++) {
+    const prev = raw[i - 1];
+    const cur = raw[i];
+    const next = raw[i + 1];
+    const dIn = cur.clone().sub(prev).normalize();
+    const dOut = next.clone().sub(cur).normalize();
+    if (Math.abs(dIn.dot(dOut)) > 0.999) {
+      line.push(cur.clone());
+      continue;
+    }
+    const pIn = cur.clone().sub(dIn.clone().multiplyScalar(R));
+    const pOut = cur.clone().add(dOut.clone().multiplyScalar(R));
+    const N = 8;
+    for (let k = 0; k <= N; k++) {
+      const t = k / N;
+      const q = pIn.clone().multiplyScalar((1 - t) * (1 - t)).add(cur.clone().multiplyScalar(2 * (1 - t) * t)).add(pOut.clone().multiplyScalar(t * t));
+      q.y = Math.max(pIn.y, pOut.y);
+      line.push(q);
+    }
+  }
+  line.push(headNotch.clone());
+  const pos: number[] = [];
+  const idx: number[] = [];
+  const quad = (a: THREE.Vector3, b: THREE.Vector3) => {
+    const d = b.clone().sub(a);
+    if (d.length() < 1e-5) return;
+    d.normalize();
+    const n = new THREE.Vector3(-d.z, 0, d.x).multiplyScalar(W / 2);
+    const y = Math.max(a.y, b.y);
+    const base = pos.length / 3;
+    pos.push(a.x + n.x, y, a.z + n.z, b.x + n.x, y, b.z + n.z, b.x - n.x, y, b.z - n.z, a.x - n.x, y, a.z - n.z);
+    idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+  };
+  const disc = (c: THREE.Vector3) => {
+    const seg = 10;
+    const base = pos.length / 3;
+    pos.push(c.x, c.y, c.z);
+    for (let k = 0; k <= seg; k++) {
+      const ang = (k / seg) * Math.PI * 2;
+      pos.push(c.x + Math.cos(ang) * (W / 2), c.y, c.z + Math.sin(ang) * (W / 2));
+      if (k > 0) idx.push(base, base + k, base + k + 1);
+    }
+  };
+  for (let i = 0; i < line.length - 1; i++) {
+    quad(line[i], line[i + 1]);
+    if (i > 0) disc(line[i]);
+  }
+  const y = headTip.y;
+  const l = headBack.clone().add(side.clone().multiplyScalar(headHalf));
+  const r = headBack.clone().sub(side.clone().multiplyScalar(headHalf));
+  const b0 = pos.length / 3;
+  pos.push(headTip.x, y, headTip.z, r.x, y, r.z, headNotch.x, y, headNotch.z, l.x, y, l.z);
+  idx.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3);
+  const out = new THREE.BufferGeometry();
+  out.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  out.setIndex(idx);
+  return out;
+}
+
 function PathLine({ path }: { path: Pos[] }) {
   const map = useGame((s) => s.config.map);
-  const W = 0.06; // ribbon width (tiles) — FE: a slim line, ~1/16 of a tile
-  const R = 0.32; // corner radius (tiles)
-  const geo = useMemo(() => {
+  const core = useRef<THREE.Mesh>(null);
+  const glow = useRef<THREE.Mesh>(null);
+  const progress = useRef(0);
+  const geos = useMemo(() => {
     if (path.length < 2) return null;
     const raw = path.map((p) => new THREE.Vector3(p.x, tileHeight(map, p) + 0.045, p.y));
-    const last = raw.length - 1;
-    // arrowhead geometry along the final direction; the ribbon stops at the head's notch
-    const dir = raw[last].clone().sub(raw[last - 1]).normalize();
-    const side = new THREE.Vector3(-dir.z, 0, dir.x);
-    const headLen = 0.3;
-    const headHalf = 0.15;
-    const notch = 0.09; // how far the back of the head is swept forward at the centre
-    const headTip = raw[last].clone().add(dir.clone().multiplyScalar(0.12));
-    const headBack = headTip.clone().sub(dir.clone().multiplyScalar(headLen)); // barb line
-    const headNotch = headBack.clone().add(dir.clone().multiplyScalar(notch));
-    // centreline: straight runs cut short by R at every turn, quarter arcs inserted
-    const line: THREE.Vector3[] = [raw[0].clone()];
-    for (let i = 1; i < last; i++) {
-      const prev = raw[i - 1];
-      const cur = raw[i];
-      const next = raw[i + 1];
-      const dIn = cur.clone().sub(prev).normalize();
-      const dOut = next.clone().sub(cur).normalize();
-      if (Math.abs(dIn.dot(dOut)) > 0.999) {
-        line.push(cur.clone());
-        continue;
-      }
-      const pIn = cur.clone().sub(dIn.clone().multiplyScalar(R));
-      const pOut = cur.clone().add(dOut.clone().multiplyScalar(R));
-      const N = 8;
-      for (let k = 0; k <= N; k++) {
-        const t = k / N;
-        // quadratic bezier pIn → cur → pOut ≈ a quarter arc for a 90° turn
-        const q = pIn.clone().multiplyScalar((1 - t) * (1 - t)).add(cur.clone().multiplyScalar(2 * (1 - t) * t)).add(pOut.clone().multiplyScalar(t * t));
-        q.y = Math.max(pIn.y, pOut.y);
-        line.push(q);
-      }
-    }
-    line.push(headNotch.clone());
-    // ribbon: one quad per centreline segment + a disc at every joint (angles are small, so this reads smooth)
-    const pos: number[] = [];
-    const idx: number[] = [];
-    const quad = (a: THREE.Vector3, b: THREE.Vector3) => {
-      const d = b.clone().sub(a);
-      if (d.length() < 1e-5) return;
-      d.normalize();
-      const n = new THREE.Vector3(-d.z, 0, d.x).multiplyScalar(W / 2);
-      const y = Math.max(a.y, b.y);
-      const base = pos.length / 3;
-      pos.push(a.x + n.x, y, a.z + n.z, b.x + n.x, y, b.z + n.z, b.x - n.x, y, b.z - n.z, a.x - n.x, y, a.z - n.z);
-      idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
-    };
-    const disc = (c: THREE.Vector3) => {
-      const seg = 10;
-      const base = pos.length / 3;
-      pos.push(c.x, c.y, c.z);
-      for (let k = 0; k <= seg; k++) {
-        const ang = (k / seg) * Math.PI * 2;
-        pos.push(c.x + Math.cos(ang) * (W / 2), c.y, c.z + Math.sin(ang) * (W / 2));
-        if (k > 0) idx.push(base, base + k, base + k + 1);
-      }
-    };
-    for (let i = 0; i < line.length - 1; i++) {
-      quad(line[i], line[i + 1]);
-      if (i > 0) disc(line[i]);
-    }
-    // swept arrowhead: tip, right barb, notch, left barb (two triangles)
-    const y = headTip.y;
-    const l = headBack.clone().add(side.clone().multiplyScalar(headHalf));
-    const r = headBack.clone().sub(side.clone().multiplyScalar(headHalf));
-    const b0 = pos.length / 3;
-    pos.push(headTip.x, y, headTip.z, r.x, y, r.z, headNotch.x, y, headNotch.z, l.x, y, l.z);
-    idx.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3);
-    const out = new THREE.BufferGeometry();
-    out.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
-    out.setIndex(idx);
-    return out;
+    return { core: buildPathGeometry(raw, 0.06, 1), glow: buildPathGeometry(raw, 0.16, 1.35) };
   }, [path, map]);
-  if (!geo) return null;
+  // restart the draw-on whenever the path changes
+  useEffect(() => {
+    progress.current = 0;
+  }, [geos]);
+  useFrame((_, dt) => {
+    if (!geos) return;
+    progress.current = Math.min(1, progress.current + dt / 0.2);
+    // ease-out so the head "lands"
+    const e = 1 - Math.pow(1 - progress.current, 3);
+    for (const [ref, g] of [
+      [core, geos.core],
+      [glow, geos.glow],
+    ] as const) {
+      const total = g.getIndex()!.count;
+      ref.current?.geometry.setDrawRange(0, Math.ceil((total * e) / 3) * 3);
+    }
+  });
+  if (!geos) return null;
   return (
-    <mesh geometry={geo} renderOrder={5}>
-      <meshBasicMaterial color="#ffffff" transparent opacity={0.95} depthTest={false} depthWrite={false} side={THREE.DoubleSide} />
-    </mesh>
+    <group>
+      <mesh ref={glow} geometry={geos.glow} renderOrder={4}>
+        <meshBasicMaterial color="#cfe6ff" transparent opacity={0.28} depthTest={false} depthWrite={false} side={THREE.DoubleSide} />
+      </mesh>
+      <mesh ref={core} geometry={geos.core} renderOrder={5}>
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.96} depthTest={false} depthWrite={false} side={THREE.DoubleSide} />
+      </mesh>
+    </group>
   );
 }
