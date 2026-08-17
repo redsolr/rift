@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { selectCaughtUp, useGame } from "@/store/game";
@@ -193,10 +193,17 @@ function FocusTile({ x, y, color }: { x: number; y: number; color: string }) {
 
 /**
  * FE Three Hopes movement path: a slim WHITE ribbon on the ground with ROUNDED turns (quarter arcs) and a swept, notched
- * arrowhead, over a soft glow. It DRAWS ON from the unit to the destination (~0.2 s) whenever the path changes —
- * geometry triangles are ordered along the path (head last) so a draw-range sweep is the whole animation.
+ * arrowhead, over a soft glow. Built as ONE mitred triangle strip (no overlapping pieces — overlaps double-blend into
+ * visible dots on a transparent mesh). Each triangle knows its distance along the path, so the visible length can be
+ * animated: it EASES toward the current path length whenever the path changes — grows out, or shrinks back — never snaps.
  */
-function buildPathGeometry(raw: THREE.Vector3[], W: number, headScale: number): THREE.BufferGeometry {
+interface PathGeo {
+  geo: THREE.BufferGeometry;
+  /** cumulative path length at the END of each triangle (index i → triangle i); the head triangles carry the total */
+  triEnd: number[];
+  total: number;
+}
+function buildPathGeometry(raw: THREE.Vector3[], W: number, headScale: number): PathGeo {
   const R = 0.32; // corner radius (tiles)
   const last = raw.length - 1;
   const dir = raw[last].clone().sub(raw[last - 1]).normalize();
@@ -207,6 +214,7 @@ function buildPathGeometry(raw: THREE.Vector3[], W: number, headScale: number): 
   const headTip = raw[last].clone().add(dir.clone().multiplyScalar(0.12));
   const headBack = headTip.clone().sub(dir.clone().multiplyScalar(headLen));
   const headNotch = headBack.clone().add(dir.clone().multiplyScalar(notch));
+  // centreline
   const line: THREE.Vector3[] = [raw[0].clone()];
   for (let i = 1; i < last; i++) {
     const prev = raw[i - 1];
@@ -229,78 +237,78 @@ function buildPathGeometry(raw: THREE.Vector3[], W: number, headScale: number): 
     }
   }
   line.push(headNotch.clone());
+  // mitred strip: two vertices per centreline point, offset along the averaged normal
   const pos: number[] = [];
   const idx: number[] = [];
-  const quad = (a: THREE.Vector3, b: THREE.Vector3) => {
-    const d = b.clone().sub(a);
-    if (d.length() < 1e-5) return;
-    d.normalize();
-    const n = new THREE.Vector3(-d.z, 0, d.x).multiplyScalar(W / 2);
-    const y = Math.max(a.y, b.y);
-    const base = pos.length / 3;
-    pos.push(a.x + n.x, y, a.z + n.z, b.x + n.x, y, b.z + n.z, b.x - n.x, y, b.z - n.z, a.x - n.x, y, a.z - n.z);
-    idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
-  };
-  const disc = (c: THREE.Vector3) => {
-    const seg = 10;
-    const base = pos.length / 3;
-    pos.push(c.x, c.y, c.z);
-    for (let k = 0; k <= seg; k++) {
-      const ang = (k / seg) * Math.PI * 2;
-      pos.push(c.x + Math.cos(ang) * (W / 2), c.y, c.z + Math.sin(ang) * (W / 2));
-      if (k > 0) idx.push(base, base + k, base + k + 1);
+  const triEnd: number[] = [];
+  const cum: number[] = [0];
+  for (let i = 1; i < line.length; i++) cum.push(cum[i - 1] + line[i].distanceTo(line[i - 1]));
+  const n = line.length;
+  for (let i = 0; i < n; i++) {
+    const dPrev = i > 0 ? line[i].clone().sub(line[i - 1]).normalize() : line[i + 1].clone().sub(line[i]).normalize();
+    const dNext = i < n - 1 ? line[i + 1].clone().sub(line[i]).normalize() : dPrev;
+    const t = dPrev.clone().add(dNext).normalize();
+    const nrm = new THREE.Vector3(-t.z, 0, t.x);
+    // mitre length so the strip keeps constant width through the turn
+    const cosHalf = Math.max(0.5, nrm.dot(new THREE.Vector3(-dPrev.z, 0, dPrev.x)));
+    const off = nrm.multiplyScalar(W / 2 / cosHalf);
+    const y = line[i].y;
+    pos.push(line[i].x + off.x, y, line[i].z + off.z, line[i].x - off.x, y, line[i].z - off.z);
+    if (i > 0) {
+      const b = (i - 1) * 2;
+      idx.push(b, b + 2, b + 3, b, b + 3, b + 1);
+      triEnd.push(cum[i], cum[i]);
     }
-  };
-  for (let i = 0; i < line.length - 1; i++) {
-    quad(line[i], line[i + 1]);
-    if (i > 0) disc(line[i]);
   }
+  const total = cum[n - 1];
+  // swept arrowhead: tip, right barb, notch, left barb (two triangles) — shown once the strip is complete
   const y = headTip.y;
   const l = headBack.clone().add(side.clone().multiplyScalar(headHalf));
   const r = headBack.clone().sub(side.clone().multiplyScalar(headHalf));
   const b0 = pos.length / 3;
   pos.push(headTip.x, y, headTip.z, r.x, y, r.z, headNotch.x, y, headNotch.z, l.x, y, l.z);
   idx.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3);
-  const out = new THREE.BufferGeometry();
-  out.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
-  out.setIndex(idx);
-  return out;
+  triEnd.push(total, total);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  geo.setIndex(idx);
+  return { geo, triEnd, total };
+}
+
+/** number of index entries to draw so that every triangle ending at or before `len` is visible */
+function drawCountFor(g: PathGeo, len: number): number {
+  let tris = 0;
+  while (tris < g.triEnd.length && g.triEnd[tris] <= len + 1e-4) tris++;
+  return tris * 3;
 }
 
 function PathLine({ path }: { path: Pos[] }) {
   const map = useGame((s) => s.config.map);
   const core = useRef<THREE.Mesh>(null);
   const glow = useRef<THREE.Mesh>(null);
-  const progress = useRef(0);
+  /** visible length along the path, in tiles — eases toward the current total */
+  const shown = useRef(0);
   const geos = useMemo(() => {
     if (path.length < 2) return null;
     const raw = path.map((p) => new THREE.Vector3(p.x, tileHeight(map, p) + 0.045, p.y));
     return { core: buildPathGeometry(raw, 0.06, 1), glow: buildPathGeometry(raw, 0.16, 1.35) };
   }, [path, map]);
-  // restart the draw-on whenever the path changes
-  useEffect(() => {
-    progress.current = 0;
-  }, [geos]);
   useFrame((_, dt) => {
     if (!geos) return;
-    progress.current = Math.min(1, progress.current + dt / 0.2);
-    // ease-out so the head "lands"
-    const e = 1 - Math.pow(1 - progress.current, 3);
-    for (const [ref, g] of [
-      [core, geos.core],
-      [glow, geos.glow],
-    ] as const) {
-      const total = g.getIndex()!.count;
-      ref.current?.geometry.setDrawRange(0, Math.ceil((total * e) / 3) * 3);
-    }
+    const target = geos.core.total;
+    // exponential ease toward the target length: grows out / shrinks back smoothly, frame-rate independent
+    shown.current += (target - shown.current) * (1 - Math.exp(-dt * 14));
+    if (Math.abs(target - shown.current) < 0.005) shown.current = target;
+    core.current?.geometry.setDrawRange(0, drawCountFor(geos.core, shown.current));
+    glow.current?.geometry.setDrawRange(0, drawCountFor(geos.glow, shown.current));
   });
   if (!geos) return null;
   return (
     <group>
-      <mesh ref={glow} geometry={geos.glow} renderOrder={4}>
+      <mesh ref={glow} geometry={geos.glow.geo} renderOrder={4}>
         <meshBasicMaterial color="#cfe6ff" transparent opacity={0.28} depthTest={false} depthWrite={false} side={THREE.DoubleSide} />
       </mesh>
-      <mesh ref={core} geometry={geos.core} renderOrder={5}>
+      <mesh ref={core} geometry={geos.core.geo} renderOrder={5}>
         <meshBasicMaterial color="#ffffff" transparent opacity={0.96} depthTest={false} depthWrite={false} side={THREE.DoubleSide} />
       </mesh>
     </group>
