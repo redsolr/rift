@@ -5,6 +5,7 @@ import Hud from "@/components/Hud";
 import Panel from "@/components/Panel";
 import Drawer from "@/components/Drawer";
 import BattleBar from "@/components/BattleBar";
+import TurnControls from "@/components/TurnControls";
 import Minimap from "@/components/Minimap";
 import CameraWidget from "@/components/CameraWidget";
 import PhaseBanner from "@/components/PhaseBanner";
@@ -71,6 +72,7 @@ export default function Home() {
             <CameraWidget />
           </div>
           <BattleBar />
+          <TurnControls />
           <PhaseBanner />
           {mobile && <div className="mobile-hint">{selectedName ?? hint}</div>}
         </div>

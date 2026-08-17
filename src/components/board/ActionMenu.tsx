@@ -38,6 +38,16 @@ export default function ActionMenu() {
   return (
     // FE: the menu hangs to the RIGHT of the unit, vertically centred on its card, never over it
     <Html position={[pendingMove.x + 0.7, th + CARD_H3 * 0.55, pendingMove.y]} zIndexRange={[2, 0]} style={{ pointerEvents: "auto", transform: "translate(0, -50%)" }}>
+      <div className="action-menu-wrap">
+        {/* FE ink/smoke edge: blurred blobs displaced by turbulence, behind the panel */}
+        <svg width="0" height="0" style={{ position: "absolute" }} aria-hidden>
+          <filter id="tact-ink" x="-30%" y="-30%" width="160%" height="160%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="3" seed="7" result="n" />
+            <feDisplacementMap in="SourceGraphic" in2="n" scale="34" xChannelSelector="R" yChannelSelector="G" />
+            <feGaussianBlur stdDeviation="1.2" />
+          </filter>
+        </svg>
+        <div className="action-smoke" />
       <div className={`action-menu page-${menuPage}`} onPointerLeave={() => setHoverAttack(null)}>
         {menuPage === "command" && (
           <>
@@ -72,7 +82,7 @@ export default function ActionMenu() {
                 </button>
               );
             })}
-            <button className="action-row back" onClick={cancelPending}>
+            <button className="action-row back" onClick={cancelPending} onPointerEnter={() => setHoverAttack(null)}>
               <span className="action-cursor">◆</span>Back
             </button>
           </>
@@ -89,6 +99,7 @@ export default function ActionMenu() {
             </button>
           </>
         )}
+      </div>
       </div>
     </Html>
   );

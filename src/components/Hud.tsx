@@ -32,7 +32,6 @@ export default function Hud() {
   const moveTiles = useGame((s) => s.moveTiles);
   const commitWait = useGame((s) => s.commitWait);
   const cancelPending = useGame((s) => s.cancelPending);
-  const endPhaseAI = useGame((s) => s.endPhaseAI);
   const playerTeam = useGame((s) => s.playerTeam);
   const seed = useGame((s) => s.seed);
   const showDanger = useGame((s) => s.showDanger);
@@ -115,11 +114,6 @@ export default function Hud() {
               </button>
             )}
           </>
-        )}
-        {mode === "manual" && yourTurn && (
-          <button className="ghost" onClick={endPhaseAI} title="Let the AI finish your remaining units using their orders">
-            End turn<span className="btn-text"> (AI finishes)</span>
-          </button>
         )}
 
         {mode === "manager" && !battle && (

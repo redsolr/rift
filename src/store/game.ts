@@ -73,6 +73,8 @@ interface GameState {
   hover: Pos | null;
   hoverUnit: string | null;
   showDanger: boolean;
+  /** Manual mode: when on, the AI plays YOUR phases too (orders/doctrine drive your units) until you turn it off */
+  autoPlay: boolean;
   /** Camera focus request: where to glide the camera; zoom in/out/keep; seq bumps on every request. */
   camFocus: { x: number; y: number; zoom: "in" | "out" | "keep"; seq: number };
   /** phase banner request: which team's phase just began (or a result), seq bumps per show */
@@ -122,6 +124,7 @@ interface GameState {
   setHover: (p: Pos | null) => void;
   setHoverUnit: (id: string | null) => void;
   toggleDanger: () => void;
+  toggleAuto: () => void;
   toggleFollow: () => void;
   focusCam: (p: Pos, zoom?: "in" | "out" | "keep") => void;
   overview: () => void;
@@ -216,7 +219,7 @@ export const useGame = create<GameState>((set, get) => {
   const afterCatchUp = () => {
     const s = get();
     if (!s.battle || s.battle.state.ended) return;
-    if (s.mode === "manual" && s.battle.state.activeTeam !== s.playerTeam) {
+    if (s.mode === "manual" && (s.battle.state.activeTeam !== s.playerTeam || s.autoPlay)) {
       s.battle.runPhaseAI();
       sync();
       set({ playing: true });
@@ -280,6 +283,7 @@ export const useGame = create<GameState>((set, get) => {
     hover: null,
     hoverUnit: null,
     showDanger: false,
+    autoPlay: false,
     camFocus: { x: 0, y: 0, zoom: "out", seq: 0 },
     banner: { kind: "phase", team: "blue", seq: 0 },
     followCam: true,
@@ -355,6 +359,18 @@ export const useGame = create<GameState>((set, get) => {
     setHover: (hover) => set({ hover }),
     setHoverUnit: (hoverUnit) => set({ hoverUnit }),
     toggleDanger: () => set({ showDanger: !get().showDanger }),
+    toggleAuto: () => {
+      const on = !get().autoPlay;
+      set({ autoPlay: on });
+      if (!on) return;
+      // switched on during your own phase with the board idle → play it out now
+      const s = get();
+      if (s.battle && !s.battle.state.ended && !s.playing && s.cursor >= s.events.length) {
+        set({ selected: null });
+        clearManual();
+        afterCatchUp();
+      }
+    },
     toggleFollow: () => set({ followCam: !get().followCam }),
     focusCam: (p, zoom = "keep") => set({ camFocus: { x: p.x, y: p.y, zoom, seq: get().camFocus.seq + 1 } }),
     setCamTilt: (rad) => {

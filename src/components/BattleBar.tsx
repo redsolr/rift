@@ -1,5 +1,5 @@
 "use client";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { selectCaughtUp, useGame } from "@/store/game";
 import { TERRAIN, TerrainDef, UnitDef } from "@/sim/types";
 import { ARCHETYPE_LABEL } from "@/sim/presets";
@@ -28,6 +28,19 @@ export default function BattleBar() {
   const map = useGame((s) => s.config.map);
   const mode = useGame((s) => s.mode);
 
+  const ref = useRef<HTMLDivElement>(null);
+  // publish the bar's height as --bb-h on .board-wrap so the turn controls can sit just above it
+  useEffect(() => {
+    const el = ref.current;
+    const host = el?.parentElement;
+    if (!host) return;
+    const ro = new ResizeObserver(() => host.style.setProperty("--bb-h", `${el.offsetHeight}px`));
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      host.style.setProperty("--bb-h", "0px");
+    };
+  });
   const byId = (id: string | null) => (id ? units.find((u) => u.id === id) ?? null : null);
   const hov = byId(hoverUnit);
   const sel = byId(selected);
@@ -57,7 +70,7 @@ export default function BattleBar() {
   const myHpAfter = duel && fc!.retaliation != null ? Math.max(0, lv!.hp - fc!.retaliation) : lv?.hp ?? 0;
 
   return (
-    <div className={`battle-bar ${duel ? "duel" : "solo"}`} aria-label="Battle forecast">
+    <div ref={ref} className={`battle-bar ${duel ? "duel" : "solo"}`} aria-label="Battle forecast">
       {lv && <Side u={left} hp={lv.hp} terrain={leftTerr} side="left" attack={fc?.attack ?? null} />}
 
       {duel && (

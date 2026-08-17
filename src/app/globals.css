@@ -869,6 +869,23 @@ button.danger {
 }
 
 /* ---- in-board command menu (FE Three Hopes: dark smoke panel to the RIGHT of the unit) ---- */
+.action-menu-wrap {
+  position: relative;
+  padding: 10px 14px;
+}
+.action-smoke {
+  position: absolute;
+  inset: -18px -26px;
+  pointer-events: none;
+  z-index: -1;
+  background:
+    radial-gradient(60% 55% at 15% 20%, rgba(4, 5, 9, 0.98) 0 40%, rgba(4, 5, 9, 0) 72%),
+    radial-gradient(55% 60% at 85% 25%, rgba(4, 5, 9, 0.98) 0 40%, rgba(4, 5, 9, 0) 72%),
+    radial-gradient(60% 55% at 20% 85%, rgba(4, 5, 9, 0.98) 0 40%, rgba(4, 5, 9, 0) 72%),
+    radial-gradient(60% 60% at 82% 80%, rgba(4, 5, 9, 0.98) 0 40%, rgba(4, 5, 9, 0) 72%),
+    radial-gradient(70% 70% at 50% 50%, rgba(4, 5, 9, 1) 0 55%, rgba(4, 5, 9, 0) 85%);
+  filter: url(#tact-ink);
+}
 .action-menu {
   --gold: #f2c96b;
   position: relative;
@@ -878,9 +895,7 @@ button.danger {
   padding: 14px 18px 12px 26px;
   color: #f4efe4;
   font-family: Georgia, "Times New Roman", serif;
-  background:
-    radial-gradient(120% 90% at 30% 50%, rgba(8, 10, 16, 0.96) 55%, rgba(8, 10, 16, 0.75) 78%, rgba(8, 10, 16, 0) 100%);
-  filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.6));
+  background: rgba(6, 8, 13, 0.92);
   white-space: nowrap;
   user-select: none;
 }
@@ -934,9 +949,9 @@ button.danger {
 .action-row::before {
   content: "➤";
   position: absolute;
-  left: -22px;
+  left: -24px;
   top: 50%;
-  transform: translateY(-50%) rotate(-12deg);
+  transform: translateY(-50%);
   color: var(--gold);
   font-size: 15px;
   opacity: 0;
@@ -972,8 +987,12 @@ button.danger {
   font-family: var(--font-sans, system-ui, sans-serif);
   font-weight: 700;
 }
+/* fixed columns — each row is its own grid, so `auto` would drift between rows */
 .action-row.attack {
-  grid-template-columns: 14px minmax(110px, 1fr) 36px 60px auto;
+  grid-template-columns: 14px 118px 40px 62px 112px;
+}
+.action-row.attack .attack-why {
+  text-align: right;
 }
 .action-row.attack .attack-pow {
   color: var(--gold);
@@ -1007,6 +1026,39 @@ button.danger {
   font-weight: 800;
 }
 
+
+/* ---- turn controls (bottom-right of the board, above the battle bar) ---- */
+.turn-controls {
+  position: absolute;
+  right: 12px;
+  bottom: calc(var(--bb-h, 0px) + 12px);
+  z-index: 4;
+  display: flex;
+  gap: 6px;
+  transition: bottom 0.15s ease;
+}
+.turn-controls button {
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid #f2c96b;
+  background: rgba(20, 24, 33, 0.92);
+  color: #f2c96b;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
+}
+.turn-controls button:hover:not(:disabled) {
+  background: rgba(242, 201, 107, 0.18);
+}
+.turn-controls button.on {
+  background: var(--accent);
+  color: #111;
+}
+.turn-controls button:disabled {
+  opacity: 0.35;
+}
 
 /* ---- editor map library ---- */
 .maps-list {
