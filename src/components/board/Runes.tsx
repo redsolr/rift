@@ -91,7 +91,7 @@ function Rune({ x, y, kind }: { x: number; y: number; kind: RuneKind }) {
     const t = clock.elapsedTime;
     if (ring.current) ring.current.rotation.z = t * 0.6;
     if (spr.current) {
-      spr.current.position.y = y0 + 0.55 + Math.sin(t * 2.2 + x) * 0.07;
+      spr.current.position.y = y0 + 0.62 + Math.sin(t * 2.2 + x) * 0.08;
       spr.current.material.rotation = Math.sin(t * 1.3) * 0.25;
     }
     motes.current.forEach((m, i) => {
@@ -104,10 +104,10 @@ function Rune({ x, y, kind }: { x: number; y: number; kind: RuneKind }) {
   return (
     <group>
       <mesh ref={ring} position={[x, y0 + 0.028, y]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[0.9, 0.9]} />
+        <planeGeometry args={[1.15, 1.15]} />
         <meshBasicMaterial map={sigil} color={color} transparent opacity={0.95} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
       </mesh>
-      <sprite ref={spr} position={[x, y0 + 0.55, y]} scale={[0.5, 0.5, 0.5]}>
+      <sprite ref={spr} position={[x, y0 + 0.62, y]} scale={[0.8, 0.8, 0.8]}>
         <spriteMaterial map={glyph} color={color} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
       </sprite>
       {Array.from({ length: 5 }, (_, i) => (

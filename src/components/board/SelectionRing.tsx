@@ -120,27 +120,38 @@ export default function SelectionRing({ color, strength = 1, spin = true }: { co
  * team-coloured fill over a dark track, always visible for both teams. Local -y maps to world +z after the -π/2 tilt.
  */
 export function HpArc({ pct, color }: { pct: number; color: string }) {
-  const span = Math.PI * 0.72; // ~130°
+  // FE Three Hopes read: a SHORT thick "smile" (~95°) right under the feet, glossy — dark track, bright fill,
+  // a lighter highlight along the outer edge and a soft additive glow. Not a long thin thread.
+  const span = Math.PI * 0.53;
   const start = -Math.PI / 2 - span / 2;
   const fill = Math.max(0, Math.min(1, pct)) * span;
   const low = pct <= 0.25;
+  const c = low ? "#ffb347" : color;
+  const R0 = 0.4,
+    R1 = 0.52;
   return (
     <group position={[0, 0.032, 0]} rotation={[-Math.PI / 2, 0, 0]}>
       <mesh>
-        <ringGeometry args={[0.42, 0.5, 40, 1, start - 0.03, span + 0.06]} />
-        <meshBasicMaterial color="#05070c" transparent opacity={0.85} depthWrite={false} />
+        <ringGeometry args={[R0 - 0.015, R1 + 0.015, 40, 1, start - 0.04, span + 0.08]} />
+        <meshBasicMaterial color="#04060b" transparent opacity={0.9} depthWrite={false} />
       </mesh>
       {fill > 0 && (
-        <mesh position={[0, 0, 0.001]}>
-          <ringGeometry args={[0.435, 0.485, 40, 1, start, fill]} />
-          <meshBasicMaterial color={low ? "#ffb347" : color} depthWrite={false} toneMapped={false} />
-        </mesh>
-      )}
-      {fill > 0 && (
-        <mesh position={[0, 0, 0.002]}>
-          <ringGeometry args={[0.44, 0.48, 40, 1, start, fill]} />
-          <meshBasicMaterial color={low ? "#ffb347" : color} transparent opacity={0.55} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
-        </mesh>
+        <>
+          <mesh position={[0, 0, 0.001]}>
+            <ringGeometry args={[R0, R1, 40, 1, start, fill]} />
+            <meshBasicMaterial color={c} depthWrite={false} toneMapped={false} />
+          </mesh>
+          {/* gloss highlight along the outer edge */}
+          <mesh position={[0, 0, 0.002]}>
+            <ringGeometry args={[R1 - 0.035, R1 - 0.008, 40, 1, start, fill]} />
+            <meshBasicMaterial color="#ffffff" transparent opacity={0.55} depthWrite={false} toneMapped={false} />
+          </mesh>
+          {/* soft glow */}
+          <mesh position={[0, 0, 0.0005]}>
+            <ringGeometry args={[R0 - 0.06, R1 + 0.06, 40, 1, start, fill]} />
+            <meshBasicMaterial color={c} transparent opacity={0.35} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+          </mesh>
+        </>
       )}
     </group>
   );

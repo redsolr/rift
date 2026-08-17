@@ -54,8 +54,9 @@ export class Battle {
       runes: new Map(),
       respawnAt: new Map(),
     };
-    this.emit({ type: "turn_start", turn: 1, team: first });
+    // runes are on the board from frame zero — spawn BEFORE the opening phase banner
     for (const p of this.shrines()) this.spawnRune(p);
+    this.emit({ type: "turn_start", turn: 1, team: first });
   }
 
   /** Every shrine tile on the map, row-major (deterministic order). */
@@ -80,15 +81,17 @@ export class Battle {
     return this.state.runes.get(posKey(p)) ?? null;
   }
 
-  private pickup(u: UnitState) {
+  /** Picks up the rune under `u` (if any); returns the kind taken. */
+  private pickup(u: UnitState): RuneKind | null {
     const key = posKey(u);
     const rune = this.state.runes.get(key);
-    if (!rune) return;
+    if (!rune) return null;
     this.state.runes.delete(key);
     this.state.respawnAt.set(key, this.state.turn + RESPAWN_TURNS);
     if (u.buff) this.emit({ type: "rune_expire", unit: u.id, rune: u.buff.kind });
     u.buff = { kind: rune, turns: RUNES[rune].turns };
     this.emit({ type: "rune_pickup", unit: u.id, rune, at: { x: u.x, y: u.y }, turns: RUNES[rune].turns });
+    return rune;
   }
 
   private expire(u: UnitState) {
@@ -286,7 +289,7 @@ export class Battle {
       this.emit({ type: "move", unit: u.id, path });
     }
     // standing on a rune (moved onto it, or acting from a shrine that just spawned one) picks it up
-    this.pickup(u);
+    const picked = this.pickup(u);
     // attacking or healing breaks invisibility (Dota rule)
     if (action.kind !== "wait" && isInvisible(u)) this.expire(u);
 
@@ -309,6 +312,11 @@ export class Battle {
       this.emit({ type: "wait", unit: u.id });
     }
     u.acted = true;
+    // Haste: the unit acts AGAIN right away (FE Galeforce read) on top of the +MOV for the buff's duration
+    if (picked === "haste" && u.alive) {
+      u.acted = false;
+      this.emit({ type: "refresh", unit: u.id });
+    }
     this.checkEnd();
     if (!this.state.ended && this.pending().length === 0) this.endTurn();
   }

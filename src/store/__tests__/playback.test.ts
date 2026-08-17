@@ -49,7 +49,8 @@ describe("playback reducer", () => {
     const b = new Battle(cfg, 5);
     b.runToEnd();
     let st = initialPlayback(cfg);
-    const first = applyEvent(st, b.log[0], cfg, "blue");
+    // rune spawns precede the opening turn_start (runes are on the board from frame zero)
+    const first = applyEvent(st, b.log.find((e) => e.type === "turn_start")!, cfg, "blue");
     expect(first.banner).toEqual({ kind: "phase", team: cfg.firstTeam ?? "red" });
     for (const e of b.log) st = applyEvent(st, e, cfg, "blue");
     const last = applyEvent(initialPlayback(cfg), b.log.at(-1)!, cfg, "blue");

@@ -171,4 +171,6 @@ export type BattleEvent =
   | { type: "rune_spawn"; rune: RuneKind; at: Pos }
   | { type: "rune_pickup"; unit: string; rune: RuneKind; at: Pos; turns: number }
   | { type: "rune_expire"; unit: string; rune: RuneKind }
+  /** the unit may act again this phase (Haste pickup) */
+  | { type: "refresh"; unit: string }
   | { type: "end"; winner: Team | "draw"; turn: number };

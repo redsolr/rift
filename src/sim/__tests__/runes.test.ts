@@ -40,21 +40,35 @@ describe("runes", () => {
     const b = battleWithRune("haste", { x: 1, y: 4 });
     b.act({ kind: "wait", unit: "bk1", moveTo: { x: 1, y: 4 } });
     const ally = b.unit("bk1");
+    expect(b.log.filter((e) => e.type === "rune_spawn").length).toBeGreaterThan(0);
+    expect(b.log[0].type).toBe("rune_spawn"); // on the board before the opening banner
     expect(ally.buff).toEqual({ kind: "haste", turns: RUNES.haste.turns });
     expect(b.runeAt({ x: 1, y: 4 })).toBeNull();
     expect(b.log.some((e) => e.type === "rune_pickup" && e.unit === "bk1" && e.rune === "haste")).toBe(true);
+  });
+
+  it("Haste: picking it up lets the unit act again immediately (refresh event), and the extra activation is a real one", () => {
+    const b = battleWithRune("haste", { x: 1, y: 4 });
+    b.act({ kind: "wait", unit: "bk1", moveTo: { x: 1, y: 4 } });
+    expect(b.unit("bk1").acted).toBe(false);
+    expect(b.state.activeTeam).toBe("blue");
+    expect(b.log.at(-1)).toEqual({ type: "refresh", unit: "bk1" });
+    // the bonus activation already enjoys +MOV: from (1,4) it reaches x = 1 + mov + HASTE_MOV
+    expect(b.reachFor("bk1").cost.get(`${1 + b.unit("bk1").stats.mov + HASTE_MOV},4`)).toBeDefined();
+    b.act({ kind: "wait", unit: "bk1", moveTo: { x: 1, y: 6 } });
+    expect(b.state.activeTeam).toBe("red"); // phase ended: no second refresh — only a fresh pickup grants one
   });
 
   it("Haste: the unit moves further than its base MOV while buffed, and the buff expires after its turns", () => {
     const b = battleWithRune("haste", { x: 1, y: 4 });
     const base = standable(reachable(b.config.map, b.unit("bk1"), b.state.units), b.unit("bk1"), b.state.units).length;
     b.act({ kind: "wait", unit: "bk1", moveTo: { x: 1, y: 4 } });
+    b.act({ kind: "wait", unit: "bk1", moveTo: { x: 1, y: 6 } }); // spend the bonus activation off the shrine
     b.runPhaseAI(); // red
     // blue's next phase: still hasted (3 → 2)
     expect(b.unit("bk1").buff?.turns).toBe(RUNES.haste.turns - 1);
     const hasted = standable(reachable(b.config.map, b.unit("bk1"), b.state.units), b.unit("bk1"), b.state.units).length;
     expect(hasted).toBeGreaterThan(base);
-    expect(b.reachFor("bk1").cost.get(`${1 + b.unit("bk1").stats.mov + HASTE_MOV},4`)).toBeDefined();
     // burn through the remaining phases idling OFF the shrine (idling on it would re-grab the respawn)
     for (let i = 0; i < RUNES.haste.turns; i++) {
       b.act({ kind: "wait", unit: "bk1", moveTo: { x: 1, y: 6 } });
@@ -93,12 +107,14 @@ describe("runes", () => {
   });
 
   it("a taken shrine respawns RESPAWN_TURNS later", () => {
+    // (Haste refreshes the unit, so it spends the bonus activation walking off the shrine below)
     // the foe holds still (hold stance + hold doctrine) so it never wanders over and takes the respawn itself
     const holdFoe = { ...makeUnit("red", "knight", 6, 1, "Foe"), id: "rk2", orders: { ...DEFAULT_ORDERS, stance: "hold" as const } };
     const b = battleWithRune("haste", { x: 1, y: 4 }, { units: [{ ...makeUnit("blue", "knight", 1, 6, "Ally"), id: "bk1" }, holdFoe], doctrine: { red: { aggression: "very_defensive", objective: "hold" }, blue: { aggression: "balanced", objective: "advance" } } });
     b.act({ kind: "wait", unit: "bk1", moveTo: { x: 1, y: 4 } });
     const took = b.state.turn;
-    // walk away then idle in place
+    // walk away (bonus activation) then idle in place
+    b.act({ kind: "wait", unit: "bk1", moveTo: { x: 1, y: 7 } });
     b.runPhaseAI();
     b.act({ kind: "wait", unit: "bk1", moveTo: { x: 1, y: 7 } });
     while (b.state.turn < took + RESPAWN_TURNS && !b.state.ended) {

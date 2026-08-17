@@ -70,9 +70,10 @@ const EVENT_MS: Record<BattleEvent["type"], number> = {
   heal: 380,
   wait: 120,
   death: 300,
-  rune_spawn: 350,
+  rune_spawn: 0,
   rune_pickup: 500,
   rune_expire: 0,
+  refresh: 350,
   end: 1600,
 };
 
@@ -173,6 +174,10 @@ export function applyEvent(prev: PlaybackState, e: BattleEvent, cfg: BattleConfi
     }
     case "rune_expire":
       v.units[e.unit] = { ...v.units[e.unit], buff: null };
+      break;
+    case "refresh":
+      v.units[e.unit] = { ...v.units[e.unit], acted: false };
+      floats.push({ key: ++floatKey, unit: e.unit, text: "Act again!", color: RUNES.haste.color });
       break;
     case "end":
       v.ended = true;

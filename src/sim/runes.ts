@@ -20,7 +20,7 @@ export interface RuneDef {
 }
 
 export const RUNES: Record<RuneKind, RuneDef> = {
-  haste: { label: "Haste", turns: 3, glyph: "⚡", color: "#ffe14a", blurb: "+2 MOV" },
+  haste: { label: "Haste", turns: 3, glyph: "⚡", color: "#ffe14a", blurb: "act again now · +2 MOV" },
   double_damage: { label: "Double Damage", turns: 2, glyph: "✶", color: "#ff6a2a", blurb: "attacks deal 2×" },
   invisibility: { label: "Invisibility", turns: 2, glyph: "◌", color: "#b56cff", blurb: "cannot be targeted — breaks when you attack" },
 };

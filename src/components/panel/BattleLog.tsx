@@ -37,6 +37,9 @@ export default function BattleLog() {
         case "rune_pickup":
           out.push({ key: i, cls: `rune ${team(e.unit)}`, unit: e.unit, text: `${name(e.unit)} picks up ${RUNES[e.rune].glyph} ${RUNES[e.rune].label} (${e.turns} turns · ${RUNES[e.rune].blurb})` });
           break;
+        case "refresh":
+          out.push({ key: i, cls: `rune ${team(e.unit)}`, unit: e.unit, text: `${name(e.unit)} acts again (Haste)` });
+          break;
         case "rune_expire":
           out.push({ key: i, cls: `dim ${team(e.unit)}`, unit: e.unit, text: `${name(e.unit)}'s ${RUNES[e.rune].label} fades` });
           break;
