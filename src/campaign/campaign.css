@@ -1,0 +1,386 @@
+/* Campaign prototype — the room page + Atlus-style dialogue. Scoped by `.campaign` / `.cd-*` prefixes. */
+.campaign {
+  position: fixed;
+  inset: 0;
+  background: #05060a;
+  color: #e6e9f0;
+  overflow: hidden;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  user-select: none;
+}
+.campaign canvas {
+  display: block;
+}
+.campaign-hud {
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  right: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  pointer-events: none;
+  z-index: 5;
+}
+.campaign-hud > * {
+  pointer-events: auto;
+}
+.campaign-brand {
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  color: #ffd54f;
+  font-size: 12px;
+}
+.campaign-chapter {
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
+  color: #c9d0e0;
+  font-size: 14px;
+  opacity: 0.85;
+}
+.campaign-back {
+  margin-left: auto;
+  background: rgba(20, 24, 33, 0.7);
+  border: 1px solid #2a3142;
+  color: #e6e9f0;
+  padding: 6px 12px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-size: 12px;
+}
+.campaign-back:hover {
+  border-color: #ffd54f;
+}
+.campaign-controls {
+  position: absolute;
+  left: 14px;
+  bottom: 12px;
+  font-size: 11px;
+  color: #8a93a8;
+  z-index: 5;
+  pointer-events: none;
+}
+.campaign-controls kbd {
+  display: inline-block;
+  min-width: 16px;
+  padding: 1px 5px;
+  border: 1px solid #2a3142;
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: #141821;
+  color: #c9d0e0;
+  font-family: inherit;
+  font-size: 10px;
+  margin: 0 1px;
+}
+
+/* --- Talk prompt over the NPC (FE: a small pill that breathes) --- */
+.campaign-prompt {
+  position: absolute;
+  left: 50%;
+  bottom: 22%;
+  transform: translateX(-50%);
+  background: rgba(8, 10, 16, 0.78);
+  border: 1px solid rgba(255, 213, 79, 0.55);
+  color: #ffe9a8;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  z-index: 6;
+  animation: cp-breathe 1.6s ease-in-out infinite;
+  cursor: pointer;
+}
+.campaign-prompt kbd {
+  display: inline-block;
+  padding: 0 6px;
+  border: 1px solid rgba(255, 213, 79, 0.6);
+  border-radius: 4px;
+  margin-right: 8px;
+  color: #ffd54f;
+  font-family: inherit;
+}
+@keyframes cp-breathe {
+  50% {
+    transform: translateX(-50%) translateY(-3px);
+    box-shadow: 0 0 22px rgba(255, 213, 79, 0.25);
+  }
+}
+
+/* --- Dialogue overlay --- */
+.cd-root {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  cursor: pointer;
+  overflow: hidden;
+}
+.cd-vignette {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(120% 90% at 50% 40%, rgba(0, 0, 0, 0) 45%, rgba(0, 0, 0, 0.55) 100%),
+    linear-gradient(to top, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0) 45%);
+  animation: cd-fade 0.35s ease-out;
+}
+@keyframes cd-fade {
+  from {
+    opacity: 0;
+  }
+}
+.cd-bust {
+  position: absolute;
+  bottom: 0;
+  height: 86vh;
+  width: 42vw;
+  max-width: 640px;
+  pointer-events: none;
+  transition:
+    filter 0.25s ease,
+    transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 0.25s ease;
+}
+.cd-bust-img {
+  position: absolute;
+  inset: 0;
+  background-repeat: no-repeat;
+  background-size: contain;
+  filter: drop-shadow(0 12px 28px rgba(0, 0, 0, 0.6));
+  -webkit-mask-image: linear-gradient(to top, transparent 0%, #000 12%);
+  mask-image: linear-gradient(to top, transparent 0%, #000 12%);
+}
+.cd-bust.left {
+  left: -2vw;
+  animation: cd-in-left 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.cd-bust.left .cd-bust-img {
+  background-position: left bottom;
+}
+.cd-bust.right {
+  right: -2vw;
+  animation: cd-in-right 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.cd-bust.right .cd-bust-img {
+  background-position: right bottom;
+  transform: scaleX(-1);
+}
+.cd-bust.idle {
+  filter: brightness(0.45) saturate(0.7);
+  transform: scale(0.88) translateY(4vh);
+  opacity: 0.85;
+}
+.cd-bust.active {
+  filter: none;
+  transform: none;
+}
+@keyframes cd-in-left {
+  from {
+    transform: translateX(-30px);
+    opacity: 0;
+  }
+}
+@keyframes cd-in-right {
+  from {
+    transform: translateX(30px);
+    opacity: 0;
+  }
+}
+
+.cd-box {
+  position: absolute;
+  left: 22vw;
+  right: 20vw;
+  bottom: 7vh;
+  min-height: 130px;
+  z-index: 2;
+  animation: cd-slab-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes cd-slab-in {
+  from {
+    transform: translateY(14px);
+    opacity: 0;
+  }
+}
+.cd-ink-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+.cd-slab {
+  position: relative;
+  padding: 26px 40px 30px 44px;
+  color: #17161a;
+  font-family: Georgia, "Times New Roman", serif;
+}
+.cd-slab::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: #f4f1ea;
+  /* skewed slab with a raked left edge — the Metaphor read; the ink tear lives ONLY on this layer so the text stays crisp */
+  clip-path: polygon(3% 0, 100% 0, 97% 100%, 0 100%);
+  filter: url(#cd-tear) drop-shadow(0 8px 26px rgba(0, 0, 0, 0.55));
+  z-index: -1;
+}
+.cd-slab::after {
+  /* thin ink rule under the name */
+  content: "";
+  position: absolute;
+  left: 44px;
+  right: 40px;
+  top: 52px;
+  height: 1px;
+  background: rgba(23, 22, 26, 0.35);
+}
+.cd-name {
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: 0.02em;
+  margin-bottom: 14px;
+}
+.cd-text {
+  margin: 0;
+  font-size: 19px;
+  line-height: 1.55;
+  min-height: 3.1em;
+  white-space: pre-wrap;
+}
+.cd-box.narration .cd-slab {
+  font-style: italic;
+  color: #2a2830;
+}
+.cd-box.narration .cd-slab::before {
+  background: #e9e4d8;
+}
+.cd-box.narration .cd-slab::after {
+  display: none;
+}
+.cd-caret {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 12px;
+  color: #17161a;
+  animation: cd-blink 0.9s steps(2, start) infinite;
+  vertical-align: middle;
+}
+@keyframes cd-blink {
+  to {
+    visibility: hidden;
+  }
+}
+.cd-choices {
+  list-style: none;
+  margin: 12px 0 0 auto;
+  padding: 0;
+  width: min(420px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  animation: cd-slab-in 0.25s ease-out;
+}
+.cd-choices button {
+  width: 100%;
+  text-align: left;
+  background: rgba(12, 12, 16, 0.92);
+  color: #f2efe8;
+  border: 1px solid rgba(244, 241, 234, 0.35);
+  padding: 10px 14px 10px 12px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 16px;
+  clip-path: polygon(2% 0, 100% 0, 98% 100%, 0 100%);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.cd-choices button:hover,
+.cd-choices button:focus-visible {
+  background: #f4f1ea;
+  color: #17161a;
+  outline: none;
+}
+.cd-choice-idx {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  font-size: 11px;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+.cd-hints {
+  position: absolute;
+  right: 22px;
+  bottom: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 3;
+  cursor: default;
+}
+.cd-hint {
+  background: none;
+  border: 0;
+  color: #e6e9f0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+.cd-key {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #f4f1ea;
+  color: #17161a;
+  font-size: 12px;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-weight: 700;
+}
+/* the faint compass sigil bottom-right, like the reference */
+.cd-sigil {
+  position: absolute;
+  right: 12vw;
+  bottom: 2vh;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  border: 1px solid rgba(244, 241, 234, 0.35);
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.6;
+  background:
+    linear-gradient(rgba(244, 241, 234, 0.35), rgba(244, 241, 234, 0.35)) 50% 0 / 1px 100% no-repeat,
+    linear-gradient(rgba(244, 241, 234, 0.35), rgba(244, 241, 234, 0.35)) 0 50% / 100% 1px no-repeat,
+    radial-gradient(circle at 50% 50%, transparent 58%, rgba(244, 241, 234, 0.35) 59%, transparent 60%);
+  animation: cd-sigil-spin 40s linear infinite;
+}
+@keyframes cd-sigil-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 900px) {
+  .cd-box {
+    left: 4vw;
+    right: 4vw;
+    bottom: 4vh;
+  }
+  .cd-bust {
+    height: 60vh;
+    width: 50vw;
+  }
+  .cd-sigil {
+    display: none;
+  }
+  .cd-text {
+    font-size: 16px;
+  }
+}

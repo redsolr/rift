@@ -60,6 +60,9 @@ export default function Hud() {
               {m.label}
             </button>
           ))}
+          <a className="tab" href="/campaign" title="Campaign prototype — walk the room, talk to Mina">
+            Campaign
+          </a>
         </nav>
       </div>
 
