@@ -12,11 +12,17 @@ import { Archetype, MapDef, Pos, UnitState } from "./types";
 export type AttackCondition = "none" | "stationary" | "moved";
 /** what the attack does: damage an enemy or heal an ally */
 export type AttackKind = "attack" | "heal";
+/** flavour/element — display-only today (no resistances yet); the slot for weakness tables later */
+export type Element = "physical" | "fire" | "ice" | "thunder" | "holy";
+/** delivery: physical strikes are stopped by DEF like today; magic will get its own resist later */
+export type School = "physical" | "magic";
 
 export interface AttackDef {
   id: string;
   name: string;
   kind: AttackKind;
+  element: Element;
+  school: School;
   /** flat modifier on the unit's atk (damage or heal amount) */
   power: number;
   /** [min, max] or null = the unit's own weapon range */
@@ -26,33 +32,34 @@ export interface AttackDef {
   hint: string;
 }
 
-const A = (id: string, name: string, power: number, range: [number, number] | null, cond: AttackCondition, hint: string): AttackDef => ({ id, name, kind: "attack", power, range, cond, hint });
-const H = (id: string, name: string, power: number, range: [number, number] | null, cond: AttackCondition, hint: string): AttackDef => ({ id, name, kind: "heal", power, range, cond, hint });
+const A = (id: string, name: string, power: number, range: [number, number] | null, cond: AttackCondition, hint: string, element: Element = "physical", school: School = "physical"): AttackDef => ({ id, name, kind: "attack", element, school, power, range, cond, hint });
+const M = (id: string, name: string, power: number, range: [number, number] | null, cond: AttackCondition, hint: string, element: Element): AttackDef => ({ id, name, kind: "attack", element, school: "magic", power, range, cond, hint });
+const H = (id: string, name: string, power: number, range: [number, number] | null, cond: AttackCondition, hint: string): AttackDef => ({ id, name, kind: "heal", element: "holy", school: "magic", power, range, cond, hint });
 
 export const ATTACKS: Record<Archetype, AttackDef[]> = {
   knight: [
     A("thrust", "Thrust", 0, null, "none", "Standard lance strike."),
     A("long_thrust", "Long Thrust", -2, [1, 2], "none", "Reaches two tiles. Lighter blow."),
     A("shield_bash", "Shield Bash", 3, null, "stationary", "Braced strike — only without moving."),
-    A("charge", "Charge", 2, null, "moved", "Momentum strike — only after moving."),
+    A("charge", "Blazing Charge", 2, null, "moved", "Momentum strike wreathed in flame — only after moving.", "fire"),
   ],
   fighter: [
     A("slash", "Slash", 0, null, "none", "Standard axe swing."),
     A("wide_swing", "Wide Swing", -2, [1, 2], "none", "Reaches two tiles. Lighter blow."),
     A("cleave", "Cleave", 3, null, "stationary", "Planted heavy swing — only without moving."),
-    A("rush", "Rush", 2, null, "moved", "Running strike — only after moving."),
+    A("rush", "Thunder Rush", 2, null, "moved", "Running strike that crackles — only after moving.", "thunder"),
   ],
   archer: [
     A("aimed_shot", "Aimed Shot", 0, null, "none", "Standard shot, range 2–3."),
     A("quick_shot", "Quick Shot", -2, [1, 3], "none", "Can fire point-blank. Lighter."),
     A("long_shot", "Long Shot", -3, [3, 4], "none", "Range 3–4. Lighter."),
-    A("snipe", "Snipe", 3, null, "stationary", "Braced shot — only without moving."),
+    A("snipe", "Fire Arrow", 3, null, "stationary", "Braced, burning shot — only without moving.", "fire"),
   ],
   mage: [
-    A("fire", "Fire", 0, null, "none", "Standard spell, range 1–2."),
-    A("ember", "Ember", -3, [1, 3], "none", "Reaches three tiles. Weaker."),
-    A("blaze", "Blaze", 3, null, "stationary", "Channelled — only without moving."),
-    A("flare", "Flare", 1, null, "moved", "Cast on the move — only after moving."),
+    M("fire", "Fire", 0, null, "none", "Standard fire spell, range 1–2.", "fire"),
+    M("ember", "Ember", -3, [1, 3], "none", "Reaches three tiles. Weaker.", "fire"),
+    M("blaze", "Blaze", 3, null, "stationary", "Channelled inferno — only without moving.", "fire"),
+    M("flare", "Frost Bolt", 1, null, "moved", "Ice cast on the move — only after moving.", "ice"),
   ],
   // every unit has at least one attack — the healer's is weak and adjacent-only
   healer: [

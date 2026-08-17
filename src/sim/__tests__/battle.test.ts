@@ -213,7 +213,7 @@ describe("threat + forecast", () => {
     expect(f3.inRange).toBe(true);
     expect(f3.retaliation).toBe(8 - 2 - 2);
     // Snipe (stationary) from a moved-to tile is not usable → out of range from here
-    const f4 = b.forecast(archer.id, knight.id, { x: knight.x, y: knight.y + 2 }, "snipe");
+    const f4 = b.forecast(archer.id, knight.id, { x: knight.x, y: knight.y + 2 }, "snipe"); // Fire Arrow (id snipe)
     expect(f4.inRange).toBe(false);
   });
 });
@@ -257,7 +257,7 @@ describe("attacks (four per unit)", () => {
     expect(() => b.act({ kind: "attack", unit: fighter.id, moveTo: { x: 1, y: 0 }, target: knight.id, attack: "cleave" })).toThrow(/stand still/);
     b.act({ kind: "attack", unit: fighter.id, moveTo: { x: 1, y: 0 }, target: knight.id, attack: "rush" });
     const hit = b.log.find((e) => e.type === "attack");
-    expect(hit && hit.type === "attack" && hit.attack).toBe("Rush");
+    expect(hit && hit.type === "attack" && hit.attack).toBe("Thunder Rush");
     expect(hit && hit.type === "attack" && hit.damage).toBe(10 + 2 - 6);
     expect(attackUsable(attackById(fighter, "slash"), true)).toBe(true);
     expect(attacksOf(fighter).map((a) => a.id)).toContain("slash");

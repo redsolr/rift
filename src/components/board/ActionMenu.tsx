@@ -3,25 +3,22 @@ import { useMemo } from "react";
 import { Html } from "@react-three/drei";
 import { useGame } from "@/store/game";
 import { tileHeight } from "@/sim/grid";
-import { attackRange } from "@/sim/attacks";
 import { CARD_H3 } from "./shared";
 
 /**
  * FE-style command menu at the unit's pending tile. Three pages, exactly the FE cadence:
  *   command  — Attack (or Heal) · Wait · Cancel, opens the moment the unit is placed
- *   attacks  — the unit's four attacks (power · range · condition · targets in reach)
+ *   attacks  — NOT here: components/SkillPanel (full-height framed panel on the right, FE-style)
  *   target   — NO menu: the centred AttackPrompt (components/AttackPrompt) + red tiles / battle bar carry it
  */
 export default function ActionMenu() {
   const pendingMove = useGame((s) => s.pendingMove);
   const menuPage = useGame((s) => s.menuPage);
-  const menuKind = useGame((s) => s.menuKind);
   const battle = useGame((s) => s.battle);
   const selected = useGame((s) => s.selected);
   const commitWait = useGame((s) => s.commitWait);
   const cancelPending = useGame((s) => s.cancelPending);
   const openAttacks = useGame((s) => s.openAttacks);
-  const chooseAttack = useGame((s) => s.chooseAttack);
   const setHoverAttack = useGame((s) => s.setHoverAttack);
   const map = useGame((s) => s.config.map);
   const selectedDef = useGame((s) => s.config.units.find((u) => u.id === s.selected) ?? null);
@@ -30,13 +27,12 @@ export default function ActionMenu() {
   const options = useMemo(() => (battle && selected && pendingMove && menuPage ? battle.attackOptions(selected, pendingMove) : []), [battle, selected, pendingMove, menuPage]);
 
   // the target step has no menu — the centred AttackPrompt + the red tiles carry it (FE)
-  if (!pendingMove || !selectedDef || !menuPage || menuPage === "target") return null;
+  // only the command page lives at the unit; the skill picker is the right-side SkillPanel, the target step is the AttackPrompt
+  if (!pendingMove || !selectedDef || menuPage !== "command") return null;
   const th = tileHeight(map, pendingMove);
   const hasHeals = options.some((o) => o.attack.kind === "heal");
   const nAttack = new Set(options.filter((o) => o.attack.kind === "attack").flatMap((o) => o.targets)).size;
   const nHeal = new Set(options.filter((o) => o.attack.kind === "heal").flatMap((o) => o.targets)).size;
-  const verb = menuKind === "heal" ? "Heal" : "Attack";
-  const shown = options.filter((o) => o.attack.kind === menuKind);
 
   return (
     // FE: the menu hangs to the RIGHT of the unit, vertically centred on its card, never over it
@@ -71,44 +67,6 @@ export default function ActionMenu() {
             </button>
             <button className="action-row back" onClick={cancelPending}>
               <span className="action-cursor">◆</span>Cancel
-            </button>
-          </>
-        )}
-
-        {menuPage === "attacks" && (
-          <>
-            <div className="action-title">{verb}</div>
-            {/* column header — every row below lines up under it */}
-            <div className="action-row attack head" aria-hidden>
-              <span />
-              <span className="attack-name">{verb}</span>
-              <span className="attack-pow">{menuKind === "heal" ? "Heal" : "Dmg"}</span>
-              <span className="attack-hit">Hit</span>
-              <span className="attack-rng">Range</span>
-              <span className="attack-why" />
-            </div>
-            {shown.map(({ attack, usable, targets: reach }) => {
-              const [lo, hi] = attackRange(selectedDef, attack);
-              const off = !usable || reach.length === 0;
-              const why = !usable ? (attack.cond === "moved" ? "after a move only" : "standing still only") : reach.length === 0 ? "nothing in reach" : `${reach.length} in reach`;
-              // Dmg = this unit's atk + the attack's power (before the target's defence — the battle bar shows the final number)
-              const might = Math.max(1, selectedDef.stats.atk + attack.power);
-              return (
-                <button key={attack.id} className={`action-row attack ${off ? "off" : ""}`} disabled={off} onClick={() => chooseAttack(attack.id)} onPointerEnter={() => setHoverAttack(attack.id)} title={`${attack.hint} ${why}.`}>
-                  <span className="action-cursor">◆</span>
-                  <span className="attack-name">{attack.name}</span>
-                  <span className="attack-pow">
-                    {might}
-                    {attack.power !== 0 && <small>{attack.power > 0 ? ` (+${attack.power})` : ` (${attack.power})`}</small>}
-                  </span>
-                  <span className="attack-hit">100%</span>
-                  <span className="attack-rng">{lo === hi ? hi : `${lo}–${hi}`}</span>
-                  <span className="attack-why">{why}</span>
-                </button>
-              );
-            })}
-            <button className="action-row back" onClick={cancelPending} onPointerEnter={() => setHoverAttack(null)}>
-              <span className="action-cursor">◆</span>Back
             </button>
           </>
         )}
