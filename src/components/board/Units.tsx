@@ -6,8 +6,10 @@ import * as THREE from "three";
 import { useGame } from "@/store/game";
 import { tileHeight } from "@/sim/grid";
 import { UnitDef } from "@/sim/types";
-import { cardKey, renderCard } from "../cards";
-import { CARD_H3, CARD_W3, TEAM_COLOR, dragged } from "./shared";
+import { TIER, cardKey, renderCard, tierOf } from "../cards";
+import { CardAura, CardFoil } from "./CardFoil";
+import SelectionRing from "./SelectionRing";
+import { CARD_H3, CARD_W3, TEAM_COLOR, TEAM_GLOW, dragged } from "./shared";
 
 /** Billboarded FUT-style card. Texture is a cached canvas from cards.ts; `dim` marks an acted unit. */
 const textureCache = new Map<string, THREE.CanvasTexture>();
@@ -23,15 +25,18 @@ function cardTexture(def: UnitDef): THREE.CanvasTexture {
   return t;
 }
 
-function CardMesh({ def, dim }: { def: UnitDef; dim: boolean }) {
+function CardMesh({ def, dim, selected }: { def: UnitDef; dim: boolean; selected: boolean }) {
   const texture = useMemo(() => cardTexture(def), [def]);
+  const foil = TIER[tierOf(def)].foil;
+  // foil sweep: tier intensity, plus a hero boost when selected (even base-tier cards get the sweep then); acted units stay flat
+  const boost = selected ? 0.5 : 0;
   return (
     <Billboard follow lockX={false} lockY={false} lockZ={false} position={[0, CARD_H3 / 2 + 0.05, 0]}>
       <mesh>
         <planeGeometry args={[CARD_W3, CARD_H3]} />
         <meshBasicMaterial map={texture} transparent alphaTest={0.05} color={dim ? "#6a6a72" : "#ffffff"} toneMapped={false} />
       </mesh>
-      {/* soft shadow blob so the card reads as standing on the tile */}
+      {!dim && (foil > 0 || selected) && <CardFoil mask={texture} foil={foil} boost={boost} w={CARD_W3} h={CARD_H3} />}
     </Billboard>
   );
 }
@@ -43,6 +48,7 @@ function Unit({ def }: { def: UnitDef }) {
   const rightClickTile = useGame((s) => s.rightClickTile);
   const setHoverUnit = useGame((s) => s.setHoverUnit);
   const selected = useGame((s) => s.selected === def.id);
+  const hovered = useGame((s) => s.hoverUnit === def.id);
   const battle = useGame((s) => s.battle);
   const mode = useGame((s) => s.mode);
   const floats = useGame((s) => s.floats);
@@ -109,18 +115,16 @@ function Unit({ def }: { def: UnitDef }) {
           }}
           onPointerOut={() => setHoverUnit(null)}
         >
-          <CardMesh def={def} dim={!!acted} />
+          <CardMesh def={def} dim={!!acted} selected={selected} />
           <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
             <circleGeometry args={[0.34, 20]} />
             <meshBasicMaterial color="#000" transparent opacity={0.35} />
           </mesh>
-          {selected && (
-            <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-              <ringGeometry args={[0.36, 0.46, 24]} />
-              <meshBasicMaterial color="#ffe082" />
-            </mesh>
-          )}
         </group>
+        {/* ground selection ring (team colour): spinning + pulsing when selected, dim static on hover */}
+        {selected ? <SelectionRing color={TEAM_GLOW[def.team]} strength={1} spin /> : hovered ? <SelectionRing color={TEAM_GLOW[def.team]} strength={0.4} spin={false} /> : null}
+        {/* gold-tier aura: slow motes drifting up around the card base */}
+        {!acted && tierOf(def) === "gold" && <CardAura color={TIER.gold.trim} seed={def.id.length + def.x * 7 + def.y * 13} />}
         {/* HP bar */}
         <group position={[0, CARD_H3 + 0.18, 0]}>
           <mesh>

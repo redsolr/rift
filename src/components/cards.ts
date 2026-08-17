@@ -14,9 +14,25 @@ export const POSITION: Record<Archetype, string> = { knight: "KNT", fighter: "FT
 export const WEAPON: Record<Archetype, string> = { knight: "Iron Lance", fighter: "Iron Axe", archer: "Iron Bow", mage: "Fire", healer: "Heal" };
 export const GLYPH: Record<Archetype, string> = { knight: "♜", fighter: "⚔", archer: "➶", mage: "✦", healer: "✚" };
 
-const FRAME: Record<Team, { a: string; b: string; c: string; ink: string; trim: string }> = {
-  red: { a: "#4a1210", b: "#b8392e", c: "#ff8a6a", ink: "#fff3ea", trim: "#f2c96b" },
-  blue: { a: "#0f1f4a", b: "#2f5fc0", c: "#7fb0ff", ink: "#eef4ff", trim: "#f2c96b" },
+const FRAME: Record<Team, { a: string; b: string; c: string; ink: string }> = {
+  red: { a: "#4a1210", b: "#b8392e", c: "#ff8a6a", ink: "#fff3ea" },
+  blue: { a: "#0f1f4a", b: "#2f5fc0", c: "#7fb0ff", ink: "#eef4ff" },
+};
+
+/**
+ * Card tier — FUT/Hearthstone-style rarity read, derived from the overall rating (data, not archetype):
+ * gold ≥ 90 (Knight, Fighter on default stats) · silver ≥ 86 (Archer, Mage) · base (Healer).
+ * Drives the trim metal, the star row, the baked holo band, the animated foil sweep and the ground aura.
+ */
+export type Tier = "gold" | "silver" | "base";
+export function tierOf(u: UnitDef): Tier {
+  const o = overall(u);
+  return o >= 90 ? "gold" : o >= 86 ? "silver" : "base";
+}
+export const TIER: Record<Tier, { trim: string; hi: string; lo: string; stars: number; foil: number; label: string }> = {
+  gold: { trim: "#f2c96b", hi: "#fff3c2", lo: "#b8862a", stars: 3, foil: 1, label: "GOLD" },
+  silver: { trim: "#d8dee8", hi: "#ffffff", lo: "#8b95a6", stars: 2, foil: 0.55, label: "SILVER" },
+  base: { trim: "#c98a52", hi: "#ecc19a", lo: "#7d4d26", stars: 1, foil: 0, label: "BRONZE" },
 };
 
 /** Overall rating, calibrated so the five archetypes land ~84–92. */
@@ -71,8 +87,15 @@ export function renderCard(u: UnitDef): HTMLCanvasElement {
   g.addColorStop(1, f.a);
   ctx.fillStyle = g;
   ctx.fill();
+  const tier = TIER[tierOf(u)];
   ctx.lineWidth = 5;
-  ctx.strokeStyle = f.trim;
+  const tg = ctx.createLinearGradient(0, 0, W, H);
+  tg.addColorStop(0, tier.hi);
+  tg.addColorStop(0.35, tier.trim);
+  tg.addColorStop(0.55, tier.lo);
+  tg.addColorStop(0.75, tier.trim);
+  tg.addColorStop(1, tier.hi);
+  ctx.strokeStyle = tg;
   ctx.stroke();
   // inner bevel
   ctx.save();
@@ -97,7 +120,7 @@ export function renderCard(u: UnitDef): HTMLCanvasElement {
   for (let i = 0; i < 26; i++) {
     const px = ((i * 97) % 220) + 18;
     const py = ((i * 61) % 170) + 20;
-    ctx.fillStyle = i % 3 === 0 ? f.trim : "#ffffff";
+    ctx.fillStyle = i % 3 === 0 ? tier.trim : "#ffffff";
     ctx.fillRect(px, py, 3 + (i % 3), 3 + ((i * 7) % 3));
   }
   ctx.globalAlpha = 1;
@@ -113,6 +136,22 @@ export function renderCard(u: UnitDef): HTMLCanvasElement {
   ctx.shadowOffsetY = 0;
   ctx.restore();
 
+  // baked holo band (foil tiers): a diagonal prismatic stripe under everything, the animated sweep rides on top
+  if (tier.foil > 0) {
+    ctx.save();
+    shieldPath(ctx, 6, 6, W - 12, H - 12, 22);
+    ctx.clip();
+    const hg = ctx.createLinearGradient(0, H, W, 0);
+    hg.addColorStop(0.3, "rgba(255,255,255,0)");
+    hg.addColorStop(0.42, `rgba(255,120,220,${0.14 * tier.foil})`);
+    hg.addColorStop(0.5, `rgba(255,255,255,${0.22 * tier.foil})`);
+    hg.addColorStop(0.58, `rgba(120,230,255,${0.14 * tier.foil})`);
+    hg.addColorStop(0.7, "rgba(255,255,255,0)");
+    ctx.fillStyle = hg;
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+  }
+
   // rating + position (top-left column)
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
@@ -120,7 +159,7 @@ export function renderCard(u: UnitDef): HTMLCanvasElement {
   ctx.font = "800 62px 'Segoe UI', system-ui, sans-serif";
   ctx.fillText(String(overall(u)), 52, 92);
   ctx.font = "800 24px 'Segoe UI', system-ui, sans-serif";
-  ctx.fillStyle = f.trim;
+  ctx.fillStyle = tier.trim;
   ctx.fillText(POSITION[u.archetype], 52, 122);
   // divider
   ctx.fillStyle = "rgba(255,255,255,0.35)";
@@ -130,11 +169,21 @@ export function renderCard(u: UnitDef): HTMLCanvasElement {
   ctx.fillStyle = f.ink;
   ctx.fillText(ARCHETYPE_LABEL[u.archetype].toUpperCase(), 52, 152);
 
-  // name band
+  // tier stars (FUT rarity read) above the name band
   const bandY = H * 0.6;
+  ctx.font = "700 15px 'Segoe UI Symbol', 'Segoe UI', system-ui, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillStyle = tier.trim;
+  ctx.shadowColor = "rgba(0,0,0,0.6)";
+  ctx.shadowBlur = 4;
+  const starW = 16;
+  for (let i = 0; i < tier.stars; i++) ctx.fillText("★", W / 2 + (i - (tier.stars - 1) / 2) * starW, bandY - 34);
+  ctx.shadowBlur = 0;
+
+  // name band
   ctx.fillStyle = "rgba(0,0,0,0.28)";
   ctx.fillRect(22, bandY - 24, W - 44, 40);
-  ctx.fillStyle = f.trim;
+  ctx.fillStyle = tier.trim;
   ctx.fillRect(22, bandY - 25, W - 44, 1.5);
   ctx.fillRect(22, bandY + 15, W - 44, 1.5);
   ctx.font = "800 26px 'Segoe UI', system-ui, sans-serif";
@@ -159,7 +208,7 @@ export function renderCard(u: UnitDef): HTMLCanvasElement {
   const cw = (right - left) / 6;
   ctx.font = "700 13px 'Segoe UI', system-ui, sans-serif";
   cols.forEach(([lab], i) => {
-    ctx.fillStyle = f.trim;
+    ctx.fillStyle = tier.trim;
     ctx.fillText(lab, left + cw * (i + 0.5), bandY + 48);
   });
   ctx.font = "800 22px 'Segoe UI', system-ui, sans-serif";
@@ -170,7 +219,7 @@ export function renderCard(u: UnitDef): HTMLCanvasElement {
   // footer badge (team crest)
   ctx.beginPath();
   ctx.arc(W / 2, H - 42, 11, 0, Math.PI * 2);
-  ctx.fillStyle = f.trim;
+  ctx.fillStyle = tier.trim;
   ctx.fill();
   ctx.fillStyle = f.a;
   ctx.font = "800 13px 'Segoe UI', system-ui, sans-serif";
@@ -178,4 +227,25 @@ export function renderCard(u: UnitDef): HTMLCanvasElement {
 
   cache.set(key, c);
   return c;
+}
+
+/**
+ * Animated foil sweep for the 2D thumbs (battle bar / panels): a diagonal light band that travels across the
+ * card, clipped to the card's own pixels. `t` in seconds. Mirrors the shader the board uses. Cheap — one gradient.
+ */
+export function drawFoilSweep(ctx: CanvasRenderingContext2D, w: number, h: number, t: number, foil: number, boost = 0) {
+  const k = ((t * 0.28) % 1.6) - 0.3; // travel −0.3 → 1.3 then restart (a pause between sweeps)
+  const x0 = -w * 0.6 + k * (w * 2.2);
+  const g = ctx.createLinearGradient(x0, h, x0 + w * 0.7, 0);
+  const a = 0.35 * foil + boost;
+  g.addColorStop(0, "rgba(255,255,255,0)");
+  g.addColorStop(0.35, `rgba(255,150,230,${a * 0.5})`);
+  g.addColorStop(0.5, `rgba(255,255,255,${a})`);
+  g.addColorStop(0.65, `rgba(140,235,255,${a * 0.5})`);
+  g.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.save();
+  ctx.globalCompositeOperation = "source-atop";
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
+  ctx.restore();
 }
