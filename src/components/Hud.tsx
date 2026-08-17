@@ -83,7 +83,7 @@ export default function Hud() {
         ) : planning ? (
           <>
             <span className={`turn-pill ${playerTeam}`}>PLANNING</span>
-            <span className="hint-pill">Deploy — drag your units inside the highlighted zone (drop on an ally to swap), then Begin battle</span>
+            <span className="hint-pill">Deploy — put your units anywhere on the blue tiles (drop on an ally to swap), then Begin battle</span>
           </>
         ) : (
           <span className="hint-pill">

@@ -96,11 +96,11 @@ export default function Highlights() {
   const tool = useGame((s) => s.tool);
   const groundHover = useGame((s) => s.groundHover);
   const planning = useGame((s) => s.planning);
-  // the placement read applies in the editor and in the planning (deployment) phase alike
-  const placing = mode === "editor" || planning;
-  const dropOk = useGame((s) => ((s.drag || s.tool.kind === "unit") && (s.mode === "editor" || s.planning) ? (selectDropTarget(s)?.ok ?? false) : true));
+  // the potential (move field + attack band) read belongs to the editor; the planning phase paints only the deploy zone
+  const placing = mode === "editor";
+  const dropOk = useGame((s) => ((s.drag || s.tool.kind === "unit") && s.mode === "editor" ? (selectDropTarget(s)?.ok ?? false) : true));
   const paletteDef = useMemo(() => (mode === "editor" && tool.kind === "unit" ? makeUnit(tool.team, tool.archetype, 0, 0) : null), [mode, tool]);
-  // planning phase: the deploy zone (soft team wash) — where your units may stand before the battle
+  // planning phase: the deploy zone — your side's rows, lit like walkable tiles: put your units anywhere in here
   const zone = useMemo(() => (planning ? deployZone(config, playerTeam) : []), [planning, config, playerTeam]);
   const editorSubject = useMemo<{ def: UnitDef; origin: Pos | null } | null>(() => {
     if (!placing) return null;
@@ -154,7 +154,8 @@ export default function Highlights() {
   }, [placing, pendingMove, hover, movable, selDef, mine]);
   const previewFrom = pendingMove ?? hoverPreview;
   // FE Three Hopes: the attack range from where the unit STANDS (or will stand) is drawn over the move field
-  const attackOrigin = useMemo(() => (placing ? editorOrigin : (previewFrom ?? (sel && sel.alive && mine ? { x: sel.x, y: sel.y } : null))), [placing, editorOrigin, previewFrom, sel, mine]);
+  // (planning phase paints only the deploy zone — no range read until the battle exists)
+  const attackOrigin = useMemo(() => (planning ? null : placing ? editorOrigin : (previewFrom ?? (sel && sel.alive && mine ? { x: sel.x, y: sel.y } : null))), [planning, placing, editorOrigin, previewFrom, sel, mine]);
   // attack range from the pending / hovered tile: the chosen (or hovered) attack's range, else the union of all four
   const focusAttack = pendingAttack ?? hoverAttack;
   // healing range (green) when a heal is focused / the Heal picker is open / a healer idles; else damage range
@@ -180,7 +181,7 @@ export default function Highlights() {
         <Highlight key={`d${p.x},${p.y}`} x={p.x} y={p.y} color="#c04cff" opacity={0.15} />
       ))}
       {zone.map((p) => (
-        <Highlight key={`z${p.x},${p.y}`} x={p.x} y={p.y} color={playerTeam === "blue" ? "#4fd8ff" : "#ff7a6a"} opacity={0.16} border={playerTeam === "blue" ? "#9fe9ff" : "#ffb0a6"} borderOpacity={0.45} lift={0.015} />
+        <Highlight key={`z${p.x},${p.y}`} x={p.x} y={p.y} color={playerTeam === "blue" ? "#6f8fff" : "#ff7a7a"} opacity={playerTeam === "blue" ? 0.45 : 0.3} border={playerTeam === "blue" ? "#e8eeff" : "#ffd0d0"} borderOpacity={0.8} lift={0.015} />
       ))}
       {attackBand.map((p) => (
         <Highlight key={`a${p.x},${p.y}`} x={p.x} y={p.y} color={mine ? "#ff7a8a" : "#ff5a5a"} opacity={mine ? 0.34 : 0.22} border={mine ? "#ff4a5e" : undefined} borderOpacity={0.8} />

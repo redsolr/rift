@@ -234,25 +234,18 @@ export const selectCaughtUp = (s: Pick<GameState, "cursor" | "events">) => s.cur
  * pointer, and whether that drop is legal. Keyed off groundHover (the pointer vs the GROUND, ignoring cards).
  * null when nothing is being placed or the pointer is off the board.
  */
-/** Planning phase deploy zone: every passable tile within DEPLOY_REACH steps of any of `team`'s units (their tiles included). */
-export const DEPLOY_REACH = 2;
+/** Planning phase deploy zone: the DEPLOY_ROWS rows on `team`'s side of the map (the side its units start on), passable tiles only. */
+export const DEPLOY_ROWS = 4;
 export function deployZone(config: BattleConfig, team: Team): Pos[] {
   const map = config.map;
-  const seen = new Set<string>();
+  const mine = config.units.filter((u) => u.team === team);
+  // which side is "ours": where our units' centre of mass sits (blue = the near/bottom rows on the default map)
+  const avgY = mine.length ? mine.reduce((a, u) => a + u.y, 0) / mine.length : map.height - 1;
+  const near = avgY >= (map.height - 1) / 2;
+  const rows = Math.min(DEPLOY_ROWS, map.height);
+  const y0 = near ? map.height - rows : 0;
   const out: Pos[] = [];
-  for (const u of config.units) {
-    if (u.team !== team) continue;
-    for (let dy = -DEPLOY_REACH; dy <= DEPLOY_REACH; dy++)
-      for (let dx = -DEPLOY_REACH + Math.abs(dy); dx <= DEPLOY_REACH - Math.abs(dy); dx++) {
-        const x = u.x + dx;
-        const y = u.y + dy;
-        if (!inBounds(map, x, y) || TERRAIN[terrainAt(map, x, y)].moveCost === null) continue;
-        const k = `${x},${y}`;
-        if (seen.has(k)) continue;
-        seen.add(k);
-        out.push({ x, y });
-      }
-  }
+  for (let y = y0; y < y0 + rows; y++) for (let x = 0; x < map.width; x++) if (TERRAIN[terrainAt(map, x, y)].moveCost !== null) out.push({ x, y });
   return out;
 }
 
