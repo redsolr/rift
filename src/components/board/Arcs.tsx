@@ -10,7 +10,7 @@ import { Pos } from "@/sim/types";
 
 /**
  * FFXII-style target line: a SOLID ribbon — wide soft glow under a coloured core under a white-hot spine —
- * with a bright pulse that travels along it toward the target and a breathing glow at the tip. No dashes,
+ * with a small bead in the arc colour that travels along it toward the target and a breathing glow at the tip. No dashes,
  * no arrowhead. Threat arcs are thin red; the target arc is gold and a little bolder.
  */
 function Arc({ from, to, color, hot, width = 2 }: { from: Pos; to: Pos; color: string; hot: string; width?: number }) {
@@ -21,7 +21,6 @@ function Arc({ from, to, color, hot, width = 2 }: { from: Pos; to: Pos; color: s
   const tip = useRef<THREE.Mesh>(null);
   const tipGlow = useRef<THREE.Mesh>(null);
   const pulse = useRef<THREE.Mesh>(null);
-  const pulseTrail = useRef<THREE.Mesh>(null);
   const t = useRef(0);
   // additive blending on drei Lines: the material is created inside Line, so set it after mount
   useEffect(() => {
@@ -47,24 +46,18 @@ function Arc({ from, to, color, hot, width = 2 }: { from: Pos; to: Pos; color: s
 
   useFrame((_, dt) => {
     t.current += dt;
-    // pulse: runs start → target, ~2.2 tiles/s, with a short comet trail behind it
+    // pulse: one small bead in the arc colour running start → target, ~2.2 tiles/s
     const speed = 2.2;
     const period = Math.max(0.6, len / speed) + 0.35;
     const k = (t.current % period) / (len / speed);
-    if (pulse.current && pulseTrail.current) {
+    if (pulse.current) {
       const vis = k <= 1;
       pulse.current.visible = vis;
-      pulseTrail.current.visible = vis;
       if (vis) {
-        const p = curve.getPoint(k);
-        pulse.current.position.copy(p);
-        const back = curve.getPoint(Math.max(0, k - 0.06));
-        pulseTrail.current.position.copy(p.clone().add(back).multiplyScalar(0.5));
-        pulseTrail.current.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), p.clone().sub(back).normalize());
+        pulse.current.position.copy(curve.getPoint(k));
         // fade in over the first 10 %, out over the last 10 %
         const fade = Math.min(1, k / 0.1, (1 - k) / 0.1);
         (pulse.current.material as THREE.MeshBasicMaterial).opacity = 0.9 * fade;
-        (pulseTrail.current.material as THREE.MeshBasicMaterial).opacity = 0.55 * fade;
       }
     }
     if (tip.current) tip.current.scale.setScalar(1 + 0.18 * Math.sin(t.current * 6));
@@ -78,23 +71,19 @@ function Arc({ from, to, color, hot, width = 2 }: { from: Pos; to: Pos; color: s
       <Line ref={glowB} points={pts} color={color} lineWidth={width * 3} transparent opacity={0.28} depthTest={false} />
       <Line points={pts} color={color} lineWidth={width * 1.25} transparent opacity={0.95} depthTest={false} />
       <Line ref={spine} points={pts} color={hot} lineWidth={Math.max(0.5, width * 0.4)} transparent opacity={0.7} depthTest={false} />
-      {/* travelling pulse + comet trail */}
+      {/* travelling pulse: a single bead in the arc colour */}
       <mesh ref={pulse}>
-        <sphereGeometry args={[0.04, 10, 8]} />
-        <meshBasicMaterial color={hot} transparent opacity={0.95} depthTest={false} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+        <sphereGeometry args={[0.045, 10, 8]} />
+        <meshBasicMaterial color={color} transparent opacity={0.9} depthTest={false} depthWrite={false} toneMapped={false} />
       </mesh>
-      <mesh ref={pulseTrail}>
-        <cylinderGeometry args={[0.008, 0.032, 0.36, 6]} />
-        <meshBasicMaterial color={color} transparent opacity={0.55} depthTest={false} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
-      </mesh>
-      {/* tip: white-hot bead + breathing coloured halo */}
+      {/* tip: coloured bead + breathing halo */}
       <mesh ref={tipGlow} position={end}>
         <sphereGeometry args={[0.07, 12, 10]} />
         <meshBasicMaterial color={color} transparent opacity={0.4} depthTest={false} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
       </mesh>
       <mesh ref={tip} position={end}>
         <sphereGeometry args={[0.045, 12, 10]} />
-        <meshBasicMaterial color={hot} transparent opacity={0.95} depthTest={false} depthWrite={false} toneMapped={false} />
+        <meshBasicMaterial color={color} transparent opacity={0.95} depthTest={false} depthWrite={false} toneMapped={false} />
       </mesh>
     </group>
   );
