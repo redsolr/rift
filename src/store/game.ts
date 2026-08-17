@@ -3,7 +3,7 @@ import { create } from "zustand";
 import { Battle, SimStats, runMany } from "@/sim/battle";
 import { Effect, Float, View, applyEvent, initialPlayback, initialView } from "./playback";
 export type { Effect, EffectStyle, Float, View, ViewUnit } from "./playback";
-import { decodeConfig, defaultConfig, encodeConfig, makeUnit } from "@/sim/presets";
+import { DEFAULT_DOCTRINE, decodeConfig, defaultConfig, emptyMap, encodeConfig, makeUnit } from "@/sim/presets";
 import {
   Action,
   Archetype,
@@ -22,6 +22,36 @@ import {
 export type Mode = "manual" | "manager" | "editor";
 /** FE command flow after a unit is placed: command list → attack picker → target select. */
 export type MenuPage = "command" | "attacks" | "target";
+
+/** A map in the editor's library: a whole battle setup (terrain + units + doctrine + turns). Order = play order. */
+export interface SavedMap {
+  id: string;
+  name: string;
+  config: BattleConfig;
+}
+const MAPS_KEY = "tactician.maps";
+const loadMaps = (): { maps: SavedMap[]; activeMapId: string | null } => {
+  try {
+    if (typeof localStorage !== "undefined") {
+      const raw = localStorage.getItem(MAPS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as { maps: SavedMap[]; activeMapId: string | null };
+        if (Array.isArray(parsed.maps) && parsed.maps.length) return parsed;
+      }
+    }
+  } catch {
+    /* corrupt / private mode → fresh library */
+  }
+  return { maps: [{ id: "default", name: "Default battlefield", config: defaultConfig() }], activeMapId: "default" };
+};
+const persistMaps = (maps: SavedMap[], activeMapId: string | null) => {
+  try {
+    localStorage.setItem(MAPS_KEY, JSON.stringify({ maps, activeMapId }));
+  } catch {
+    /* private mode */
+  }
+};
+const newMapId = () => `m${Date.now().toString(36)}${Math.floor(Math.random() * 1e4).toString(36)}`;
 export type Tool = { kind: "select" } | { kind: "terrain"; terrain: Terrain } | { kind: "unit"; team: Team; archetype: Archetype } | { kind: "erase" };
 
 let timer: ReturnType<typeof setTimeout> | null = null;
@@ -65,7 +95,9 @@ interface GameState {
   targets: string[];
   // manager
   phaseLen: number;
-  // editor
+  // editor — map library (localStorage), ordered; the active map receives every config edit
+  maps: SavedMap[];
+  activeMapId: string | null;
   tool: Tool;
   painting: boolean;
   simStats: SimStats | null;
@@ -112,6 +144,18 @@ interface GameState {
   setOrders: (id: string, patch: Partial<Orders>) => void;
   setPersonality: (id: string, patch: Partial<Personality>) => void;
   setDoctrine: (team: Team, patch: Partial<Doctrine>) => void;
+  // editor — maps
+  /** load the library from localStorage (called once on mount; SSR renders the default) */
+  hydrateMaps: () => void;
+  selectMap: (id: string) => void;
+  /** new entry: a blank ground map (`blank`) or a copy of the current setup (`copy`); becomes active */
+  newMap: (kind: "blank" | "copy") => void;
+  renameMap: (id: string, name: string) => void;
+  deleteMap: (id: string) => void;
+  /** move a map one step earlier (-1) or later (+1) in play order */
+  moveMap: (id: string, dir: -1 | 1) => void;
+  /** store the current (detached) setup as a new map */
+  saveAsMap: () => void;
   // editor
   setTool: (t: Tool) => void;
   setPainting: (b: boolean) => void;
@@ -213,15 +257,21 @@ export const useGame = create<GameState>((set, get) => {
     startPlayback();
   };
 
+  // SSR-safe: the server and the first client render both start from the default library;
+  // `hydrateMaps()` (page mount) swaps in localStorage.
+  const cfg0 = defaultConfig();
+
   return {
-    config: defaultConfig(),
-    mode: "manager",
+    config: cfg0,
+    maps: [{ id: "default", name: "Default battlefield", config: cfg0 }],
+    activeMapId: "default",
+    mode: "manual",
     playerTeam: "blue",
     seed: 1,
     battle: null,
     events: [],
     cursor: 0,
-    view: initialView(defaultConfig()),
+    view: initialView(cfg0),
     playing: false,
     speed: 1,
     floats: [],
@@ -343,7 +393,6 @@ export const useGame = create<GameState>((set, get) => {
         const u = b.unit(id);
         if (u.team === s.playerTeam && u.alive && !u.acted) {
           set({ selected: id, moveTiles: b.standableFor(id), pendingMove: null, menuPage: null, pendingAttack: null, hoverAttack: null, targets: [] });
-          if (s.followCam) get().focusCam({ x: u.x, y: u.y }, "keep");
           return;
         }
       }
@@ -490,6 +539,73 @@ export const useGame = create<GameState>((set, get) => {
       if (s.battle) s.battle.config.doctrine[team] = doctrine[team];
     },
 
+    // ---- editor: map library ----
+    hydrateMaps: () => {
+      const lib = loadMaps();
+      const active = lib.maps.find((m) => m.id === lib.activeMapId) ?? null;
+      const config = active?.config ?? get().config;
+      stopTimer();
+      set({ maps: lib.maps, activeMapId: active?.id ?? null, config, ...resetPlayback(config, null) });
+      clearManual();
+    },
+    selectMap: (id) => {
+      const s = get();
+      const m = s.maps.find((x) => x.id === id);
+      if (!m) return;
+      stopTimer();
+      set({ config: m.config, activeMapId: id, ...resetPlayback(m.config, null), simStats: null });
+      clearManual();
+      persistMaps(s.maps, id);
+    },
+    newMap: (kind) => {
+      const s = get();
+      const config: BattleConfig = kind === "copy" ? JSON.parse(JSON.stringify(s.config)) : { map: emptyMap(), units: [], doctrine: { red: { ...DEFAULT_DOCTRINE }, blue: { ...DEFAULT_DOCTRINE } }, maxTurns: 30, firstTeam: "blue" };
+      const m: SavedMap = { id: newMapId(), name: kind === "copy" ? `${s.maps.find((x) => x.id === s.activeMapId)?.name ?? "Setup"} (copy)` : `Map ${s.maps.length + 1}`, config };
+      const maps = [...s.maps, m];
+      stopTimer();
+      set({ maps, config, activeMapId: m.id, ...resetPlayback(config, null), simStats: null });
+      clearManual();
+      persistMaps(maps, m.id);
+    },
+    renameMap: (id, name) => {
+      const maps = get().maps.map((m) => (m.id === id ? { ...m, name } : m));
+      set({ maps });
+      persistMaps(maps, get().activeMapId);
+    },
+    deleteMap: (id) => {
+      const s = get();
+      if (s.maps.length <= 1) return;
+      const i = s.maps.findIndex((m) => m.id === id);
+      const maps = s.maps.filter((m) => m.id !== id);
+      if (s.activeMapId === id) {
+        const next = maps[Math.max(0, i - 1)];
+        stopTimer();
+        set({ maps, config: next.config, activeMapId: next.id, ...resetPlayback(next.config, null), simStats: null });
+        clearManual();
+        persistMaps(maps, next.id);
+      } else {
+        set({ maps });
+        persistMaps(maps, s.activeMapId);
+      }
+    },
+    moveMap: (id, dir) => {
+      const s = get();
+      const i = s.maps.findIndex((m) => m.id === id);
+      const j = i + dir;
+      if (i < 0 || j < 0 || j >= s.maps.length) return;
+      const maps = [...s.maps];
+      [maps[i], maps[j]] = [maps[j], maps[i]];
+      set({ maps });
+      persistMaps(maps, s.activeMapId);
+    },
+    saveAsMap: () => {
+      const s = get();
+      const m: SavedMap = { id: newMapId(), name: `Map ${s.maps.length + 1}`, config: s.config };
+      const maps = [...s.maps, m];
+      set({ maps, activeMapId: m.id });
+      persistMaps(maps, m.id);
+    },
+
     // ---- editor ----
     setTool: (tool) => set({ tool }),
     setPainting: (painting) => set({ painting }),
@@ -578,8 +694,9 @@ export const useGame = create<GameState>((set, get) => {
       try {
         const config = decodeConfig(code.trim());
         stopTimer();
-        set({ config, ...resetPlayback(config, null), simStats: null });
+        set({ config, activeMapId: null, ...resetPlayback(config, null), simStats: null });
         clearManual();
+        persistMaps(get().maps, null);
         return true;
       } catch {
         return false;
@@ -588,8 +705,17 @@ export const useGame = create<GameState>((set, get) => {
     loadDefault: () => {
       const config = defaultConfig();
       stopTimer();
-      set({ config, ...resetPlayback(config, null), simStats: null });
+      set({ config, activeMapId: null, ...resetPlayback(config, null), simStats: null });
       clearManual();
+      persistMaps(get().maps, null);
     },
   };
+});
+
+// Every config edit flows into the active map (autosave) — the library IS the setup, no "save" button to forget.
+useGame.subscribe((s, prev) => {
+  if (s.config === prev.config || !s.activeMapId) return;
+  const maps = s.maps.map((m) => (m.id === s.activeMapId ? { ...m, config: s.config } : m));
+  useGame.setState({ maps });
+  persistMaps(maps, s.activeMapId);
 });

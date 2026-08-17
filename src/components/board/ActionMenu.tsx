@@ -36,20 +36,21 @@ export default function ActionMenu() {
   const chosen = pendingAttack ? options.find((o) => o.attack.id === pendingAttack) : null;
 
   return (
-    <Html position={[pendingMove.x, th + CARD_H3 * 0.6, pendingMove.y - 0.7]} zIndexRange={[2, 0]} style={{ pointerEvents: "auto", transform: "translate(-100%, -50%)" }}>
+    // FE: the menu hangs to the RIGHT of the unit, vertically centred on its card, never over it
+    <Html position={[pendingMove.x + 0.7, th + CARD_H3 * 0.55, pendingMove.y]} zIndexRange={[2, 0]} style={{ pointerEvents: "auto", transform: "translate(0, -50%)" }}>
       <div className={`action-menu page-${menuPage}`} onPointerLeave={() => setHoverAttack(null)}>
         {menuPage === "command" && (
           <>
             <button className="action-row" onClick={openAttacks} disabled={targets.length === 0} title={targets.length ? `${targets.length} in reach` : "Nothing in reach from here"}>
-              <span className="action-cursor">▸</span>
+              <span className="action-cursor">◆</span>
               {verb}
               <span className="action-meta">{targets.length ? targets.length : "—"}</span>
             </button>
             <button className="action-row" onClick={commitWait}>
-              <span className="action-cursor">▸</span>Wait
+              <span className="action-cursor">◆</span>Wait
             </button>
-            <button className="action-row ghost" onClick={cancelPending}>
-              <span className="action-cursor">▸</span>Cancel
+            <button className="action-row back" onClick={cancelPending}>
+              <span className="action-cursor">◆</span>Cancel
             </button>
           </>
         )}
@@ -63,7 +64,7 @@ export default function ActionMenu() {
               const why = !usable ? (attack.cond === "moved" ? "needs a move first" : "must stand still") : reach.length === 0 ? "nothing in reach" : `${reach.length} in reach`;
               return (
                 <button key={attack.id} className={`action-row attack ${off ? "off" : ""}`} disabled={off} onClick={() => chooseAttack(attack.id)} onPointerEnter={() => setHoverAttack(attack.id)} title={`${attack.hint} ${why}.`}>
-                  <span className="action-cursor">▸</span>
+                  <span className="action-cursor">◆</span>
                   <span className="attack-name">{attack.name}</span>
                   <span className="attack-pow">{attack.power > 0 ? `+${attack.power}` : attack.power < 0 ? `${attack.power}` : "±0"}</span>
                   <span className="attack-rng">rng {lo === hi ? hi : `${lo}–${hi}`}</span>
@@ -71,8 +72,8 @@ export default function ActionMenu() {
                 </button>
               );
             })}
-            <button className="action-row ghost" onClick={cancelPending}>
-              <span className="action-cursor">▸</span>Back
+            <button className="action-row back" onClick={cancelPending}>
+              <span className="action-cursor">◆</span>Back
             </button>
           </>
         )}
@@ -83,8 +84,8 @@ export default function ActionMenu() {
             <div className="action-hint">
               Click a {healer ? "green" : "red"} target ({targets.length})
             </div>
-            <button className="action-row ghost" onClick={cancelPending}>
-              <span className="action-cursor">▸</span>Back
+            <button className="action-row back" onClick={cancelPending}>
+              <span className="action-cursor">◆</span>Back
             </button>
           </>
         )}

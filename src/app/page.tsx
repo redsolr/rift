@@ -52,6 +52,9 @@ export default function Home() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
   useEffect(() => {
+    useGame.getState().hydrateMaps();
+  }, []);
+  useEffect(() => {
     const m = location.hash.match(/#c=([A-Za-z0-9_-]+)/);
     if (m) loadShareCode(m[1]);
     // dev/e2e hook — the store is the game's public API

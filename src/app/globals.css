@@ -868,116 +868,135 @@ button.danger {
   }
 }
 
-/* ---- in-board action menu ---- */
+/* ---- in-board command menu (FE Three Hopes: dark smoke panel to the RIGHT of the unit) ---- */
 .action-menu {
+  --gold: #f2c96b;
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  background: rgba(20, 24, 33, 0.94);
-  border: 1px solid #5a4a24;
-  outline: 1px solid rgba(255, 213, 79, 0.25);
-  outline-offset: -3px;
-  border-radius: 6px;
-  padding: 6px;
-  min-width: 150px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+  min-width: 190px;
+  padding: 14px 18px 12px 26px;
+  color: #f4efe4;
+  font-family: Georgia, "Times New Roman", serif;
+  background:
+    radial-gradient(120% 90% at 30% 50%, rgba(8, 10, 16, 0.96) 55%, rgba(8, 10, 16, 0.75) 78%, rgba(8, 10, 16, 0) 100%);
+  filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.6));
   white-space: nowrap;
+  user-select: none;
+}
+.action-menu.page-attacks {
+  min-width: 330px;
+}
+.action-title {
+  color: var(--gold);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  padding: 0 0 6px 4px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid rgba(242, 201, 107, 0.45);
 }
 .action-hint {
-  color: var(--muted);
-  font-size: 11px;
-  padding: 2px 4px 4px;
-}
-.action-btn {
-  background: var(--accent);
-  color: #111;
-  font-weight: 800;
-  border-radius: 4px;
-  padding: 6px 10px;
-  text-align: left;
-}
-.action-btn.ghost {
-  background: var(--bg-3);
-  color: var(--fg);
-  font-weight: 600;
-}
-/* FE list rows: cursor glyph appears on hover/focus, gold band on the active row */
-.action-title {
-  color: #f2c96b;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  padding: 2px 6px 4px;
-  border-bottom: 1px solid rgba(242, 201, 107, 0.3);
-  margin-bottom: 2px;
+  color: #b9b2a3;
+  font-size: 12px;
+  padding: 4px 4px 6px;
 }
 .action-row {
+  position: relative;
   display: grid;
-  grid-template-columns: 12px 1fr auto;
+  grid-template-columns: 14px 1fr auto;
   align-items: center;
-  gap: 6px;
+  column-gap: 8px;
+  width: 100%;
   background: transparent;
-  color: var(--fg);
-  font-weight: 700;
-  font-size: 13px;
-  border-radius: 4px;
-  padding: 5px 8px 5px 4px;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 0;
+  padding: 7px 6px 7px 2px;
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  font-size: 17px;
+  letter-spacing: 0.02em;
   text-align: left;
-  border: 1px solid transparent;
+  line-height: 1.1;
+}
+.action-row:last-child {
+  border-bottom: 0;
+}
+.action-row .action-cursor {
+  color: #ddd5c2;
+  font-size: 9px;
+  text-align: center;
+}
+/* the FE hand-cursor arrow, outside the row on the left */
+.action-row::before {
+  content: "➤";
+  position: absolute;
+  left: -22px;
+  top: 50%;
+  transform: translateY(-50%) rotate(-12deg);
+  color: var(--gold);
+  font-size: 15px;
+  opacity: 0;
+  text-shadow: 0 0 6px rgba(242, 201, 107, 0.8);
 }
 .action-row:hover:not(:disabled),
 .action-row:focus-visible {
-  background: linear-gradient(90deg, rgba(242, 201, 107, 0.28), rgba(242, 201, 107, 0.06));
-  border-color: rgba(242, 201, 107, 0.55);
+  outline: 0;
   color: #fff;
+  background: linear-gradient(90deg, rgba(242, 201, 107, 0.55) 0%, rgba(242, 201, 107, 0.28) 60%, rgba(242, 201, 107, 0) 100%);
 }
-.action-row .action-cursor {
-  color: #f2c96b;
-  opacity: 0;
-  font-size: 11px;
-}
-.action-row:hover:not(:disabled) .action-cursor,
-.action-row:focus-visible .action-cursor {
+.action-row:hover:not(:disabled)::before,
+.action-row:focus-visible::before {
   opacity: 1;
 }
 .action-row:disabled,
 .action-row.off {
-  color: var(--muted);
+  opacity: 1;
+  color: #7d7669;
   cursor: default;
 }
-.action-row.ghost {
-  color: var(--muted);
-  font-weight: 600;
+.action-row:disabled .action-cursor,
+.action-row.off .action-cursor {
+  color: #5f5a50;
+}
+.action-row.back {
+  color: #cfc7b5;
+  font-size: 15px;
 }
 .action-row .action-meta {
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 600;
-}
-.action-menu.page-attacks {
-  min-width: 260px;
+  color: #b9b2a3;
+  font-size: 12px;
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-weight: 700;
 }
 .action-row.attack {
-  grid-template-columns: 12px minmax(84px, 1fr) 34px 54px auto;
+  grid-template-columns: 14px minmax(110px, 1fr) 36px 60px auto;
 }
 .action-row.attack .attack-pow {
-  color: #f2c96b;
+  color: var(--gold);
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-weight: 800;
+  font-size: 13px;
   font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 .action-row.attack.off .attack-pow {
-  color: var(--muted);
+  color: #6f695d;
 }
-.action-row.attack .attack-rng {
-  color: var(--muted);
+.action-row.attack .attack-rng,
+.action-row.attack .attack-why {
+  color: #b9b2a3;
+  font-family: var(--font-sans, system-ui, sans-serif);
   font-size: 11px;
   font-weight: 600;
-}
-.action-row.attack .attack-why {
-  color: var(--muted);
-  font-size: 10px;
-  font-weight: 600;
   white-space: nowrap;
+}
+.action-row.attack.off .attack-rng,
+.action-row.attack.off .attack-why {
+  color: #6f695d;
 }
 .bb-attack {
   color: #f2c96b;
@@ -988,6 +1007,95 @@ button.danger {
   font-weight: 800;
 }
 
+
+/* ---- editor map library ---- */
+.maps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+.map-row {
+  display: grid;
+  grid-template-columns: 20px 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-size: 13px;
+}
+.map-row:hover {
+  background: var(--bg-3);
+}
+.map-row.active {
+  background: rgba(242, 201, 107, 0.12);
+  border-color: rgba(242, 201, 107, 0.5);
+}
+.map-no {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+.map-name {
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.map-meta {
+  color: var(--muted);
+  font-size: 11px;
+}
+.map-actions {
+  display: flex;
+  gap: 2px;
+}
+.map-btn {
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  width: 22px;
+  height: 22px;
+  font-size: 10px;
+  line-height: 1;
+}
+.map-btn.del:hover:not(:disabled) {
+  color: #ff9a9a;
+  border-color: #5a2a2a;
+}
+.map-rename {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.map-rename input {
+  flex: 1;
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 4px 6px;
+}
+.map-detached {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 4px 0 8px;
+}
+button.link {
+  background: none;
+  color: var(--accent);
+  text-decoration: underline;
+  padding: 0;
+}
+.muted.small {
+  font-size: 11px;
+  margin-top: 6px;
+}
 
 /* ---- phase banner ---- */
 .phase-banner {

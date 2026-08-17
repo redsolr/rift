@@ -6,6 +6,7 @@ import { DoctrineEditor, SquadList } from "./panel/Squad";
 import { Explain, OrdersEditor, PersonalityEditor, StatsEditor, UnitCard } from "./panel/UnitSections";
 import { EditorTools, SimPanel } from "./panel/EditorPanel";
 import SharePanel from "./panel/SharePanel";
+import MapsPanel from "./panel/MapsPanel";
 import BattleLog from "./panel/BattleLog";
 
 export default function Panel() {
@@ -20,6 +21,9 @@ export default function Panel() {
     <aside className="panel">
       {mode === "editor" && (
         <>
+          <Section title="Maps">
+            <MapsPanel />
+          </Section>
           <Section title="Tools">
             <EditorTools />
           </Section>
