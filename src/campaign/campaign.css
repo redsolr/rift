@@ -131,9 +131,9 @@
 .cd-bust {
   position: absolute;
   bottom: 0;
-  height: 86vh;
-  width: 42vw;
-  max-width: 640px;
+  height: 88vh;
+  width: 44vw;
+  max-width: 680px;
   pointer-events: none;
   transition:
     filter 0.25s ease,
@@ -188,8 +188,8 @@
 
 .cd-box {
   position: absolute;
-  left: 22vw;
-  right: 20vw;
+  left: 26vw;
+  right: 16vw;
   bottom: 7vh;
   min-height: 130px;
   z-index: 2;
@@ -208,7 +208,7 @@
 }
 .cd-slab {
   position: relative;
-  padding: 26px 40px 30px 44px;
+  padding: 22px 40px 26px 44px;
   color: #17161a;
   font-family: Georgia, "Times New Roman", serif;
 }
@@ -222,21 +222,26 @@
   filter: url(#cd-tear) drop-shadow(0 8px 26px rgba(0, 0, 0, 0.55));
   z-index: -1;
 }
-.cd-slab::after {
-  /* thin ink rule under the name */
+.cd-name {
+  position: relative;
+  display: inline-block;
+  margin: 0 0 -6px 18px;
+  padding: 7px 34px 9px 22px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 700;
+  font-size: 19px;
+  letter-spacing: 0.02em;
+  color: #17161a;
+  z-index: 3;
+}
+.cd-name::before {
   content: "";
   position: absolute;
-  left: 44px;
-  right: 40px;
-  top: 52px;
-  height: 1px;
-  background: rgba(23, 22, 26, 0.35);
-}
-.cd-name {
-  font-weight: 700;
-  font-size: 18px;
-  letter-spacing: 0.02em;
-  margin-bottom: 14px;
+  inset: 0;
+  background: #f4f1ea;
+  clip-path: polygon(4% 0, 100% 0, 94% 100%, 0 100%);
+  filter: url(#cd-tear) drop-shadow(0 4px 12px rgba(0, 0, 0, 0.5));
+  z-index: -1;
 }
 .cd-text {
   margin: 0;
@@ -251,9 +256,6 @@
 }
 .cd-box.narration .cd-slab::before {
   background: #e9e4d8;
-}
-.cd-box.narration .cd-slab::after {
-  display: none;
 }
 .cd-caret {
   display: inline-block;

@@ -7,8 +7,8 @@ import { currentLine, useCampaign } from "./store";
 /**
  * Atlus / Metaphor-style conversation overlay: a white slab with torn ink edges low on the screen, the speaker's
  * name on a small tab, serif typewriter text, ▼ blink when it is your turn to click, an Atlus choice list when the
- * line has choices, the SPEAKER'S bust large on the left and the listener smaller + dimmed on the right, and Skip /
- * button hints bottom-right. Click / Space / Enter: finish the typewriter, then advance.
+ * line has choices, ONE bust — the speaker's — large on the left (Metaphor never shows a second one; the right side is
+ * only the button hints), and Skip / button hints bottom-right. Click / Space / Enter: finish the typewriter, then advance.
  */
 const CPS = 46; // typewriter characters per second
 
@@ -78,21 +78,11 @@ export default function Dialogue() {
 
   if (!dialogue || !line) return null;
   const speaker = line.speaker;
-  const other: SpeakerId = speaker === "mina" ? "rook" : "mina";
   return (
     <div className="cd-root" onClick={onNext}>
       <div className="cd-vignette" />
-      {speaker ? (
-        <>
-          <Bust id={speaker} side="left" active />
-          <Bust id={other} side="right" active={false} />
-        </>
-      ) : (
-        <>
-          <Bust id="rook" side="left" active={false} />
-          <Bust id="mina" side="right" active={false} />
-        </>
-      )}
+      {/* Metaphor: ONE bust, always on the left — the speaker; narration shows none */}
+      {speaker && <Bust id={speaker} side="left" active />}
       <div className={`cd-box ${speaker ? "" : "narration"}`}>
         <svg className="cd-ink-defs" width="0" height="0" aria-hidden>
           <filter id="cd-tear" x="-5%" y="-20%" width="110%" height="140%">
@@ -100,8 +90,8 @@ export default function Dialogue() {
             <feDisplacementMap in="SourceGraphic" in2="n" scale="14" xChannelSelector="R" yChannelSelector="G" />
           </filter>
         </svg>
+        {speaker && <div className="cd-name">{SPEAKERS[speaker].name}</div>}
         <div className="cd-slab">
-          {speaker && <div className="cd-name">{SPEAKERS[speaker].name}</div>}
           <p className="cd-text">
             {line.text.slice(0, shown)}
             {done && !line.choices && <span className="cd-caret">▼</span>}
