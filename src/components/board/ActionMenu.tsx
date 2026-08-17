@@ -78,16 +78,31 @@ export default function ActionMenu() {
         {menuPage === "attacks" && (
           <>
             <div className="action-title">{verb}</div>
+            {/* column header — every row below lines up under it */}
+            <div className="action-row attack head" aria-hidden>
+              <span />
+              <span className="attack-name">{verb}</span>
+              <span className="attack-pow">{menuKind === "heal" ? "Heal" : "Dmg"}</span>
+              <span className="attack-hit">Hit</span>
+              <span className="attack-rng">Range</span>
+              <span className="attack-why" />
+            </div>
             {shown.map(({ attack, usable, targets: reach }) => {
               const [lo, hi] = attackRange(selectedDef, attack);
               const off = !usable || reach.length === 0;
-              const why = !usable ? (attack.cond === "moved" ? "needs a move first" : "must stand still") : reach.length === 0 ? "nothing in reach" : `${reach.length} in reach`;
+              const why = !usable ? (attack.cond === "moved" ? "after a move only" : "standing still only") : reach.length === 0 ? "nothing in reach" : `${reach.length} in reach`;
+              // Dmg = this unit's atk + the attack's power (before the target's defence — the battle bar shows the final number)
+              const might = Math.max(1, selectedDef.stats.atk + attack.power);
               return (
                 <button key={attack.id} className={`action-row attack ${off ? "off" : ""}`} disabled={off} onClick={() => chooseAttack(attack.id)} onPointerEnter={() => setHoverAttack(attack.id)} title={`${attack.hint} ${why}.`}>
                   <span className="action-cursor">◆</span>
                   <span className="attack-name">{attack.name}</span>
-                  <span className="attack-pow">{attack.power > 0 ? `+${attack.power}` : attack.power < 0 ? `${attack.power}` : "±0"}</span>
-                  <span className="attack-rng">rng {lo === hi ? hi : `${lo}–${hi}`}</span>
+                  <span className="attack-pow">
+                    {might}
+                    {attack.power !== 0 && <small>{attack.power > 0 ? ` (+${attack.power})` : ` (${attack.power})`}</small>}
+                  </span>
+                  <span className="attack-hit">100%</span>
+                  <span className="attack-rng">{lo === hi ? hi : `${lo}–${hi}`}</span>
                   <span className="attack-why">{why}</span>
                 </button>
               );

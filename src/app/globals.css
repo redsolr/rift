@@ -884,7 +884,7 @@ button.danger {
     radial-gradient(50% 55% at 84% 26%, rgba(4, 5, 9, 0.9) 0 30%, rgba(4, 5, 9, 0) 70%),
     radial-gradient(55% 50% at 22% 82%, rgba(4, 5, 9, 0.9) 0 30%, rgba(4, 5, 9, 0) 70%),
     radial-gradient(55% 55% at 80% 80%, rgba(4, 5, 9, 0.9) 0 30%, rgba(4, 5, 9, 0) 70%),
-    radial-gradient(62% 62% at 50% 50%, rgba(4, 5, 9, 0.96) 0 44%, rgba(4, 5, 9, 0) 76%);
+    radial-gradient(70% 70% at 50% 50%, rgba(4, 5, 9, 0.97) 0 50%, rgba(4, 5, 9, 0) 80%);
   filter: url(#tact-ink);
 }
 .action-menu {
@@ -896,12 +896,12 @@ button.danger {
   padding: 14px 18px 12px 26px;
   color: #f4efe4;
   font-family: Georgia, "Times New Roman", serif;
-  background: rgba(6, 8, 13, 0.55);
+  background: transparent;
   white-space: nowrap;
   user-select: none;
 }
 .action-menu.page-attacks {
-  min-width: 330px;
+  min-width: 400px;
 }
 .action-title {
   color: var(--gold);
@@ -990,7 +990,44 @@ button.danger {
 }
 /* fixed columns — each row is its own grid, so `auto` would drift between rows */
 .action-row.attack {
-  grid-template-columns: 14px 118px 40px 62px 112px;
+  grid-template-columns: 14px 112px 74px 44px 52px 118px;
+}
+.action-row.attack.head {
+  padding-top: 0;
+  padding-bottom: 3px;
+  border-bottom: 1px solid rgba(242, 201, 107, 0.35);
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #b9b2a3;
+  pointer-events: none;
+}
+.action-row.attack.head .attack-name,
+.action-row.attack.head .attack-pow,
+.action-row.attack.head .attack-hit,
+.action-row.attack.head .attack-rng {
+  color: #b9b2a3;
+  font-size: 10px;
+  font-weight: 700;
+}
+.action-row.attack .attack-pow small {
+  font-size: 10px;
+  font-weight: 600;
+  color: #b9b2a3;
+  margin-left: 2px;
+}
+.action-row.attack .attack-hit {
+  color: #e8e2d4;
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.action-row.attack.off .attack-hit {
+  color: #6f695d;
 }
 .action-row.attack .attack-why {
   text-align: right;
@@ -999,9 +1036,10 @@ button.danger {
   color: var(--gold);
   font-family: var(--font-sans, system-ui, sans-serif);
   font-weight: 800;
-  font-size: 13px;
+  font-size: 14px;
   font-variant-numeric: tabular-nums;
   text-align: right;
+  white-space: nowrap;
 }
 .action-row.attack.off .attack-pow {
   color: #6f695d;
@@ -1013,6 +1051,16 @@ button.danger {
   font-size: 11px;
   font-weight: 600;
   white-space: nowrap;
+}
+.action-row.attack .attack-rng {
+  text-align: right;
+  color: #e8e2d4;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.action-row.attack.off .attack-rng {
+  color: #6f695d;
 }
 .action-row.attack.off .attack-rng,
 .action-row.attack.off .attack-why {
