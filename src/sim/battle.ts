@@ -1,6 +1,7 @@
 import { scoreActions } from "./ai";
+import { AttackDef, attackById, attackRange, attacksOf, attacksReaching, attackUsable, inAnyRange, tilesInAnyRange } from "./attacks";
 import { damage, healAmount } from "./combat";
-import { inRange, pathTo, posKey, reachable, standable, tilesInRange, Reach } from "./grid";
+import { inRange, pathTo, posKey, reachable, standable, Reach } from "./grid";
 import { Rng } from "./rng";
 import {
   Action,
@@ -77,10 +78,46 @@ export class Battle {
     return standable(this.reachFor(id), this.unit(id), this.state.units);
   }
 
-  targetsFrom(id: string, at: Pos): UnitState[] {
+  /** Legal targets from `at`. With `attackId`: only that attack (movement condition applied); without: any usable attack. */
+  targetsFrom(id: string, at: Pos, attackId?: string): UnitState[] {
     const u = this.unit(id);
+    const moved = at.x !== u.x || at.y !== u.y;
     const list = u.archetype === "healer" ? this.alive(u.team).filter((a) => a.id !== id && a.hp < a.stats.hp) : this.alive(otherTeam(u.team));
-    return list.filter((t) => inRange(at, t, u.stats.rangeMin, u.stats.rangeMax));
+    if (attackId) {
+      const a = attackById(u, attackId);
+      if (!attackUsable(a, moved)) return [];
+      const [lo, hi] = attackRange(u, a);
+      return list.filter((t) => inRange(at, t, lo, hi));
+    }
+    return list.filter((t) => attacksReaching(u, at, moved, t).length > 0);
+  }
+
+  /** The unit's four attacks with, for standing on `at`, whether each is usable and which targets it reaches. */
+  attackOptions(id: string, at: Pos): { attack: AttackDef; usable: boolean; targets: string[] }[] {
+    const u = this.unit(id);
+    const moved = at.x !== u.x || at.y !== u.y;
+    return attacksOf(u).map((attack) => ({ attack, usable: attackUsable(attack, moved), targets: this.targetsFrom(id, at, attack.id).map((t) => t.id) }));
+  }
+
+  /**
+   * Best usable attack for `id` standing on `from` against `target`: highest damage
+   * (or heal), ties → table order. null when nothing usable reaches. This is what the AI
+   * and the one-click (right-click) order use.
+   */
+  bestAttack(id: string, from: Pos, targetId: string): AttackDef | null {
+    const u = this.unit(id);
+    const t = this.unit(targetId);
+    const moved = from.x !== u.x || from.y !== u.y;
+    let best: AttackDef | null = null;
+    let bestVal = -1;
+    for (const a of attacksReaching(u, from, moved, t)) {
+      const v = u.archetype === "healer" ? healAmount(u, a) : damage(this.config.map, u, t, a);
+      if (v > bestVal) {
+        best = a;
+        bestVal = v;
+      }
+    }
+    return best;
   }
 
   candidates(id: string): ScoredAction[] {
@@ -97,7 +134,7 @@ export class Battle {
     if (!u.alive) return new Set();
     const out = new Set<string>();
     for (const o of [...this.standableFor(id), { x: u.x, y: u.y }])
-      for (const p of tilesInRange(this.config.map, o, u.stats.rangeMin, u.stats.rangeMax)) out.add(posKey(p));
+      for (const p of tilesInAnyRange(this.config.map, u, o)) out.add(posKey(p));
     return out;
   }
 
@@ -121,23 +158,33 @@ export class Battle {
    * back on ITS turn if it can reach `from` from where it stands (no counterattacks
    * exist in the engine yet — this is a next-turn threat number, labelled as such).
    */
-  forecast(attackerId: string, defenderId: string, from?: Pos): Forecast {
+  forecast(attackerId: string, defenderId: string, from?: Pos, attackId?: string): Forecast {
     const a = this.unit(attackerId);
     const d = this.unit(defenderId);
     const at = from ?? { x: a.x, y: a.y };
     const map = this.config.map;
-    const inRangeNow = inRange(at, d, a.stats.rangeMin, a.stats.rangeMax);
-    const dmg = damage(map, a, d);
+    const moved = at.x !== a.x || at.y !== a.y;
+    // the attack: the one asked for, else the best usable one that reaches, else the unit's first
+    const chosen = attackId ? attackById(a, attackId) : this.bestAttack(attackerId, at, defenderId);
+    const atk = chosen ?? attacksOf(a)[0];
+    const [lo, hi] = attackRange(a, atk);
+    const inRangeNow = attackUsable(atk, moved) && inRange(at, d, lo, hi);
+    const dmg = damage(map, a, d, atk);
     const kill = dmg >= d.hp;
     const hpAfter = Math.max(0, d.hp - dmg);
     let retaliation: number | null = null;
     let retaliationKill = false;
-    if (!kill && inRange(d, at, d.stats.rangeMin, d.stats.rangeMax)) {
+    if (!kill && inAnyRange(d, d, at)) {
       const probe: UnitState = { ...a, x: at.x, y: at.y };
-      retaliation = damage(map, d, probe);
-      retaliationKill = retaliation >= a.hp;
+      // the defender answers on ITS turn from where it stands — its best stationary-legal attack
+      let best = 0;
+      for (const da of attacksReaching(d, d, false, at)) best = Math.max(best, damage(map, d, probe, da));
+      if (best > 0) {
+        retaliation = best;
+        retaliationKill = retaliation >= a.hp;
+      }
     }
-    return { attacker: a.id, defender: d.id, from: at, inRange: inRangeNow, damage: dmg, kill, hpAfter, retaliation, retaliationKill };
+    return { attacker: a.id, defender: d.id, from: at, attack: chosen ? { id: chosen.id, name: chosen.name } : null, inRange: inRangeNow, damage: dmg, kill, hpAfter, retaliation, retaliationKill };
   }
 
   // ---- mutations ----
@@ -154,32 +201,42 @@ export class Battle {
     if (this.state.units.some((o) => o.alive && o.id !== u.id && o.x === action.moveTo.x && o.y === action.moveTo.y))
       throw new Error(`${key} occupied`);
 
-    if (action.moveTo.x !== u.x || action.moveTo.y !== u.y) {
+    const moved = action.moveTo.x !== u.x || action.moveTo.y !== u.y;
+
+    // Validate the whole action BEFORE mutating anything — a rejected attack must not leave the unit displaced.
+    let resolved: { t: UnitState; atk: AttackDef } | null = null;
+    if (action.kind !== "wait") {
+      const t = this.unit(action.target);
+      if (action.kind === "attack" && (!t.alive || t.team === u.team)) throw new Error("bad target");
+      if (action.kind === "heal" && (!t.alive || t.team !== u.team)) throw new Error("bad heal target");
+      const atk = attackById(u, action.attack);
+      if (!attackUsable(atk, moved)) throw new Error(`${atk.name} needs ${atk.cond === "moved" ? "a move first" : "to stand still"}`);
+      if (!inRange(action.moveTo, t, ...attackRange(u, atk))) throw new Error("out of range");
+      resolved = { t, atk };
+    }
+
+    if (moved) {
       const path = pathTo(reach, action.moveTo);
       u.x = action.moveTo.x;
       u.y = action.moveTo.y;
       this.emit({ type: "move", unit: u.id, path });
     }
 
-    if (action.kind === "attack") {
-      const t = this.unit(action.target);
-      if (!t.alive || t.team === u.team) throw new Error("bad target");
-      if (!inRange(u, t, u.stats.rangeMin, u.stats.rangeMax)) throw new Error("out of range");
-      const dmg = damage(this.config.map, u, t);
+    if (action.kind === "attack" && resolved) {
+      const { t, atk } = resolved;
+      const dmg = damage(this.config.map, u, t, atk);
       t.hp = Math.max(0, t.hp - dmg);
       const killed = t.hp === 0;
-      this.emit({ type: "attack", attacker: u.id, target: t.id, damage: dmg, targetHp: t.hp, killed });
+      this.emit({ type: "attack", attacker: u.id, target: t.id, attack: atk.name, damage: dmg, targetHp: t.hp, killed });
       if (killed) {
         t.alive = false;
         this.emit({ type: "death", unit: t.id });
       }
-    } else if (action.kind === "heal") {
-      const t = this.unit(action.target);
-      if (!t.alive || t.team !== u.team) throw new Error("bad heal target");
-      if (!inRange(u, t, u.stats.rangeMin, u.stats.rangeMax)) throw new Error("out of range");
-      const amt = Math.min(healAmount(u), t.stats.hp - t.hp);
+    } else if (action.kind === "heal" && resolved) {
+      const { t, atk } = resolved;
+      const amt = Math.min(healAmount(u, atk), t.stats.hp - t.hp);
       t.hp += amt;
-      this.emit({ type: "heal", healer: u.id, target: t.id, amount: amt, targetHp: t.hp });
+      this.emit({ type: "heal", healer: u.id, target: t.id, attack: atk.name, amount: amt, targetHp: t.hp });
     } else {
       this.emit({ type: "wait", unit: u.id });
     }

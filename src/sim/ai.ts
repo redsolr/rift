@@ -1,5 +1,6 @@
+import { AttackDef, attacksReaching } from "./attacks";
 import { damage, defenseAt, healAmount } from "./combat";
-import { dist, inRange, reachable, standable, threatCount } from "./grid";
+import { dist, reachable, standable, threatCount } from "./grid";
 import { Rng } from "./rng";
 import {
   Action,
@@ -101,14 +102,26 @@ export function scoreActions(ctx: AiContext, unit: UnitState): ScoredAction[] {
     }
   };
 
+  /** Best usable attack from tile `t` against `target` by raw value (damage or heal); ties → table order. */
+  const pick = (t: Pos, target: UnitState, value: (a: AttackDef) => number): { attack: AttackDef; value: number } | null => {
+    const moved = t.x !== start.x || t.y !== start.y;
+    let best: { attack: AttackDef; value: number } | null = null;
+    for (const a of attacksReaching(unit, t, moved, target)) {
+      const v = value(a);
+      if (!best || v > best.value) best = { attack: a, value: v };
+    }
+    return best;
+  };
+
   for (const t of tiles) {
     // ---- attacks ----
     for (const e of enemies) {
-      if (!inRange(t, e, unit.stats.rangeMin, unit.stats.rangeMax)) continue;
-      const dmg = damage(map, unit, e);
+      const choice = pick(t, e, (a) => damage(map, unit, e, a));
+      if (!choice) continue;
+      const dmg = choice.value;
       const kill = dmg >= e.hp;
       const terms: ScoreTerm[] = [];
-      terms.push({ label: "Damage", value: Math.min(45, dmg * 3) });
+      terms.push({ label: `Damage (${choice.attack.name})`, value: Math.min(45, dmg * 3) });
       if (kill) terms.push({ label: "Kill", value: 70 + Math.round(p.aggression / 4) });
       terms.push({ label: "Aggression", value: Math.round(p.aggression / 5) });
       terms.push({ label: `Doctrine: ${doctrine.aggression.replace("_", " ")}`, value: DOCTRINE_ATTACK[doctrine.aggression] });
@@ -129,28 +142,29 @@ export function scoreActions(ctx: AiContext, unit: UnitState): ScoredAction[] {
       if (chase && o.noPursue) terms.push({ label: "Do not pursue", value: -Math.round(50 * adh) });
       if (chase && !o.noPursue) terms.push({ label: "Pursue wounded", value: Math.round(p.aggression / 4) });
       if (retreating) terms.push({ label: "Retreating", value: -Math.round(45 * adh) });
-      // counter-attack risk: melee target that can hit back
-      const counter = inRange(e, t, e.stats.rangeMin, e.stats.rangeMax);
-      if (counter && thinks) terms.push({ label: "Counter risk", value: -Math.round(damage(map, e, unit) * 1.5 * ((100 - p.courage) / 100 + 0.3)) });
+      // counter-attack risk: a target that can hit back from where it stands (its best attack)
+      const counterDmg = attacksReaching(e, e, false, t).reduce((m, a) => Math.max(m, damage(map, e, unit, a)), 0);
+      if (counterDmg > 0 && thinks) terms.push({ label: "Counter risk", value: -Math.round(counterDmg * 1.5 * ((100 - p.courage) / 100 + 0.3)) });
       positional(t, terms);
-      const action: Action = { kind: "attack", unit: unit.id, moveTo: t, target: e.id };
-      out.push({ action, label: `Attack ${e.name}${kill ? " (kill)" : ""}`, score: 0, terms });
+      const action: Action = { kind: "attack", unit: unit.id, moveTo: t, target: e.id, attack: choice.attack.id };
+      out.push({ action, label: `${choice.attack.name} → ${e.name}${kill ? " (kill)" : ""}`, score: 0, terms });
     }
     // ---- heals ----
     if (unit.archetype === "healer") {
       for (const a of allies) {
         if (a.hp >= a.stats.hp) continue;
-        if (!inRange(t, a, unit.stats.rangeMin, unit.stats.rangeMax)) continue;
         const missing = a.stats.hp - a.hp;
-        const amt = Math.min(missing, healAmount(unit));
+        const choice = pick(t, a, (x) => Math.min(missing, healAmount(unit, x)));
+        if (!choice) continue;
+        const amt = choice.value;
         const terms: ScoreTerm[] = [];
-        terms.push({ label: "Heal amount", value: Math.min(50, amt * 4) });
+        terms.push({ label: `Heal amount (${choice.attack.name})`, value: Math.min(50, amt * 4) });
         if (a.hp < a.stats.hp * 0.35) terms.push({ label: "Ally critical", value: 40 });
         terms.push({ label: "Loyalty", value: Math.round(p.loyalty / 4) });
         if (protectee && a.id === protectee.id) terms.push({ label: "Protectee", value: 25 });
         positional(t, terms);
-        const action: Action = { kind: "heal", unit: unit.id, moveTo: t, target: a.id };
-        out.push({ action, label: `Heal ${a.name}`, score: 0, terms });
+        const action: Action = { kind: "heal", unit: unit.id, moveTo: t, target: a.id, attack: choice.attack.id };
+        out.push({ action, label: `${choice.attack.name} → ${a.name}`, score: 0, terms });
       }
     }
     // ---- move / wait ----

@@ -20,6 +20,8 @@ import {
 } from "@/sim/types";
 
 export type Mode = "manual" | "manager" | "editor";
+/** FE command flow after a unit is placed: command list → attack picker → target select. */
+export type MenuPage = "command" | "attacks" | "target";
 export type Tool = { kind: "select" } | { kind: "terrain"; terrain: Terrain } | { kind: "unit"; team: Team; archetype: Archetype } | { kind: "erase" };
 
 let timer: ReturnType<typeof setTimeout> | null = null;
@@ -50,9 +52,16 @@ interface GameState {
   camTilt: number;
   camZoom: { factor: number; seq: number };
   edgeScroll: boolean;
-  // manual
+  // manual — FE flow: click tile → pendingMove + command menu → Attack → attack picker → target select → commit
   moveTiles: Pos[];
   pendingMove: Pos | null;
+  /** which page of the in-board menu is open (null = no unit placed) */
+  menuPage: MenuPage | null;
+  /** attack chosen in the picker (target-select page); null = none yet */
+  pendingAttack: string | null;
+  /** attack row under the pointer in the picker — previews its range + forecast */
+  hoverAttack: string | null;
+  /** legal targets from the pending tile: for pendingAttack when chosen, else for any usable attack */
   targets: string[];
   // manager
   phaseLen: number;
@@ -88,8 +97,13 @@ interface GameState {
   zoomCam: (factor: number) => void;
   toggleEdgeScroll: () => void;
   select: (id: string | null) => void;
+  /** step back one menu page (target → picker → command → un-place); Esc and the Cancel/Back rows call this */
   cancelPending: () => void;
+  openAttacks: () => void;
+  chooseAttack: (id: string) => void;
+  setHoverAttack: (id: string | null) => void;
   commitWait: () => void;
+  /** attack/heal `id` with the chosen attack, else the best usable one from the pending tile */
   commitTarget: (id: string) => void;
   endPhaseAI: () => void;
   // manager
@@ -176,7 +190,7 @@ export const useGame = create<GameState>((set, get) => {
     schedule();
   };
 
-  const clearManual = () => set({ moveTiles: [], pendingMove: null, targets: [] });
+  const clearManual = () => set({ moveTiles: [], pendingMove: null, menuPage: null, pendingAttack: null, hoverAttack: null, targets: [] });
 
   /** Everything that resets when a battle starts, ends or the setup changes. */
   const resetPlayback = (cfg: BattleConfig, battle: Battle | null) => ({
@@ -224,6 +238,9 @@ export const useGame = create<GameState>((set, get) => {
     edgeScroll: true,
     moveTiles: [],
     pendingMove: null,
+    menuPage: null,
+    pendingAttack: null,
+    hoverAttack: null,
     targets: [],
     phaseLen: 3,
     tool: { kind: "select" },
@@ -325,7 +342,7 @@ export const useGame = create<GameState>((set, get) => {
       if (s.mode === "manual" && b && !b.state.ended && b.state.activeTeam === s.playerTeam && s.cursor >= s.events.length) {
         const u = b.unit(id);
         if (u.team === s.playerTeam && u.alive && !u.acted) {
-          set({ selected: id, moveTiles: b.standableFor(id), pendingMove: null, targets: [] });
+          set({ selected: id, moveTiles: b.standableFor(id), pendingMove: null, menuPage: null, pendingAttack: null, hoverAttack: null, targets: [] });
           if (s.followCam) get().focusCam({ x: u.x, y: u.y }, "keep");
           return;
         }
@@ -359,13 +376,9 @@ export const useGame = create<GameState>((set, get) => {
           clearManual();
           return;
         }
+        // FE: the unit previews on the tile and the command menu opens right away (Attack only if something is in reach)
         const targets = s.battle.targetsFrom(s.selected, p).map((u) => u.id);
-        if (targets.length === 0) {
-          // nothing to do from there — just move (FE would ask "Wait", but that is pure friction)
-          commit({ kind: "wait", unit: s.selected, moveTo: p });
-          return;
-        }
-        set({ pendingMove: p, targets });
+        set({ pendingMove: p, menuPage: "command", pendingAttack: null, hoverAttack: null, targets });
         return;
       }
       set({ selected: null });
@@ -383,7 +396,7 @@ export const useGame = create<GameState>((set, get) => {
         const u = s.battle.unit(s.selected);
         const from = [{ x: u.x, y: u.y }, ...s.moveTiles].find((t) => s.battle!.targetsFrom(u.id, t).some((x) => x.id === enemy.id));
         if (!from) return;
-        set({ pendingMove: from, targets: s.battle.targetsFrom(u.id, from).map((x) => x.id) });
+        set({ pendingMove: from, menuPage: "command", pendingAttack: null, hoverAttack: null, targets: s.battle.targetsFrom(u.id, from).map((x) => x.id) });
         get().commitTarget(enemy.id);
         return;
       }
@@ -391,8 +404,29 @@ export const useGame = create<GameState>((set, get) => {
     },
     cancelPending: () => {
       const s = get();
-      if (s.selected && s.battle) set({ pendingMove: null, targets: [], moveTiles: s.battle.standableFor(s.selected) });
+      if (!s.selected || !s.battle) return;
+      if (s.menuPage === "target" && s.pendingMove) {
+        set({ menuPage: "attacks", pendingAttack: null, hoverAttack: null, targets: s.battle.targetsFrom(s.selected, s.pendingMove).map((u) => u.id) });
+        return;
+      }
+      if (s.menuPage === "attacks") {
+        set({ menuPage: "command", hoverAttack: null });
+        return;
+      }
+      set({ pendingMove: null, menuPage: null, pendingAttack: null, hoverAttack: null, targets: [], moveTiles: s.battle.standableFor(s.selected) });
     },
+    openAttacks: () => {
+      const s = get();
+      if (s.pendingMove && s.menuPage === "command") set({ menuPage: "attacks", hoverAttack: null });
+    },
+    chooseAttack: (id) => {
+      const s = get();
+      if (!s.battle || !s.selected || !s.pendingMove) return;
+      const targets = s.battle.targetsFrom(s.selected, s.pendingMove, id).map((u) => u.id);
+      if (!targets.length) return;
+      set({ menuPage: "target", pendingAttack: id, hoverAttack: null, targets });
+    },
+    setHoverAttack: (hoverAttack) => set({ hoverAttack }),
 
     commitWait: () => {
       const s = get();
@@ -406,7 +440,9 @@ export const useGame = create<GameState>((set, get) => {
       if (!s.battle || !s.selected || !s.pendingMove) return;
       const u = s.battle.unit(s.selected);
       const kind = u.archetype === "healer" && s.battle.unit(id).team === u.team ? "heal" : "attack";
-      commit({ kind, unit: u.id, moveTo: s.pendingMove, target: id });
+      const attack = s.pendingAttack ?? s.battle.bestAttack(u.id, s.pendingMove, id)?.id;
+      if (!attack) return;
+      commit({ kind, unit: u.id, moveTo: s.pendingMove, target: id, attack });
     },
 
     endPhaseAI: () => {

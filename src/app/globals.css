@@ -901,6 +901,92 @@ button.danger {
   color: var(--fg);
   font-weight: 600;
 }
+/* FE list rows: cursor glyph appears on hover/focus, gold band on the active row */
+.action-title {
+  color: #f2c96b;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 2px 6px 4px;
+  border-bottom: 1px solid rgba(242, 201, 107, 0.3);
+  margin-bottom: 2px;
+}
+.action-row {
+  display: grid;
+  grid-template-columns: 12px 1fr auto;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  color: var(--fg);
+  font-weight: 700;
+  font-size: 13px;
+  border-radius: 4px;
+  padding: 5px 8px 5px 4px;
+  text-align: left;
+  border: 1px solid transparent;
+}
+.action-row:hover:not(:disabled),
+.action-row:focus-visible {
+  background: linear-gradient(90deg, rgba(242, 201, 107, 0.28), rgba(242, 201, 107, 0.06));
+  border-color: rgba(242, 201, 107, 0.55);
+  color: #fff;
+}
+.action-row .action-cursor {
+  color: #f2c96b;
+  opacity: 0;
+  font-size: 11px;
+}
+.action-row:hover:not(:disabled) .action-cursor,
+.action-row:focus-visible .action-cursor {
+  opacity: 1;
+}
+.action-row:disabled,
+.action-row.off {
+  color: var(--muted);
+  cursor: default;
+}
+.action-row.ghost {
+  color: var(--muted);
+  font-weight: 600;
+}
+.action-row .action-meta {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+.action-menu.page-attacks {
+  min-width: 260px;
+}
+.action-row.attack {
+  grid-template-columns: 12px minmax(84px, 1fr) 34px 54px auto;
+}
+.action-row.attack .attack-pow {
+  color: #f2c96b;
+  font-variant-numeric: tabular-nums;
+}
+.action-row.attack.off .attack-pow {
+  color: var(--muted);
+}
+.action-row.attack .attack-rng {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+.action-row.attack .attack-why {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.bb-attack {
+  color: #f2c96b;
+}
+.bb-art {
+  margin-left: 6px;
+  color: #f2c96b;
+  font-weight: 800;
+}
 
 
 /* ---- phase banner ---- */

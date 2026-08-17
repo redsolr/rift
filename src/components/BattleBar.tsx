@@ -4,6 +4,7 @@ import { selectCaughtUp, useGame } from "@/store/game";
 import { TERRAIN, TerrainDef, UnitDef } from "@/sim/types";
 import { ARCHETYPE_LABEL } from "@/sim/presets";
 import { WEAPON, overall } from "./cards";
+import { attackById, attackRange } from "@/sim/attacks";
 import CardThumb from "./CardThumb";
 
 /**
@@ -19,6 +20,8 @@ export default function BattleBar() {
   const hoverUnit = useGame((s) => s.hoverUnit);
   const pendingMove = useGame((s) => s.pendingMove);
   const targets = useGame((s) => s.targets);
+  const pendingAttack = useGame((s) => s.pendingAttack);
+  const hoverAttack = useGame((s) => s.hoverAttack);
   const caughtUp = useGame(selectCaughtUp);
   const view = useGame((s) => s.view);
   const units = useGame((s) => s.config.units);
@@ -37,8 +40,8 @@ export default function BattleBar() {
     if (!battle || !caughtUp || !left || !right) return null;
     if (!view.units[left.id]?.alive || !view.units[right.id]?.alive) return null;
     if (left.archetype === "healer" || left.team === right.team) return null;
-    return battle.forecast(left.id, right.id, pendingMove ?? undefined);
-  }, [battle, caughtUp, left, right, pendingMove, view.units]);
+    return battle.forecast(left.id, right.id, pendingMove ?? undefined, pendingAttack ?? hoverAttack ?? undefined);
+  }, [battle, caughtUp, left, right, pendingMove, pendingAttack, hoverAttack, view.units]);
 
   const terrainOf = (x: number, y: number): TerrainDef | null => (x >= 0 && y >= 0 && x < map.width && y < map.height ? TERRAIN[map.tiles[y * map.width + x]] : null);
   const leftPos = left ? (pendingMove ?? { x: view.units[left.id]?.x ?? left.x, y: view.units[left.id]?.y ?? left.y }) : null;
@@ -55,11 +58,14 @@ export default function BattleBar() {
 
   return (
     <div className={`battle-bar ${duel ? "duel" : "solo"}`} aria-label="Battle forecast">
-      {lv && <Side u={left} hp={lv.hp} terrain={leftTerr} side="left" />}
+      {lv && <Side u={left} hp={lv.hp} terrain={leftTerr} side="left" attack={fc?.attack ?? null} />}
 
       {duel && (
         <div className="bb-center">
-          <div className="bb-prompt">{fc!.inRange ? (coarse ? "Tap target ▸ Attack" : "Right-click ▸ Attack") : "Out of range from here"}</div>
+          <div className="bb-prompt">
+            {fc!.attack && <span className="bb-attack">{fc!.attack.name} · </span>}
+            {fc!.inRange ? (coarse ? "Tap target ▸ Attack" : "Right-click ▸ Attack") : fc!.attack ? "Out of range from here" : "Nothing reaches from here"}
+          </div>
           <div className="bb-grid">
             <span className="bb-h">Crit</span>
             <span className="bb-h">Hit</span>
@@ -98,7 +104,9 @@ export default function BattleBar() {
   );
 }
 
-function Side({ u, hp, terrain, side }: { u: UnitDef; hp: number; terrain: TerrainDef | null; side: "left" | "right" }) {
+function Side({ u, hp, terrain, side, attack = null }: { u: UnitDef; hp: number; terrain: TerrainDef | null; side: "left" | "right"; attack?: { id: string; name: string } | null }) {
+  // the range shown follows the attack being forecast; without one it is the weapon's own
+  const [lo, hi] = attack ? attackRange(u, attackById(u, attack.id)) : [u.stats.rangeMin, u.stats.rangeMax];
   return (
     <div className={`bb-side ${side} ${u.team}`}>
       <CardThumb u={u} className="bb-portrait" scale={0.75} />
@@ -115,7 +123,8 @@ function Side({ u, hp, terrain, side }: { u: UnitDef; hp: number; terrain: Terra
         </div>
         <div className="bb-weapon">
           <span className="bb-wicon">⚔</span> {WEAPON[u.archetype]}
-          <span className="bb-rng">rng {u.stats.rangeMin === u.stats.rangeMax ? u.stats.rangeMax : `${u.stats.rangeMin}–${u.stats.rangeMax}`}</span>
+          {attack && <span className="bb-art">{attack.name}</span>}
+          <span className="bb-rng">rng {lo === hi ? hi : `${lo}–${hi}`}</span>
         </div>
         <div className="bb-hpbar">
           <div style={{ width: `${(100 * hp) / u.stats.hp}%` }} />

@@ -111,9 +111,10 @@ export interface Pos {
 
 // ---- Actions ----
 
+/** `attack` = id from `sim/attacks.ts` (one of the unit's four); attacks and heals always name one. */
 export type Action =
-  | { kind: "attack"; unit: string; moveTo: Pos; target: string }
-  | { kind: "heal"; unit: string; moveTo: Pos; target: string }
+  | { kind: "attack"; unit: string; moveTo: Pos; target: string; attack: string }
+  | { kind: "heal"; unit: string; moveTo: Pos; target: string; attack: string }
   | { kind: "wait"; unit: string; moveTo: Pos };
 
 export interface ScoreTerm {
@@ -132,6 +133,8 @@ export interface Forecast {
   attacker: string;
   defender: string;
   from: Pos;
+  /** the attack this forecast is for (id + display name); null when nothing usable reaches from `from` */
+  attack: { id: string; name: string } | null;
   inRange: boolean;
   damage: number;
   kill: boolean;
@@ -151,11 +154,13 @@ export type BattleEvent =
       type: "attack";
       attacker: string;
       target: string;
+      /** display name of the attack used */
+      attack: string;
       damage: number;
       targetHp: number;
       killed: boolean;
     }
-  | { type: "heal"; healer: string; target: string; amount: number; targetHp: number }
+  | { type: "heal"; healer: string; target: string; attack: string; amount: number; targetHp: number }
   | { type: "wait"; unit: string }
   | { type: "death"; unit: string }
   | { type: "end"; winner: Team | "draw"; turn: number };

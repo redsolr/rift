@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Battle, runMany } from "../battle";
+import { ARCHETYPES } from "../types";
+import { ATTACKS, attackById, attackUsable, attacksOf } from "../attacks";
 import { damage } from "../combat";
 import { pathTo, reachable, standable } from "../grid";
 import { decodeConfig, defaultConfig, encodeConfig, makeUnit } from "../presets";
@@ -179,10 +181,11 @@ describe("threat + forecast", () => {
     const t = b.threatTiles(archer.id);
     expect(t.has("0,0")).toBe(true);
     expect(t.has("6,0")).toBe(true);
-    // knight mov 3 range 1 → tiles 0..4 (blocked beyond by nothing) → hits up to 4
+    // knight mov 3 → tiles 0..3; Thrust range 1 hits 4, Long Thrust range 2 hits 5, nothing hits 6
     const k = b.threatTiles(knight.id);
     expect(k.has("4,0")).toBe(true);
-    expect(k.has("5,0")).toBe(false);
+    expect(k.has("5,0")).toBe(true);
+    expect(k.has("6,0")).toBe(false);
     expect(b.threatsTo(knight.id).map((u) => u.id)).toEqual([archer.id]);
     expect(b.threatsTo(archer.id, { x: 6, y: 0 })).toEqual([]);
   });
@@ -192,17 +195,85 @@ describe("threat + forecast", () => {
     const b = new Battle(cfg, 1);
     const knight = b.state.units.find((u) => u.archetype === "knight" && u.team === "red")!;
     const archer = b.state.units.find((u) => u.archetype === "archer" && u.team === "blue")!;
-    // adjacent → archer (range 2-3) cannot retaliate
-    const f1 = b.forecast(knight.id, archer.id, { x: archer.x, y: archer.y - 1 });
+    // adjacent, explicit Thrust (±0): 8 − 2. The archer answers with Quick Shot (−2, range 1–3): 8 − 2 − 6 → floor 1
+    const f1 = b.forecast(knight.id, archer.id, { x: archer.x, y: archer.y - 1 }, "thrust");
+    expect(f1.attack?.id).toBe("thrust");
     expect(f1.inRange).toBe(true);
     expect(f1.damage).toBe(8 - 2);
     expect(f1.hpAfter).toBe(archer.hp - 6);
-    expect(f1.retaliation).toBeNull();
-    // archer attacking knight from range 2 → knight (range 1) cannot retaliate; from range 1 it can
-    const f2 = b.forecast(archer.id, knight.id, { x: knight.x, y: knight.y + 2 });
+    expect(f1.retaliation).toBe(1);
+    // no attack named → the best usable one: the knight moved, so Charge (+2) beats Thrust
+    const f1b = b.forecast(knight.id, archer.id, { x: archer.x, y: archer.y - 1 });
+    expect(f1b.attack?.id).toBe("charge");
+    expect(f1b.damage).toBe(8 + 2 - 2);
+    // archer at range 3 → the knight (Thrust 1 / Long Thrust 2) cannot answer; at range 2 Long Thrust answers (8 − 2 − 2)
+    const f2 = b.forecast(archer.id, knight.id, { x: knight.x, y: knight.y + 3 });
     expect(f2.retaliation).toBeNull();
-    const f3 = b.forecast(archer.id, knight.id, { x: knight.x, y: knight.y + 1 });
-    expect(f3.inRange).toBe(false); // archer min range 2
-    expect(f3.retaliation).toBe(8 - 2);
+    const f3 = b.forecast(archer.id, knight.id, { x: knight.x, y: knight.y + 2 }, "aimed_shot");
+    expect(f3.inRange).toBe(true);
+    expect(f3.retaliation).toBe(8 - 2 - 2);
+    // Snipe (stationary) from a moved-to tile is not usable → out of range from here
+    const f4 = b.forecast(archer.id, knight.id, { x: knight.x, y: knight.y + 2 }, "snipe");
+    expect(f4.inRange).toBe(false);
+  });
+});
+
+describe("attacks (four per unit)", () => {
+  it("every archetype has exactly four attacks with unique ids and a ±0 baseline first", () => {
+    for (const a of ARCHETYPES) {
+      const list = ATTACKS[a];
+      expect(list).toHaveLength(4);
+      expect(new Set(list.map((x) => x.id)).size).toBe(4);
+      expect(list[0].power).toBe(0);
+      expect(list[0].range).toBeNull();
+    }
+  });
+
+  it("movement conditions gate the picker and the engine: stationary attacks only without a move, momentum attacks only after one", () => {
+    const cfg: BattleConfig = {
+      map: { width: 6, height: 1, tiles: Array(6).fill("ground") },
+      units: [makeUnit("blue", "fighter", 0, 0), makeUnit("red", "knight", 2, 0)],
+      doctrine: { red: { aggression: "balanced", objective: "advance" }, blue: { aggression: "balanced", objective: "advance" } },
+      maxTurns: 10,
+      firstTeam: "blue",
+    };
+    const b = new Battle(cfg, 1);
+    const [fighter, knight] = b.state.units;
+    // standing still at 0: knight at 2 is out of Slash range but Wide Swing (1–2) reaches; Cleave usable, Rush not
+    const stay = b.attackOptions(fighter.id, { x: 0, y: 0 });
+    expect(stay.find((o) => o.attack.id === "cleave")!.usable).toBe(true);
+    expect(stay.find((o) => o.attack.id === "rush")!.usable).toBe(false);
+    expect(stay.find((o) => o.attack.id === "wide_swing")!.targets).toEqual([knight.id]);
+    expect(stay.find((o) => o.attack.id === "slash")!.targets).toEqual([]);
+    // after moving to 1: Rush usable, Cleave not; targetsFrom with an attack id applies the condition
+    const moved = b.attackOptions(fighter.id, { x: 1, y: 0 });
+    expect(moved.find((o) => o.attack.id === "rush")!.usable).toBe(true);
+    expect(moved.find((o) => o.attack.id === "cleave")!.usable).toBe(false);
+    expect(b.targetsFrom(fighter.id, { x: 1, y: 0 }, "cleave")).toEqual([]);
+    expect(b.targetsFrom(fighter.id, { x: 1, y: 0 }, "rush").map((u) => u.id)).toEqual([knight.id]);
+    // best usable after moving = Rush (+2 beats Slash ±0 and Wide Swing −2)
+    expect(b.bestAttack(fighter.id, { x: 1, y: 0 }, knight.id)?.id).toBe("rush");
+    // the engine refuses an illegal condition and applies the power of a legal one
+    expect(() => b.act({ kind: "attack", unit: fighter.id, moveTo: { x: 1, y: 0 }, target: knight.id, attack: "cleave" })).toThrow(/stand still/);
+    b.act({ kind: "attack", unit: fighter.id, moveTo: { x: 1, y: 0 }, target: knight.id, attack: "rush" });
+    const hit = b.log.find((e) => e.type === "attack");
+    expect(hit && hit.type === "attack" && hit.attack).toBe("Rush");
+    expect(hit && hit.type === "attack" && hit.damage).toBe(10 + 2 - 6);
+    expect(attackUsable(attackById(fighter, "slash"), true)).toBe(true);
+    expect(attacksOf(fighter).map((a) => a.id)).toContain("slash");
+  });
+
+  it("the AI names the attack it chose and its action carries a legal attack id", () => {
+    const b = new Battle(defaultConfig(), 3);
+    b.runToEnd();
+    const decisions = b.log.filter((e) => e.type === "decision");
+    const attacks = decisions.flatMap((d) => (d.type === "decision" ? d.candidates.filter((c) => c.action.kind !== "wait") : []));
+    expect(attacks.length).toBeGreaterThan(0);
+    for (const c of attacks) {
+      const u = b.unit(c.action.unit);
+      const a = c.action.kind === "wait" ? null : attackById(u, c.action.attack);
+      expect(a).not.toBeNull();
+      expect(c.label.startsWith(a!.name)).toBe(true);
+    }
   });
 });

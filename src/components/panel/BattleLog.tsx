@@ -22,10 +22,10 @@ export default function BattleLog() {
           out.push({ key: i, cls: team(e.unit), unit: e.unit, text: `${name(e.unit)} moves to ${e.path[e.path.length - 1].x},${e.path[e.path.length - 1].y}` });
           break;
         case "attack":
-          out.push({ key: i, cls: `hit ${team(e.attacker)}`, unit: e.attacker, text: `${name(e.attacker)} hits ${name(e.target)} for ${e.damage}${e.killed ? " — KILLED" : ` (${e.targetHp} left)`}` });
+          out.push({ key: i, cls: `hit ${team(e.attacker)}`, unit: e.attacker, text: `${name(e.attacker)} · ${e.attack} → ${name(e.target)} for ${e.damage}${e.killed ? " — KILLED" : ` (${e.targetHp} left)`}` });
           break;
         case "heal":
-          out.push({ key: i, cls: `heal ${team(e.healer)}`, unit: e.healer, text: `${name(e.healer)} heals ${name(e.target)} +${e.amount}` });
+          out.push({ key: i, cls: `heal ${team(e.healer)}`, unit: e.healer, text: `${name(e.healer)} · ${e.attack} → ${name(e.target)} +${e.amount}` });
           break;
         case "wait":
           out.push({ key: i, cls: `dim ${team(e.unit)}`, unit: e.unit, text: `${name(e.unit)} waits` });

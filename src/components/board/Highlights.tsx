@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { Line } from "@react-three/drei";
 import { selectCaughtUp, useGame } from "@/store/game";
 import { parseKey, pathTo, tileHeight, tilesInRange } from "@/sim/grid";
+import { attackById, attackRange, tilesInAnyRange } from "@/sim/attacks";
 import { Pos, otherTeam } from "@/sim/types";
 
 /** Hollow square frame (outer 0.98, inner 0.86) — the FE tile edge. Built once. */
@@ -47,6 +48,8 @@ export default function Highlights() {
   const moveTiles = useGame((s) => s.moveTiles);
   const pendingMove = useGame((s) => s.pendingMove);
   const targets = useGame((s) => s.targets);
+  const pendingAttack = useGame((s) => s.pendingAttack);
+  const hoverAttack = useGame((s) => s.hoverAttack);
   const hover = useGame((s) => s.hover);
   const selected = useGame((s) => s.selected);
   const view = useGame((s) => s.view);
@@ -101,11 +104,13 @@ export default function Highlights() {
   const previewFrom = pendingMove ?? hoverPreview;
   // FE Three Hopes: the attack range from where the unit STANDS (or will stand) is drawn over the move field
   const attackOrigin = useMemo(() => previewFrom ?? (sel && sel.alive && mine ? { x: sel.x, y: sel.y } : null), [previewFrom, sel, mine]);
-  // attack range from the pending / hovered tile
-  const pendingRange = useMemo(
-    () => (attackOrigin && selDef ? tilesInRange(config.map, attackOrigin, selDef.stats.rangeMin, selDef.stats.rangeMax) : []),
-    [attackOrigin, selDef, config.map],
-  );
+  // attack range from the pending / hovered tile: the chosen (or hovered) attack's range, else the union of all four
+  const focusAttack = pendingAttack ?? hoverAttack;
+  const pendingRange = useMemo(() => {
+    if (!attackOrigin || !selDef) return [];
+    if (focusAttack) return tilesInRange(config.map, attackOrigin, ...attackRange(selDef, attackById(selDef, focusAttack)));
+    return tilesInAnyRange(config.map, { ...selDef, hp: 0, alive: true, acted: false }, attackOrigin);
+  }, [attackOrigin, selDef, focusAttack, config.map]);
   // movement path to the previewed tile
   const path = useMemo(() => {
     if (!previewFrom || !selected || !battle || !caughtUp) return null;
