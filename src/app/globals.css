@@ -1256,3 +1256,137 @@ button.danger {
     grid-template-columns: 1fr 44px;
   }
 }
+
+/* ---- phase banner ---- */
+.phase-banner {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  overflow: hidden;
+  --pb: #5aa0ff;
+  --pb-glow: rgba(90, 160, 255, 0.55);
+}
+.phase-banner.enemy,
+.phase-banner.defeat {
+  --pb: #ff5a4a;
+  --pb-glow: rgba(255, 90, 74, 0.55);
+}
+.phase-banner.victory {
+  --pb: #ffd54f;
+  --pb-glow: rgba(255, 213, 79, 0.55);
+}
+.phase-banner.draw {
+  --pb: #cfd4e0;
+  --pb-glow: rgba(207, 212, 224, 0.4);
+}
+.pb-flash {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, var(--pb-glow), transparent 60%);
+  animation: pb-flash 1.25s ease-out forwards;
+}
+.pb-circle {
+  position: relative;
+  width: min(72vh, 72vw);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  animation: pb-in 1.25s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+.pb-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: var(--pb);
+  filter: drop-shadow(0 0 8px var(--pb-glow));
+  animation: pb-spin 6s linear infinite;
+}
+.pb-r1 {
+  stroke-width: 1.5;
+  stroke-dasharray: 3 4;
+}
+.pb-r2 {
+  stroke-width: 3;
+  opacity: 0.8;
+}
+.pb-r3 {
+  stroke-width: 1;
+  opacity: 0.7;
+}
+.pb-star line {
+  stroke-width: 1.2;
+  opacity: 0.85;
+}
+.pb-runes text {
+  fill: var(--pb);
+  font-size: 9px;
+  font-weight: 700;
+  opacity: 0.9;
+}
+.pb-text {
+  position: relative;
+  font-size: clamp(28px, 6vw, 64px);
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: #fff;
+  text-shadow: 0 0 18px var(--pb), 0 0 4px var(--pb), 0 2px 2px #000;
+  animation: pb-text 1.25s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  white-space: nowrap;
+}
+@keyframes pb-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.6) rotate(-20deg);
+  }
+  20% {
+    opacity: 1;
+    transform: scale(1.02) rotate(0deg);
+  }
+  80% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.08);
+  }
+}
+@keyframes pb-text {
+  0% {
+    opacity: 0;
+    letter-spacing: 0.5em;
+    transform: translateY(8px);
+  }
+  25% {
+    opacity: 1;
+    letter-spacing: 0.12em;
+    transform: translateY(0);
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes pb-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes pb-flash {
+  0% {
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}

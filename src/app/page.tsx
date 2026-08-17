@@ -7,6 +7,7 @@ import Drawer from "@/components/Drawer";
 import Forecast from "@/components/Forecast";
 import CameraWidget from "@/components/CameraWidget";
 import UnitBadge from "@/components/UnitBadge";
+import PhaseBanner from "@/components/PhaseBanner";
 import { useGame } from "@/store/game";
 
 const Board = dynamic(() => import("@/components/Board"), { ssr: false });
@@ -65,6 +66,7 @@ export default function Home() {
           <Forecast />
           <CameraWidget />
           <UnitBadge />
+          <PhaseBanner />
           {mobile && <div className="mobile-hint">{selectedName ?? hint}</div>}
         </div>
         {mobile ? (

@@ -6,6 +6,7 @@ import * as THREE from "three";
 import { useGame } from "@/store/game";
 import Effects from "./Effects";
 import { cardKey, renderCard } from "./cards";
+import { pathTo } from "@/sim/grid";
 import { Pos, TERRAIN, Team, UnitDef, otherTeam } from "@/sim/types";
 
 const TEAM_COLOR: Record<Team, string> = { red: "#e0554a", blue: "#4a86e0" };
@@ -149,8 +150,15 @@ function Highlights() {
     }
     return out;
   }, [sel, selDef, battle, cursor, events.length, movable]);
-  // attack range from the pending tile (manual)
+  // hovering a reachable tile previews the destination (FE cursor): path + attack squares + arcs
+  const hoverPreview = useMemo(() => {
+    if (pendingMove || !hover || !movable.length || !selDef || !mine) return null;
+    return movable.some((m) => m.x === hover.x && m.y === hover.y) ? hover : null;
+  }, [pendingMove, hover, movable, selDef, mine]);
+  const previewFrom = pendingMove ?? hoverPreview;
+  // attack range from the pending / hovered tile
   const pendingRange = useMemo(() => {
+    const pendingMove = previewFrom;
     if (!pendingMove || !selDef) return [];
     const out: { x: number; y: number }[] = [];
     const { rangeMin, rangeMax } = selDef.stats;
@@ -162,7 +170,16 @@ function Highlights() {
         if (x >= 0 && y >= 0 && x < config.map.width && y < config.map.height) out.push({ x, y });
       }
     return out;
-  }, [pendingMove, selDef, config.map.width, config.map.height]);
+  }, [previewFrom, selDef, config.map.width, config.map.height]);
+  // movement path to the previewed tile
+  const path = useMemo(() => {
+    if (!previewFrom || !selected || !battle || cursor < events.length) return null;
+    const u = battle.state.units.find((x) => x.id === selected);
+    if (!u || !u.alive || (u.x === previewFrom.x && u.y === previewFrom.y)) return null;
+    const reach = battle.reachFor(selected);
+    if (!reach.cost.has(`${previewFrom.x},${previewFrom.y}`)) return null;
+    return pathTo(reach, previewFrom);
+  }, [previewFrom, selected, battle, cursor, events.length]);
   const unitAt = (x: number, y: number) => config.units.find((u) => view.units[u.id]?.alive !== false && view.units[u.id]?.x === x && view.units[u.id]?.y === y);
   return (
     <group>
@@ -182,7 +199,8 @@ function Highlights() {
         const u = view.units[id];
         return u ? <Highlight key={`t${id}`} x={u.x} y={u.y} color="#ff4040" opacity={0.6} /> : null;
       })}
-      {pendingMove && <Highlight x={pendingMove.x} y={pendingMove.y} color="#ffd54f" opacity={0.7} />}
+      {previewFrom && <Highlight x={previewFrom.x} y={previewFrom.y} color="#ffd54f" opacity={0.7} />}
+      {path && <PathLine path={path} />}
       {sel && sel.alive && <Highlight x={sel.x} y={sel.y} color="#ffe082" opacity={0.5} />}
       {hover && !unitAt(hover.x, hover.y) && <Highlight x={hover.x} y={hover.y} color="#ffffff" opacity={0.18} />}
     </group>
@@ -357,6 +375,26 @@ function Arc({ from, to, color, width = 3, dashed = false }: { from: Pos; to: Po
   );
 }
 
+/** Yellow movement path drawn on the ground (FE cursor arrow). */
+function PathLine({ path }: { path: Pos[] }) {
+  const map = useGame((s) => s.config.map);
+  const pts = useMemo(() => path.map((p) => new THREE.Vector3(p.x, (TERRAIN[map.tiles[p.y * map.width + p.x]]?.height ?? 0.1) + 0.06, p.y)), [path, map]);
+  if (pts.length < 2) return null;
+  const end = pts[pts.length - 1];
+  const prev = pts[pts.length - 2];
+  const dir = end.clone().sub(prev).normalize();
+  const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+  return (
+    <group>
+      <Line points={pts} color="#ffd54f" lineWidth={5} transparent opacity={0.9} depthTest={false} />
+      <mesh position={end.clone().sub(dir.clone().multiplyScalar(0.18))} quaternion={q}>
+        <coneGeometry args={[0.16, 0.34, 4]} />
+        <meshBasicMaterial color="#ffd54f" depthTest={false} />
+      </mesh>
+    </group>
+  );
+}
+
 /** Red arcs from every enemy that can hit the selected unit where it stands (or will stand); yellow arc to the target being considered. */
 function Arcs() {
   const battle = useGame((s) => s.battle);
@@ -367,14 +405,25 @@ function Arcs() {
   const cursor = useGame((s) => s.cursor);
   const events = useGame((s) => s.events);
   const mode = useGame((s) => s.mode);
-  const showDanger = useGame((s) => s.showDanger);
+
+  const hover = useGame((s) => s.hover);
+  const moveTiles = useGame((s) => s.moveTiles);
+  const playerTeam = useGame((s) => s.playerTeam);
 
   const data = useMemo(() => {
-    if (!battle || !selected || cursor < events.length || mode === "editor") return null;
+    if (!battle || cursor < events.length || mode === "editor") return null;
+    // nothing selected: hovering one of your units shows who threatens it
+    if (!selected) {
+      const hu = hoverUnit ? battle.state.units.find((x) => x.id === hoverUnit) : null;
+      if (!hu || !hu.alive || hu.team !== playerTeam) return null;
+      const at = { x: hu.x, y: hu.y };
+      return { at, threats: battle.threatsTo(hu.id, at).map((e) => ({ id: e.id, from: { x: e.x, y: e.y } })), target: null, team: hu.team };
+    }
     const u = battle.state.units.find((x) => x.id === selected);
     if (!u || !u.alive) return null;
-    const at = pendingMove ?? { x: u.x, y: u.y };
-    const threats = showDanger ? battle.threatsTo(selected, at).map((e) => ({ id: e.id, from: { x: e.x, y: e.y } })) : [];
+    const hoverTile = !pendingMove && hover && moveTiles.some((m) => m.x === hover.x && m.y === hover.y) ? hover : null;
+    const at = pendingMove ?? hoverTile ?? { x: u.x, y: u.y };
+    const threats = battle.threatsTo(selected, at).map((e) => ({ id: e.id, from: { x: e.x, y: e.y } }));
     let target: { id: string; to: Pos } | null = null;
     const hov = hoverUnit ? battle.state.units.find((x) => x.id === hoverUnit) : null;
     if (hov && hov.alive && hov.team !== u.team) target = { id: hov.id, to: { x: hov.x, y: hov.y } };
@@ -383,7 +432,7 @@ function Arcs() {
       target = { id: t.id, to: { x: t.x, y: t.y } };
     }
     return { at, threats, target, team: u.team };
-  }, [battle, selected, pendingMove, hoverUnit, targets, cursor, events.length, mode, showDanger]);
+  }, [battle, selected, pendingMove, hoverUnit, targets, cursor, events.length, mode, hover, moveTiles, playerTeam]);
 
   if (!data) return null;
   return (

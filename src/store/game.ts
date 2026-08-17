@@ -53,7 +53,7 @@ export interface View {
 }
 
 const EVENT_MS: Record<BattleEvent["type"], number> = {
-  turn_start: 250,
+  turn_start: 1300,
   decision: 0,
   move: 0, // computed from path
   attack: 420,
@@ -92,6 +92,8 @@ interface GameState {
   showDanger: boolean;
   /** Camera focus request: where to glide the camera; zoom in/out/keep; seq bumps on every request. */
   camFocus: { x: number; y: number; zoom: "in" | "out" | "keep"; seq: number };
+  /** phase banner request: which team's phase just began (or a result), seq bumps per show */
+  banner: { kind: "phase" | "victory" | "defeat" | "draw"; team: Team; seq: number };
   followCam: boolean;
   /** viewing angle from horizontal, radians (30°–70°) */
   camTilt: number;
@@ -182,10 +184,12 @@ export const useGame = create<GameState>((set, get) => {
     };
     let ms = EVENT_MS[e.type];
     let focus: { x: number; y: number; zoom: "in" | "out" | "keep" } | null = null;
+    let banner: GameState["banner"] | null = null;
     switch (e.type) {
       case "turn_start":
         v.turn = e.turn;
         v.activeTeam = e.team;
+        banner = { kind: "phase", team: e.team, seq: s.banner.seq + 1 };
         break;
       case "decision":
         v.lastDecision[e.unit] = e.candidates;
@@ -234,6 +238,8 @@ export const useGame = create<GameState>((set, get) => {
         v.ended = true;
         v.winner = e.winner;
         focus = { x: (s.config.map.width - 1) / 2, y: (s.config.map.height - 1) / 2, zoom: "out" };
+        banner = { kind: e.winner === "draw" ? "draw" : e.winner === s.playerTeam ? "victory" : "defeat", team: e.winner === "draw" ? s.playerTeam : e.winner, seq: s.banner.seq + 1 };
+        ms = 1600;
         break;
       case "wait": {
         const w = v.units[e.unit];
@@ -242,7 +248,7 @@ export const useGame = create<GameState>((set, get) => {
       }
     }
     const camFocus = focus && s.followCam ? { ...focus, seq: s.camFocus.seq + 1 } : s.camFocus;
-    set({ view: v, cursor: s.cursor + 1, floats: floats.slice(-12), effects: effects.slice(-16), camFocus });
+    set({ view: v, cursor: s.cursor + 1, floats: floats.slice(-12), effects: effects.slice(-16), camFocus, banner: banner ?? s.banner });
     return ms;
   };
 
@@ -302,6 +308,7 @@ export const useGame = create<GameState>((set, get) => {
     hoverUnit: null,
     showDanger: false,
     camFocus: { x: 0, y: 0, zoom: "out", seq: 0 },
+    banner: { kind: "phase", team: "blue", seq: 0 },
     followCam: true,
     camTilt: typeof localStorage !== "undefined" && localStorage.getItem("tactician.camTilt") ? Number(localStorage.getItem("tactician.camTilt")) : (45 * Math.PI) / 180,
     camZoom: { factor: 1, seq: 0 },
