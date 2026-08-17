@@ -2,7 +2,7 @@
 import { CSSProperties } from "react";
 import { Archetype, UnitDef } from "@/sim/types";
 import { GLYPH } from "./cards";
-import { PORTRAIT_FOCUS, portraitUrl, usePortraitsVersion } from "./portraits";
+import { portraitFocus, portraitUrl, usePortraitsVersion } from "./portraits";
 
 /**
  * A character bust for the HTML overlays (character panel, battle bar): the keyed portrait cover-fitted into a
@@ -11,8 +11,8 @@ import { PORTRAIT_FOCUS, portraitUrl, usePortraitsVersion } from "./portraits";
  */
 export default function Portrait({ u, className = "", style }: { u: Pick<UnitDef, "archetype" | "team">; className?: string; style?: CSSProperties }) {
   usePortraitsVersion();
-  const url = portraitUrl(u.archetype);
-  const f = PORTRAIT_FOCUS[u.archetype];
+  const url = portraitUrl(u.team, u.archetype);
+  const f = portraitFocus(u.team, u.archetype);
   return (
     <div className={`portrait ${u.team} ${className}`} style={style} aria-hidden>
       <div className="portrait-glow" />

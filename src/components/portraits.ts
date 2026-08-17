@@ -1,10 +1,10 @@
 "use client";
 import { useSyncExternalStore } from "react";
-import { Archetype } from "@/sim/types";
+import { Archetype, Team } from "@/sim/types";
 
 /**
- * Character portraits — one bust per archetype (placeholder art in `public/portraits/`; the slot for real
- * character artwork). Loaded once, keyed against their white studio background (near-white, low-saturation pixels
+ * Character portraits — one bust per TEAM × archetype (`public/portraits/` = blue cast, `public/portraits/red/` =
+ * the enemy cast; placeholder art, the slot for real character artwork). Loaded once, keyed against their white studio background (near-white, low-saturation pixels
  * → transparent, soft ramp at the edge) and downscaled to ≤ 1024px, then served two ways:
  *   - `portraitCanvas(a)`   → the keyed bitmap for the card generator (`cards.ts` draws it into the card window)
  *   - `portraitUrl(a)`      → a data URL for the HTML panels (character panel top-left, battle bar)
@@ -12,25 +12,46 @@ import { Archetype } from "@/sim/types";
  * Pure presentation — nothing here feeds the sim.
  */
 
-export const PORTRAIT_SRC: Record<Archetype, string> = {
-  knight: "/portraits/knight.jpg",
-  fighter: "/portraits/fighter.png",
-  archer: "/portraits/archer.jpg",
-  mage: "/portraits/mage.webp",
-  healer: "/portraits/healer.webp",
+export const PORTRAIT_SRC: Record<Team, Record<Archetype, string>> = {
+  blue: {
+    knight: "/portraits/knight.jpg",
+    fighter: "/portraits/fighter.png",
+    archer: "/portraits/archer.jpg",
+    mage: "/portraits/mage.webp",
+    healer: "/portraits/healer.webp",
+  },
+  red: {
+    knight: "/portraits/red/knight.jpg",
+    fighter: "/portraits/red/fighter.png",
+    archer: "/portraits/red/archer.jpg",
+    mage: "/portraits/red/mage.jpg",
+    healer: "/portraits/red/healer.jpg",
+  },
 };
 
 /** where the face sits in each source, as a fraction of the (keyed) bitmap — the card and the panels crop around it */
-export const PORTRAIT_FOCUS: Record<Archetype, { x: number; y: number }> = {
-  knight: { x: 0.5, y: 0.3 },
-  fighter: { x: 0.52, y: 0.4 },
-  archer: { x: 0.55, y: 0.3 },
-  mage: { x: 0.5, y: 0.35 },
-  healer: { x: 0.5, y: 0.35 },
+export const PORTRAIT_FOCUS: Record<Team, Record<Archetype, { x: number; y: number }>> = {
+  blue: {
+    knight: { x: 0.5, y: 0.3 },
+    fighter: { x: 0.52, y: 0.4 },
+    archer: { x: 0.55, y: 0.3 },
+    mage: { x: 0.5, y: 0.35 },
+    healer: { x: 0.5, y: 0.35 },
+  },
+  red: {
+    knight: { x: 0.5, y: 0.3 },
+    fighter: { x: 0.5, y: 0.32 },
+    archer: { x: 0.5, y: 0.3 },
+    mage: { x: 0.5, y: 0.3 },
+    healer: { x: 0.5, y: 0.32 },
+  },
 };
 
-const canvases = new Map<Archetype, HTMLCanvasElement>();
-const urls = new Map<Archetype, string>();
+const TEAMS_: Team[] = ["blue", "red"];
+const ARCHES: Archetype[] = ["knight", "fighter", "archer", "mage", "healer"];
+const keyOf = (t: Team, a: Archetype) => `${t}/${a}`;
+const canvases = new Map<string, HTMLCanvasElement>();
+const urls = new Map<string, string>();
 let version = 0;
 const listeners = new Set<() => void>();
 let started = false;
@@ -114,23 +135,25 @@ function keyWhite(img: HTMLImageElement): HTMLCanvasElement {
 export function preloadPortraits() {
   if (started || typeof window === "undefined") return;
   started = true;
-  (Object.keys(PORTRAIT_SRC) as Archetype[]).forEach((a) => {
-    const img = new Image();
-    img.decoding = "async";
-    img.onload = () => {
-      const c = keyWhite(img);
-      canvases.set(a, c);
-      urls.set(a, c.toDataURL("image/png"));
-      emit();
-    };
-    img.src = PORTRAIT_SRC[a];
-  });
+  for (const t of TEAMS_)
+    for (const a of ARCHES) {
+      const img = new Image();
+      img.decoding = "async";
+      img.onload = () => {
+        const c = keyWhite(img);
+        canvases.set(keyOf(t, a), c);
+        urls.set(keyOf(t, a), c.toDataURL("image/png"));
+        emit();
+      };
+      img.src = PORTRAIT_SRC[t][a];
+    }
 }
 
-export const portraitCanvas = (a: Archetype): HTMLCanvasElement | null => canvases.get(a) ?? null;
-export const portraitUrl = (a: Archetype): string | null => urls.get(a) ?? null;
+export const portraitCanvas = (t: Team, a: Archetype): HTMLCanvasElement | null => canvases.get(keyOf(t, a)) ?? null;
+export const portraitUrl = (t: Team, a: Archetype): string | null => urls.get(keyOf(t, a)) ?? null;
+export const portraitFocus = (t: Team, a: Archetype) => PORTRAIT_FOCUS[t][a];
 /** cache-key fragment: which portraits are in — cards drawn before the art arrived must not be reused after */
-export const portraitsKey = () => (Object.keys(PORTRAIT_SRC) as Archetype[]).map((a) => (canvases.has(a) ? "1" : "0")).join("");
+export const portraitsKey = () => TEAMS_.flatMap((t) => ARCHES.map((a) => (canvases.has(keyOf(t, a)) ? "1" : "0"))).join("");
 
 const subscribe = (l: () => void) => {
   listeners.add(l);

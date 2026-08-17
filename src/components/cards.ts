@@ -1,7 +1,7 @@
 "use client";
 import { Archetype, Team, UnitDef } from "@/sim/types";
 import { ARCHETYPE_LABEL } from "@/sim/presets";
-import { PORTRAIT_FOCUS, portraitCanvas, portraitsKey } from "./portraits";
+import { portraitCanvas, portraitFocus, portraitsKey } from "./portraits";
 
 /**
  * Procedural FUT-style unit cards, drawn to a canvas. Used as a billboard texture on the
@@ -124,12 +124,12 @@ export function renderCard(u: UnitDef): HTMLCanvasElement {
     ctx.fillRect(px, py, 3 + (i % 3), 3 + ((i * 7) % 3));
   }
   ctx.globalAlpha = 1;
-  const art = portraitCanvas(u.archetype);
+  const art = portraitCanvas(u.team, u.archetype);
   if (art) {
     // character bust: cover-fit into the portrait window (right of the rating column, above the name band),
     // cropped around the face, faded out at the bottom so it melts into the frame instead of ending in a hard line
     const win = { x: 44, y: 16, w: W - 58, h: H * 0.6 - 30 };
-    const focus = PORTRAIT_FOCUS[u.archetype];
+    const focus = portraitFocus(u.team, u.archetype);
     const k = Math.max(win.w / art.width, win.h / art.height) * 1.08;
     const dw = art.width * k;
     const dh = art.height * k;
