@@ -5,7 +5,7 @@ import { SPEAKERS, SpeakerId } from "./script";
 import { currentLine, useCampaign } from "./store";
 
 /**
- * Atlus / Metaphor-style conversation overlay: a white slab with torn ink edges low on the screen, the speaker's
+ * Atlus / Metaphor-style conversation overlay: a near-black slab with white torn ink smears low on the screen, the speaker's
  * name on a small tab, serif typewriter text, ▼ blink when it is your turn to click, Persona 3 Reload choices when the
  * line has choices (slanted ink ribbons fanned on the RIGHT over the scene — the focused one big and hot pink with white
  * text, the others small, dark and dim; ↑↓ / hover moves focus, Enter / click confirms), ONE bust — the speaker's — large on the left (Metaphor never shows a second one; the right side is
@@ -102,6 +102,7 @@ export default function Dialogue() {
         </svg>
         {speaker && <div className="cd-name">{SPEAKERS[speaker].name}</div>}
         <div className="cd-slab">
+          <span className="cd-outline" aria-hidden />
           <p className="cd-text">
             {line.text.slice(0, shown)}
             {done && !line.choices && <span className="cd-caret">▼</span>}
