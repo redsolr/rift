@@ -35,8 +35,8 @@ export default function ActionMenu() {
   const nHeal = new Set(options.filter((o) => o.attack.kind === "heal").flatMap((o) => o.targets)).size;
 
   return (
-    // FE: the menu hangs to the RIGHT of the unit, vertically centred on its card, never over it
-    <Html position={[pendingMove.x + 1.15, th + CARD_H3 * 0.55, pendingMove.y]} zIndexRange={[2, 0]} style={{ pointerEvents: "auto", transform: "translate(0, -50%)" }}>
+    // FE: the menu hangs about two tiles to the RIGHT of the unit, level with its card, never over it
+    <Html position={[pendingMove.x + 2.1, th + CARD_H3 * 0.6, pendingMove.y]} zIndexRange={[2, 0]} style={{ pointerEvents: "auto", transform: "translate(0, -50%)" }}>
       <div className="action-menu-wrap">
         {/* FE ink/smoke edge: blurred blobs displaced by turbulence, behind the panel */}
         <svg width="0" height="0" style={{ position: "absolute" }} aria-hidden>

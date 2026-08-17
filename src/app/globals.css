@@ -862,20 +862,20 @@ button.danger {
 /* ---- in-board command menu (FE Three Hopes: dark smoke panel to the RIGHT of the unit) ---- */
 .action-menu-wrap {
   position: relative;
-  padding: 14px 18px;
+  padding: 18px 26px;
 }
 /* FE ink cloud: soft blobs, displaced by turbulence for the ragged edge, blurred so it FADES out — never a hard block */
 .action-smoke {
   position: absolute;
-  inset: -34px -48px;
+  inset: -44px -70px -44px -14px; /* short on the LEFT so the cloud never rolls back over the unit */
   pointer-events: none;
   z-index: -1;
   background:
-    radial-gradient(55% 50% at 18% 22%, rgba(4, 5, 9, 0.9) 0 30%, rgba(4, 5, 9, 0) 70%),
+    radial-gradient(50% 50% at 24% 22%, rgba(4, 5, 9, 0.9) 0 30%, rgba(4, 5, 9, 0) 70%),
     radial-gradient(50% 55% at 84% 26%, rgba(4, 5, 9, 0.9) 0 30%, rgba(4, 5, 9, 0) 70%),
-    radial-gradient(55% 50% at 22% 82%, rgba(4, 5, 9, 0.9) 0 30%, rgba(4, 5, 9, 0) 70%),
+    radial-gradient(50% 50% at 26% 82%, rgba(4, 5, 9, 0.9) 0 30%, rgba(4, 5, 9, 0) 70%),
     radial-gradient(55% 55% at 80% 80%, rgba(4, 5, 9, 0.9) 0 30%, rgba(4, 5, 9, 0) 70%),
-    radial-gradient(70% 70% at 50% 50%, rgba(4, 5, 9, 0.97) 0 50%, rgba(4, 5, 9, 0) 80%);
+    radial-gradient(66% 70% at 54% 50%, rgba(4, 5, 9, 0.97) 0 50%, rgba(4, 5, 9, 0) 80%);
   filter: url(#tact-ink);
 }
 .action-menu {
@@ -883,8 +883,8 @@ button.danger {
   position: relative;
   display: flex;
   flex-direction: column;
-  min-width: 190px;
-  padding: 14px 18px 12px 26px;
+  min-width: 250px;
+  padding: 16px 22px 14px 30px;
   color: #f4efe4;
   font-family: Georgia, "Times New Roman", serif;
   background: transparent;
@@ -920,11 +920,11 @@ button.danger {
   border: 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 0;
-  padding: 7px 6px 7px 2px;
+  padding: 9px 8px 9px 2px;
   margin: 0;
   color: inherit;
   font: inherit;
-  font-size: 17px;
+  font-size: 21px;
   letter-spacing: 0.02em;
   text-align: left;
   line-height: 1.1;
@@ -971,7 +971,7 @@ button.danger {
 }
 .action-row.back {
   color: #cfc7b5;
-  font-size: 15px;
+  font-size: 18px;
 }
 .action-row .action-meta {
   color: #b9b2a3;
@@ -1073,7 +1073,7 @@ button.danger {
   top: 12px;
   right: 12px;
   bottom: calc(var(--bb-h, 0px) + 12px);
-  width: 330px;
+  width: 380px;
   z-index: 5;
   display: flex;
   flex-direction: column;
@@ -1139,8 +1139,10 @@ button.danger {
   align-items: center;
   column-gap: 8px;
   width: 100%;
+  height: 46px; /* fixed — rows never reflow on hover */
+  flex: 0 0 46px;
   margin: 2px 0;
-  padding: 8px 10px 8px 12px;
+  padding: 0 10px 0 12px;
   border: 1px solid rgba(214, 200, 168, 0.25);
   border-radius: 3px;
   background: rgba(10, 12, 18, 0.55);
@@ -1227,6 +1229,9 @@ button.danger {
 }
 .sp-detail {
   flex: 0 0 auto;
+  height: 262px; /* fixed — the list above never shifts when the hovered skill changes */
+  display: flex;
+  flex-direction: column;
 }
 .sp-dhead {
   display: flex;
@@ -1252,7 +1257,8 @@ button.danger {
 .sp-hint {
   font-size: 14px;
   color: #d9d2c2;
-  min-height: 34px;
+  height: 40px;
+  overflow: hidden;
   margin-bottom: 8px;
 }
 .sp-stats {
@@ -1288,7 +1294,8 @@ button.danger {
   font-weight: 700;
 }
 .sp-status {
-  margin-top: 8px;
+  margin-top: auto;
+  height: 18px;
   text-align: center;
   font-family: var(--font-sans, system-ui, sans-serif);
   font-size: 12px;
@@ -1305,7 +1312,7 @@ button.danger {
 }
 @media (max-width: 1100px) {
   .skill-panel {
-    width: 280px;
+    width: 300px;
   }
 }
 
