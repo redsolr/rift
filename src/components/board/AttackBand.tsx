@@ -23,15 +23,27 @@ export default function AttackBand() {
   const armed = !!hoverUnit && targets.includes(hoverUnit);
   const th = tileHeight(map, pendingMove);
   return (
-    <Html position={[pendingMove.x, th + 0.02, pendingMove.y + 0.85]} zIndexRange={[3, 0]} center style={{ pointerEvents: "none" }}>
+    <Html position={[pendingMove.x, th + 0.02, pendingMove.y + 1.35]} zIndexRange={[3, 0]} center style={{ pointerEvents: "none" }}>
       <div className={`attack-band ${armed ? "armed" : ""}`}>
         <div className="ab-main">
-          <span className="ab-key">{coarse ? "TAP" : "R"}</span>
+          {coarse ? <span className="ab-key">TAP</span> : <MouseRight />}
           <span className="ab-verb">{a.kind === "heal" ? "Heal" : "Attack"}</span>
           <span className="ab-skill">{a.name}</span>
         </div>
         <div className="ab-sub">{armed ? (coarse ? "tap again to confirm" : "right-click to confirm") : `${a.kind === "heal" ? "pick a green ally" : "pick a red target"} (${targets.length}) · right-click empty = back`}</div>
       </div>
     </Html>
+  );
+}
+
+/** Right-mouse-button glyph (right half filled) — the desktop game's "A button". */
+function MouseRight() {
+  return (
+    <svg className="ab-mouse" viewBox="0 0 24 32" width="18" height="24" aria-label="right mouse button">
+      <path d="M2 12a10 10 0 0 1 20 0v9a10 10 0 0 1-20 0z" fill="none" stroke="#f4efe4" strokeWidth="2" />
+      <path d="M12 2a10 10 0 0 1 10 10v2H12z" fill="#f4efe4" />
+      <path d="M2 14h20" stroke="#f4efe4" strokeWidth="2" />
+      <path d="M12 2v12" stroke="#f4efe4" strokeWidth="2" />
+    </svg>
   );
 }
