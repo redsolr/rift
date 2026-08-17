@@ -11,17 +11,19 @@ import Units from "./board/Units";
 import Runes from "./board/Runes";
 import Arcs from "./board/Arcs";
 import ActionMenu from "./board/ActionMenu";
+import GroundHover from "./board/GroundHover";
 import AttackBand from "./board/AttackBand";
 import CameraRig from "./board/CameraRig";
 
 export default function Board() {
   const map = useGame((s) => s.config.map);
   const setPainting = useGame((s) => s.setPainting);
+  const targeting = useGame((s) => s.menuPage === "target");
   const cx = (map.width - 1) / 2;
   const cz = (map.height - 1) / 2;
   const span = Math.max(map.width, map.height);
   return (
-    <div className="board" onPointerUp={() => setPainting(false)} onPointerLeave={() => setPainting(false)} onContextMenu={(e) => e.preventDefault()}>
+    <div className={`board ${targeting ? "targeting" : ""}`} onPointerUp={() => setPainting(false)} onPointerLeave={() => setPainting(false)} onContextMenu={(e) => e.preventDefault()}>
       <Canvas
         shadows
         dpr={[1, 2]}
@@ -34,6 +36,7 @@ export default function Board() {
         <ambientLight intensity={0.6} />
         <directionalLight position={[cx - 6, 14, cz - 4]} intensity={1.4} castShadow shadow-mapSize={[1024, 1024]} />
         <group>
+          <GroundHover />
           <Tiles />
           <Scenery />
           <Highlights />

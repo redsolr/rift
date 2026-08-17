@@ -74,6 +74,9 @@ interface GameState {
   effects: Effect[];
   selected: string | null;
   hover: Pos | null;
+  /** the tile under the pointer measured against the GROUND, ignoring cards (cards are tall billboards that
+   *  cover the tile behind them) — this drives the Sims-style card cutaway */
+  groundHover: Pos | null;
   hoverUnit: string | null;
   showDanger: boolean;
   /** board dressing — see BoardView; persisted in localStorage */
@@ -131,6 +134,7 @@ interface GameState {
   rightClickTile: (p: Pos) => void;
   clickUnit: (id: string) => void;
   setHover: (p: Pos | null) => void;
+  setGroundHover: (p: Pos | null) => void;
   setHoverUnit: (id: string | null) => void;
   toggleDanger: () => void;
   toggleBoardView: () => void;
@@ -301,6 +305,7 @@ export const useGame = create<GameState>((set, get) => {
     effects: [],
     selected: null,
     hover: null,
+    groundHover: null,
     hoverUnit: null,
     showDanger: false,
     boardView: "scene", // hydrateMaps() reads the persisted choice on mount (SSR-safe)
@@ -380,6 +385,10 @@ export const useGame = create<GameState>((set, get) => {
     setSpeed: (speed) => set({ speed }),
 
     setHover: (hover) => set({ hover }),
+    setGroundHover: (p) => {
+      const g = get().groundHover;
+      if ((p?.x ?? -1) !== (g?.x ?? -1) || (p?.y ?? -1) !== (g?.y ?? -1)) set({ groundHover: p });
+    },
     setHoverUnit: (hoverUnit) => set({ hoverUnit }),
     toggleDanger: () => set({ showDanger: !get().showDanger }),
     toggleBoardView: () => {

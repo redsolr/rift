@@ -84,12 +84,9 @@ function Unit({ def }: { def: UnitDef }) {
   const vy = pending?.y ?? vu?.y ?? def.y;
   // Sims-style cutaway, tile rule: whatever tile the pointer is over, the card standing on the tile directly IN FRONT
   // of it (y + 1, one step toward the camera) fades so the pointed-at tile/unit stays readable. Nothing else fades.
-  const cutaway = useGame((s) => {
-    // a hovered unit's card swallows the tile hover, so the unit under the pointer wins over the (possibly stale) tile
-    const hv = s.hoverUnit ? s.view.units[s.hoverUnit] : null;
-    const p = hv ? { x: hv.x, y: hv.y } : s.hover;
-    return !!p && p.x === vx && p.y === vy - 1;
-  });
+  // groundHover = the pointer measured against the ground, ignoring cards — so pointing at the upper part of a card
+  // (which visually covers the tile behind it) counts as pointing at that tile, and this card steps aside.
+  const cutaway = useGame((s) => !!s.groundHover && s.groundHover.x === vx && s.groundHover.y === vy - 1);
   const actionSeq = vu?.actionSeq ?? 0;
   const hitSeq = vu?.hitSeq ?? 0;
   const th = tileHeight(map, { x: vx, y: vy });
