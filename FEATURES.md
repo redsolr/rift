@@ -21,7 +21,7 @@ What the product does **today**. Update in the same commit as any feature-visibl
 ## Modes (`src/store`, `src/components`)
 
 - ✅ **Manager (default)**: set orders/doctrine → Start → command phase → Execute 1/3/5/all turns → watch → adjust → repeat. Both sides AI.
-- ✅ **Manual**: you control red; click unit → blue reachable tiles → click tile → red attackable targets (or "Wait") → blue AI plays. "End turn (AI finishes)" delegates the rest of your phase to your own units' orders.
+- ✅ **Manual**: you control red; click unit → blue reachable tiles → click tile → the card **previews on the new tile**; if nothing is in range from there the move just commits (no "Wait" friction), otherwise an in-board **action menu** appears (attack a highlighted target / Wait / Cancel) and the forecast auto-fills for a single target. **Right-click** = Civ-style one-click order: move to a reachable tile, or attack an enemy (from the current tile, or from a reachable tile in range); right-*drag* still pans (a drag never orders). **Esc** cancels the pending move / deselects. "End turn (AI finishes)" delegates the rest of your phase to your own units' orders. Walls are 0.6 tall to limit occlusion at the 45° angle.
 - ✅ **Editor**: click-drag terrain painting, place/erase/move units for either team, edit stats/name/team/archetype, resize map, max turns, clear terrain; **Run once** (watch), **Run 10/100/1000/5000×** with win bar + deaths/survivals; live personality sliders + orders on any unit.
 - ✅ Playback: play/pause/step, 0.5–4× speed, event cursor; Rematch = next seed; Reset = back to setup.
 - ✅ "Why did it do that?" — selected unit's last decision: ranked candidates, expandable term breakdown (Explain panel).

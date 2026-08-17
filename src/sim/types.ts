@@ -15,7 +15,7 @@ export const TERRAIN: Record<Terrain, TerrainDef> = {
   forest: { label: "Forest", moveCost: 2, defense: 2, color: "#3f6b3a", height: 0.25 },
   hill: { label: "Hill", moveCost: 2, defense: 1, color: "#9a8a6a", height: 0.45 },
   water: { label: "Water", moveCost: null, defense: 0, color: "#3d6f9e", height: 0.02 },
-  wall: { label: "Wall", moveCost: null, defense: 0, color: "#4a4a52", height: 0.9 },
+  wall: { label: "Wall", moveCost: null, defense: 0, color: "#4a4a52", height: 0.6 },
   objective: { label: "Objective", moveCost: 1, defense: 1, color: "#b59a3c", height: 0.12 },
 };
 

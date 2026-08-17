@@ -123,6 +123,7 @@ interface GameState {
   setSpeed: (s: number) => void;
   // interaction
   clickTile: (p: Pos) => void;
+  rightClickTile: (p: Pos) => void;
   clickUnit: (id: string) => void;
   setHover: (p: Pos | null) => void;
   setHoverUnit: (id: string | null) => void;
@@ -443,6 +444,16 @@ export const useGame = create<GameState>((set, get) => {
           return;
         }
         const targets = s.battle.targetsFrom(s.selected, p).map((u) => u.id);
+        if (targets.length === 0) {
+          // nothing to do from there — just move (FE would ask "Wait", but that is pure friction)
+          const u = s.battle.unit(s.selected);
+          s.battle.act({ kind: "wait", unit: u.id, moveTo: p });
+          sync();
+          set({ selected: null });
+          clearManual();
+          startPlayback();
+          return;
+        }
         set({ pendingMove: p, targets });
         return;
       }
@@ -450,6 +461,23 @@ export const useGame = create<GameState>((set, get) => {
       clearManual();
     },
 
+    rightClickTile: (p) => {
+      const s = get();
+      if (s.mode !== "manual" || !s.battle || !s.selected) return;
+      // enemy on the tile? treat as attack from the pending tile / current tile
+      const enemy = s.battle.alive().find((u) => u.x === p.x && u.y === p.y && u.id !== s.selected);
+      if (enemy) {
+        if (s.pendingMove && s.targets.includes(enemy.id)) return get().commitTarget(enemy.id);
+        // find any reachable tile from which the enemy is in range, prefer the current tile
+        const u = s.battle.unit(s.selected);
+        const from = [{ x: u.x, y: u.y }, ...s.moveTiles].find((t) => s.battle!.targetsFrom(u.id, t).some((x) => x.id === enemy.id));
+        if (!from) return;
+        set({ pendingMove: from, targets: s.battle.targetsFrom(u.id, from).map((x) => x.id) });
+        get().commitTarget(enemy.id);
+        return;
+      }
+      if (s.moveTiles.some((m) => m.x === p.x && m.y === p.y)) get().clickTile(p);
+    },
     cancelPending: () => {
       const s = get();
       if (s.selected && s.battle) set({ pendingMove: null, targets: [], moveTiles: s.battle.standableFor(s.selected) });

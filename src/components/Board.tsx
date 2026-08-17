@@ -10,9 +10,26 @@ import { Pos, TERRAIN, Team, UnitDef, otherTeam } from "@/sim/types";
 
 const TEAM_COLOR: Record<Team, string> = { red: "#e0554a", blue: "#4a86e0" };
 
+/** Right-button drag vs click: OrbitControls pans on right-drag, so a context-menu after a drag is not an order. */
+const rmb = { x: 0, y: 0, moved: false };
+if (typeof window !== "undefined") {
+  window.addEventListener("pointerdown", (e) => {
+    if (e.button === 2) {
+      rmb.x = e.clientX;
+      rmb.y = e.clientY;
+      rmb.moved = false;
+    }
+  });
+  window.addEventListener("pointermove", (e) => {
+    if (e.buttons & 2 && Math.hypot(e.clientX - rmb.x, e.clientY - rmb.y) > 6) rmb.moved = true;
+  });
+}
+const dragged = () => rmb.moved;
+
 function Tiles() {
   const map = useGame((s) => s.config.map);
   const clickTile = useGame((s) => s.clickTile);
+  const rightClickTile = useGame((s) => s.rightClickTile);
   const setHover = useGame((s) => s.setHover);
   const painting = useGame((s) => s.painting);
   const setPainting = useGame((s) => s.setPainting);
@@ -37,6 +54,11 @@ function Tiles() {
             onClick={(e: ThreeEvent<MouseEvent>) => {
               e.stopPropagation();
               clickTile({ x, y });
+            }}
+            onContextMenu={(e: ThreeEvent<MouseEvent>) => {
+              e.stopPropagation();
+              e.nativeEvent.preventDefault();
+              if (!dragged()) rightClickTile({ x, y });
             }}
             onPointerDown={(e: ThreeEvent<PointerEvent>) => {
               if (mode === "editor" && tool.kind === "terrain") {
@@ -185,6 +207,7 @@ function Unit({ def }: { def: UnitDef }) {
   const vu = useGame((s) => s.view.units[def.id]);
   const map = useGame((s) => s.config.map);
   const clickUnit = useGame((s) => s.clickUnit);
+  const rightClickTile = useGame((s) => s.rightClickTile);
   const setHoverUnit = useGame((s) => s.setHoverUnit);
   const selected = useGame((s) => s.selected === def.id);
   const battle = useGame((s) => s.battle);
@@ -195,8 +218,9 @@ function Unit({ def }: { def: UnitDef }) {
   const shake = useRef(0);
   const target = useRef(new THREE.Vector3(def.x, 0, def.y));
 
-  const vx = vu?.x ?? def.x;
-  const vy = vu?.y ?? def.y;
+  const pending = useGame((s) => (s.selected === def.id ? s.pendingMove : null));
+  const vx = pending?.x ?? vu?.x ?? def.x;
+  const vy = pending?.y ?? vu?.y ?? def.y;
   const actionSeq = vu?.actionSeq ?? 0;
   const hitSeq = vu?.hitSeq ?? 0;
   const th = TERRAIN[map.tiles[vy * map.width + vx]]?.height ?? 0.1;
@@ -240,6 +264,11 @@ function Unit({ def }: { def: UnitDef }) {
           onClick={(e) => {
             e.stopPropagation();
             clickUnit(def.id);
+          }}
+          onContextMenu={(e) => {
+            e.stopPropagation();
+            e.nativeEvent.preventDefault();
+            if (!dragged()) rightClickTile({ x: vx, y: vy });
           }}
           onPointerOver={(e) => {
             e.stopPropagation();
@@ -348,6 +377,34 @@ function Arcs() {
       ))}
       {data.target && <Arc from={data.at} to={data.target.to} color="#ffd54f" width={4} />}
     </group>
+  );
+}
+
+/** FE-style action menu shown at the unit after it previews a move with targets in range. */
+function ActionMenu() {
+  const pendingMove = useGame((s) => s.pendingMove);
+  const targets = useGame((s) => s.targets);
+  const commitWait = useGame((s) => s.commitWait);
+  const cancelPending = useGame((s) => s.cancelPending);
+  const map = useGame((s) => s.config.map);
+  const selectedDef = useGame((s) => s.config.units.find((u) => u.id === s.selected) ?? null);
+  if (!pendingMove || !selectedDef) return null;
+  const th = TERRAIN[map.tiles[pendingMove.y * map.width + pendingMove.x]]?.height ?? 0.1;
+  const verb = selectedDef.archetype === "healer" ? "Heal" : "Attack";
+  return (
+    <Html position={[pendingMove.x, th + CARD_H3 * 0.6, pendingMove.y - 0.7]} zIndexRange={[2, 0]} style={{ pointerEvents: "auto", transform: "translate(-100%, -50%)" }}>
+      <div className="action-menu">
+        <div className="action-hint">
+          {verb}: click a {selectedDef.archetype === "healer" ? "green" : "red"} target ({targets.length})
+        </div>
+        <button className="action-btn" onClick={commitWait}>
+          Wait
+        </button>
+        <button className="action-btn ghost" onClick={cancelPending}>
+          Cancel
+        </button>
+      </div>
+    </Html>
   );
 }
 
@@ -519,7 +576,7 @@ export default function Board() {
   const cz = (map.height - 1) / 2;
   const span = Math.max(map.width, map.height);
   return (
-    <div className="board" onPointerUp={() => setPainting(false)} onPointerLeave={() => setPainting(false)}>
+    <div className="board" onPointerUp={() => setPainting(false)} onPointerLeave={() => setPainting(false)} onContextMenu={(e) => e.preventDefault()}>
       <Canvas
         shadows
         dpr={[1, 2]}
@@ -535,6 +592,7 @@ export default function Board() {
           <Tiles />
           <Highlights />
           <Units />
+          <ActionMenu />
           <Arcs />
           <Effects />
         </group>

@@ -40,6 +40,16 @@ export default function Home() {
     };
   }, []);
   useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      const s = useGame.getState();
+      if (s.pendingMove) s.cancelPending();
+      else s.select(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+  useEffect(() => {
     const m = location.hash.match(/#c=([A-Za-z0-9_-]+)/);
     if (m) loadShareCode(m[1]);
     // dev/e2e hook — the store is the game's public API

@@ -1092,3 +1092,37 @@ button.danger {
     width: 230px;
   }
 }
+
+/* ---- in-board action menu ---- */
+.action-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: rgba(20, 24, 33, 0.94);
+  border: 1px solid #5a4a24;
+  outline: 1px solid rgba(255, 213, 79, 0.25);
+  outline-offset: -3px;
+  border-radius: 6px;
+  padding: 6px;
+  min-width: 150px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+  white-space: nowrap;
+}
+.action-hint {
+  color: var(--muted);
+  font-size: 11px;
+  padding: 2px 4px 4px;
+}
+.action-btn {
+  background: var(--accent);
+  color: #111;
+  font-weight: 800;
+  border-radius: 4px;
+  padding: 6px 10px;
+  text-align: left;
+}
+.action-btn.ghost {
+  background: var(--bg-3);
+  color: var(--fg);
+  font-weight: 600;
+}
