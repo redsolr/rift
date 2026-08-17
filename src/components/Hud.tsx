@@ -37,9 +37,6 @@ export default function Hud() {
   const seed = useGame((s) => s.seed);
   const showDanger = useGame((s) => s.showDanger);
   const toggleDanger = useGame((s) => s.toggleDanger);
-  const followCam = useGame((s) => s.followCam);
-  const toggleFollow = useGame((s) => s.toggleFollow);
-  const overview = useGame((s) => s.overview);
 
   const caughtUp = cursor >= events.length;
   const live = !!battle && !battle.state.ended;
@@ -150,12 +147,6 @@ export default function Hud() {
           </button>
         )}
 
-        <button className="ghost" onClick={overview} title="Show the whole battlefield">
-          ⤢<span className="btn-text"> Overview</span>
-        </button>
-        <button className={`ghost follow-toggle ${followCam ? "on" : ""}`} onClick={toggleFollow} title="Camera follows whoever is acting">
-          ◎<span className="btn-text"> Follow</span>
-        </button>
         {battle && mode !== "editor" && (
           <button className={`ghost danger-toggle ${showDanger ? "on" : ""}`} onClick={toggleDanger} title="Show every tile the enemy can attack next turn + who can hit your selected unit">
             ◆<span className="btn-text"> Danger</span>

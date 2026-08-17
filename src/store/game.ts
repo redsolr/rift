@@ -93,6 +93,10 @@ interface GameState {
   /** Camera focus request: where to glide the camera; zoom in/out/keep; seq bumps on every request. */
   camFocus: { x: number; y: number; zoom: "in" | "out" | "keep"; seq: number };
   followCam: boolean;
+  /** viewing angle from horizontal, radians (30°–70°) */
+  camTilt: number;
+  camZoom: { factor: number; seq: number };
+  edgeScroll: boolean;
   // manual
   moveTiles: Pos[];
   pendingMove: Pos | null;
@@ -126,6 +130,9 @@ interface GameState {
   toggleFollow: () => void;
   focusCam: (p: Pos, zoom?: "in" | "out" | "keep") => void;
   overview: () => void;
+  setCamTilt: (rad: number) => void;
+  zoomCam: (factor: number) => void;
+  toggleEdgeScroll: () => void;
   select: (id: string | null) => void;
   cancelPending: () => void;
   commitWait: () => void;
@@ -295,6 +302,9 @@ export const useGame = create<GameState>((set, get) => {
     showDanger: true,
     camFocus: { x: 0, y: 0, zoom: "out", seq: 0 },
     followCam: true,
+    camTilt: typeof localStorage !== "undefined" && localStorage.getItem("tactician.camTilt") ? Number(localStorage.getItem("tactician.camTilt")) : (45 * Math.PI) / 180,
+    camZoom: { factor: 1, seq: 0 },
+    edgeScroll: true,
     moveTiles: [],
     pendingMove: null,
     targets: [],
@@ -363,6 +373,17 @@ export const useGame = create<GameState>((set, get) => {
     toggleDanger: () => set({ showDanger: !get().showDanger }),
     toggleFollow: () => set({ followCam: !get().followCam }),
     focusCam: (p, zoom = "keep") => set({ camFocus: { x: p.x, y: p.y, zoom, seq: get().camFocus.seq + 1 } }),
+    setCamTilt: (rad) => {
+      const t = Math.max((30 * Math.PI) / 180, Math.min((70 * Math.PI) / 180, rad));
+      set({ camTilt: t });
+      try {
+        localStorage.setItem("tactician.camTilt", String(t));
+      } catch {
+        /* private mode */
+      }
+    },
+    zoomCam: (factor) => set({ camZoom: { factor, seq: get().camZoom.seq + 1 } }),
+    toggleEdgeScroll: () => set({ edgeScroll: !get().edgeScroll }),
     overview: () => {
       const m = get().config.map;
       set({ camFocus: { x: (m.width - 1) / 2, y: (m.height - 1) / 2, zoom: "out", seq: get().camFocus.seq + 1 } });

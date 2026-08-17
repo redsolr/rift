@@ -1004,3 +1004,91 @@ button.danger {
     font-size: 11px;
   }
 }
+
+/* ---- camera widget ---- */
+.cam-widget {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+.cam-row {
+  display: flex;
+  gap: 4px;
+  background: rgba(20, 24, 33, 0.85);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 4px;
+  backdrop-filter: blur(4px);
+}
+.cam-btn {
+  width: 32px;
+  height: 30px;
+  border-radius: 6px;
+  background: var(--bg-3);
+  color: var(--fg);
+  font-size: 15px;
+  line-height: 1;
+}
+.cam-btn:hover {
+  background: #262d40;
+}
+.cam-btn.on {
+  outline: 1px solid var(--accent);
+  color: var(--accent);
+}
+.cam-settings {
+  background: rgba(20, 24, 33, 0.94);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cam-slider {
+  display: grid;
+  grid-template-columns: 48px 1fr 40px;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.cam-slider input[type="range"] {
+  accent-color: var(--accent);
+  width: 100%;
+}
+.cam-val {
+  text-align: right;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+.cam-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.cam-hint {
+  color: var(--muted);
+  font-size: 11px;
+  margin: 0;
+}
+@media (pointer: coarse) and (max-height: 900px) and (max-width: 1100px) {
+  .cam-widget {
+    right: 8px;
+    bottom: 8px;
+  }
+  .cam-btn {
+    width: 36px;
+    height: 34px;
+  }
+  .cam-settings {
+    width: 230px;
+  }
+}

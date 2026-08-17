@@ -5,6 +5,7 @@ import Hud from "@/components/Hud";
 import Panel from "@/components/Panel";
 import Drawer from "@/components/Drawer";
 import Forecast from "@/components/Forecast";
+import CameraWidget from "@/components/CameraWidget";
 import { useGame } from "@/store/game";
 
 const Board = dynamic(() => import("@/components/Board"), { ssr: false });
@@ -51,6 +52,7 @@ export default function Home() {
         <div className="board-wrap">
           <Board />
           <Forecast />
+          <CameraWidget />
           {mobile && <div className="mobile-hint">{selectedName ?? hint}</div>}
         </div>
         {mobile ? (
