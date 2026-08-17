@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import Hud from "@/components/Hud";
 import Panel from "@/components/Panel";
 import Drawer from "@/components/Drawer";
-import Forecast from "@/components/Forecast";
+import BattleBar from "@/components/BattleBar";
+import Minimap from "@/components/Minimap";
 import CameraWidget from "@/components/CameraWidget";
-import UnitBadge from "@/components/UnitBadge";
 import PhaseBanner from "@/components/PhaseBanner";
 import { useGame } from "@/store/game";
 
@@ -63,9 +63,11 @@ export default function Home() {
       <div className={mobile ? "stage mobile" : "stage"}>
         <div className="board-wrap">
           <Board />
-          <Forecast />
-          <CameraWidget />
-          <UnitBadge />
+          <div className="hud-tr">
+            <Minimap />
+            <CameraWidget />
+          </div>
+          <BattleBar />
           <PhaseBanner />
           {mobile && <div className="mobile-hint">{selectedName ?? hint}</div>}
         </div>

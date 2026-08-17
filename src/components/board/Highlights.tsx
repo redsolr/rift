@@ -1,5 +1,6 @@
 "use client";
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
+import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { Line } from "@react-three/drei";
 import { selectCaughtUp, useGame } from "@/store/game";
@@ -48,6 +49,10 @@ export default function Highlights() {
     return [];
   }, [selected, mode, battle, caughtUp]);
 
+  const hoverUnit = useGame((s) => s.hoverUnit);
+  const hovDef = hoverUnit ? config.units.find((u) => u.id === hoverUnit) ?? null : null;
+  const hovView = hoverUnit ? view.units[hoverUnit] : null;
+  const focusEnemy = hovDef && hovView && hovView.alive && hovDef.team !== playerTeam ? hovView : null;
   const sel = selected ? view.units[selected] : null;
   const selDef = selected ? config.units.find((u) => u.id === selected) : null;
   const mine = !!selDef && selDef.team === playerTeam;
@@ -102,9 +107,50 @@ export default function Highlights() {
         return u ? <Highlight key={`t${id}`} x={u.x} y={u.y} color="#ff4040" opacity={0.6} /> : null;
       })}
       {previewFrom && <Highlight x={previewFrom.x} y={previewFrom.y} color="#ffd54f" opacity={0.7} />}
+      {focusEnemy && <FocusTile x={focusEnemy.x} y={focusEnemy.y} color={selected && targets.includes(hoverUnit!) ? "#ffe082" : "#ff6a6a"} />}
       {path && <PathLine path={path} />}
       {sel && sel.alive && <Highlight x={sel.x} y={sel.y} color="#ffe082" opacity={0.5} />}
       {hover && !unitAt(hover.x, hover.y) && <Highlight x={hover.x} y={hover.y} color="#ffffff" opacity={0.18} />}
+    </group>
+  );
+}
+
+/** Pulsing bracket frame on the tile of the enemy under the pointer (FE target focus). */
+function FocusTile({ x, y, color }: { x: number; y: number; color: string }) {
+  const map = useGame((s) => s.config.map);
+  const g = useRef<THREE.Group>(null);
+  const t = useRef(0);
+  useFrame((_, dt) => {
+    t.current += dt;
+    const k = 1 + 0.06 * Math.sin(t.current * 6);
+    g.current?.scale.set(k, 1, k);
+  });
+  const h = tileHeight(map, { x, y }) + 0.03;
+  const L = 0.32, T = 0.07, o = 0.5;
+  const corners: [number, number, number, number][] = [
+    [-o, -o, 1, 1],
+    [o, -o, -1, 1],
+    [-o, o, 1, -1],
+    [o, o, -1, -1],
+  ];
+  return (
+    <group ref={g} position={[x, h, y]}>
+      {corners.map(([cx, cz, sx, sz], i) => (
+        <group key={i} position={[cx, 0, cz]}>
+          <mesh position={[(sx * L) / 2, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[L, T]} />
+            <meshBasicMaterial color={color} depthTest={false} transparent opacity={0.95} />
+          </mesh>
+          <mesh position={[0, 0, (sz * L) / 2]} rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[T, L]} />
+            <meshBasicMaterial color={color} depthTest={false} transparent opacity={0.95} />
+          </mesh>
+        </group>
+      ))}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.005, 0]}>
+        <planeGeometry args={[0.96, 0.96]} />
+        <meshBasicMaterial color={color} transparent opacity={0.28} depthWrite={false} />
+      </mesh>
     </group>
   );
 }
