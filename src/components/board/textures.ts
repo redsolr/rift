@@ -43,52 +43,44 @@ function grain(ctx: CanvasRenderingContext2D, rnd: () => number, n: number, alph
   }
 }
 
-/** Cream plaza paving (FE town square): irregular flagstones on a sandy grout. */
+/** Cream plaza paving (FE town square): large flat flagstones, hairline grout, no bevel — reads as a floor, not rubble. */
 export function cobbleTexture(): THREE.Texture {
   const k = "cobble";
   if (cache.has(k)) return cache.get(k)!;
   const c = canvas();
   const ctx = c.getContext("2d")!;
   const rnd = lcg(11);
-  ctx.fillStyle = "#b8a98f"; // grout
+  ctx.fillStyle = "#c4b69c"; // grout — only a shade darker than the stone
   ctx.fillRect(0, 0, SIZE, SIZE);
-  const cols = 4;
-  const cell = SIZE / cols;
-  for (let gy = 0; gy < cols; gy++)
-    for (let gx = 0; gx < cols; gx++) {
-      const jitter = 3;
-      const x0 = gx * cell + 2 + (rnd() - 0.5) * jitter;
-      const y0 = gy * cell + 2 + (rnd() - 0.5) * jitter;
-      const w = cell - 4 - rnd() * 4;
-      const h = cell - 4 - rnd() * 4;
-      const l = 78 + rnd() * 10;
-      ctx.fillStyle = `hsl(${36 + rnd() * 8}, ${22 + rnd() * 10}%, ${l}%)`;
-      ctx.beginPath();
-      const r = 5;
-      ctx.moveTo(x0 + r, y0);
-      ctx.arcTo(x0 + w, y0, x0 + w, y0 + h, r);
-      ctx.arcTo(x0 + w, y0 + h, x0, y0 + h, r);
-      ctx.arcTo(x0, y0 + h, x0, y0, r);
-      ctx.arcTo(x0, y0, x0 + w, y0, r);
-      ctx.closePath();
-      ctx.fill();
-      // bevel: light top-left, dark bottom-right
-      ctx.strokeStyle = "rgba(255,255,255,0.35)";
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(x0 + 2, y0 + h - 2);
-      ctx.lineTo(x0 + 2, y0 + 2);
-      ctx.lineTo(x0 + w - 2, y0 + 2);
-      ctx.stroke();
-      ctx.strokeStyle = "rgba(60,40,20,0.25)";
-      ctx.beginPath();
-      ctx.moveTo(x0 + w - 2, y0 + 2);
-      ctx.lineTo(x0 + w - 2, y0 + h - 2);
-      ctx.lineTo(x0 + 2, y0 + h - 2);
-      ctx.stroke();
+  const rows = 3;
+  const rh = SIZE / rows;
+  const sw = SIZE / 2; // slab width — running bond, every other row offset by half a slab
+  for (let r = 0; r < rows; r++) {
+    const off = r % 2 ? sw / 2 : 0;
+    for (let x = -sw; x < SIZE + sw; x += sw) {
+      const x0 = x + off + 1.5;
+      const y0 = r * rh + 1.5;
+      const w = sw - 3;
+      const h = rh - 3;
+      const l = 80 + rnd() * 6;
+      const hue = 38 + rnd() * 6;
+      // flat slab with a barely-there tonal drift across it (weathering), no edge lighting
+      const g = ctx.createLinearGradient(x0, y0, x0 + w, y0 + h);
+      g.addColorStop(0, `hsl(${hue}, 24%, ${l}%)`);
+      g.addColorStop(1, `hsl(${hue + 2}, 22%, ${l - 2.5}%)`);
+      ctx.fillStyle = g;
+      ctx.fillRect(x0, y0, w, h);
+      // faint mineral blotches
+      for (let i = 0; i < 3; i++) {
+        ctx.fillStyle = `hsla(${hue}, 20%, ${l + (rnd() < 0.5 ? -4 : 3)}%, 0.35)`;
+        ctx.beginPath();
+        ctx.ellipse(x0 + rnd() * w, y0 + rnd() * h, 6 + rnd() * 14, 4 + rnd() * 8, rnd() * Math.PI, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
-  grain(ctx, rnd, 900, 0.18, false);
-  grain(ctx, rnd, 600, 0.22, true);
+  }
+  grain(ctx, rnd, 350, 0.08, false);
+  grain(ctx, rnd, 250, 0.1, true);
   return finish(k, c);
 }
 
