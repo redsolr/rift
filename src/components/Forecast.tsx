@@ -1,8 +1,9 @@
 "use client";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useGame } from "@/store/game";
 import { Archetype, TERRAIN, UnitDef, otherTeam } from "@/sim/types";
 import { ARCHETYPE_LABEL } from "@/sim/presets";
+import { CARD_H, CARD_W, overall, renderCard } from "./cards";
 
 const WEAPON: Record<Archetype, string> = {
   knight: "Iron Lance",
@@ -11,7 +12,6 @@ const WEAPON: Record<Archetype, string> = {
   mage: "Fire",
   healer: "Heal",
 };
-const GLYPH: Record<Archetype, string> = { knight: "♜", fighter: "⚔", archer: "➶", mage: "✦", healer: "✚" };
 
 /**
  * FE-style combat forecast, docked to the left of the board. Left column = the selected
@@ -101,14 +101,27 @@ export default function Forecast() {
   );
 }
 
+/** Blits the cached procedural card into a small canvas (same art as the board). */
+function CardThumb({ u }: { u: UnitDef }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const c = ref.current;
+    if (!c) return;
+    const ctx = c.getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, c.width, c.height);
+    ctx.drawImage(renderCard(u), 0, 0, c.width, c.height);
+  }, [u]);
+  return <canvas ref={ref} className="fc-card" width={CARD_W / 2} height={CARD_H / 2} aria-hidden />;
+}
+
 function Head({ u, hp, side }: { u: UnitDef; hp: number; side: "a" | "d" }) {
   return (
     <div className={`fc-head ${side} ${u.team}`}>
-      <div className="fc-diamond">
-        <span className="fc-glyph">{GLYPH[u.archetype]}</span>
-      </div>
+      <CardThumb u={u} />
       <div className="fc-name">
         <span>{u.name}</span>
+        <span className="fc-ovr">{overall(u)}</span>
         <span className="fc-hp-num">{hp}</span>
       </div>
     </div>

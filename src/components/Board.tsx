@@ -1,14 +1,14 @@
 "use client";
 import { Canvas, ThreeEvent, useFrame, useThree } from "@react-three/fiber";
-import { Html, Line, OrbitControls } from "@react-three/drei";
+import { Billboard, Html, Line, OrbitControls } from "@react-three/drei";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useGame } from "@/store/game";
 import Effects from "./Effects";
-import { Archetype, Pos, TERRAIN, Team, UnitDef, otherTeam } from "@/sim/types";
+import { cardKey, renderCard } from "./cards";
+import { Pos, TERRAIN, Team, UnitDef, otherTeam } from "@/sim/types";
 
 const TEAM_COLOR: Record<Team, string> = { red: "#e0554a", blue: "#4a86e0" };
-const TEAM_DARK: Record<Team, string> = { red: "#7a2a24", blue: "#233f75" };
 
 function Tiles() {
   const map = useGame((s) => s.config.map);
@@ -151,44 +151,34 @@ function Highlights() {
   );
 }
 
-function UnitMesh({ archetype, color }: { archetype: Archetype; color: string }) {
-  switch (archetype) {
-    case "knight":
-      return (
-        <mesh position={[0, 0.35, 0]} castShadow>
-          <boxGeometry args={[0.5, 0.7, 0.5]} />
-          <meshStandardMaterial color={color} metalness={0.4} roughness={0.5} />
-        </mesh>
-      );
-    case "fighter":
-      return (
-        <mesh position={[0, 0.35, 0]} castShadow>
-          <coneGeometry args={[0.32, 0.7, 6]} />
-          <meshStandardMaterial color={color} roughness={0.7} />
-        </mesh>
-      );
-    case "archer":
-      return (
-        <mesh position={[0, 0.35, 0]} castShadow>
-          <cylinderGeometry args={[0.2, 0.26, 0.7, 10]} />
-          <meshStandardMaterial color={color} roughness={0.7} />
-        </mesh>
-      );
-    case "mage":
-      return (
-        <mesh position={[0, 0.4, 0]} castShadow>
-          <octahedronGeometry args={[0.36]} />
-          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.25} roughness={0.4} />
-        </mesh>
-      );
-    case "healer":
-      return (
-        <mesh position={[0, 0.34, 0]} castShadow>
-          <sphereGeometry args={[0.32, 16, 12]} />
-          <meshStandardMaterial color={color} roughness={0.5} />
-        </mesh>
-      );
+const CARD_W3 = 0.92;
+const CARD_H3 = CARD_W3 * (352 / 256);
+
+/** Billboarded FUT-style card. Texture is a cached canvas from cards.ts; `dim` marks an acted unit. */
+const textureCache = new Map<string, THREE.CanvasTexture>();
+function cardTexture(def: UnitDef): THREE.CanvasTexture {
+  const key = cardKey(def);
+  let t = textureCache.get(key);
+  if (!t) {
+    t = new THREE.CanvasTexture(renderCard(def));
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = 4;
+    textureCache.set(key, t);
   }
+  return t;
+}
+
+function CardMesh({ def, dim }: { def: UnitDef; dim: boolean }) {
+  const texture = useMemo(() => cardTexture(def), [def]);
+  return (
+    <Billboard follow lockX={false} lockY={false} lockZ={false} position={[0, CARD_H3 / 2 + 0.05, 0]}>
+      <mesh>
+        <planeGeometry args={[CARD_W3, CARD_H3]} />
+        <meshBasicMaterial map={texture} transparent alphaTest={0.05} color={dim ? "#6a6a72" : "#ffffff"} toneMapped={false} />
+      </mesh>
+      {/* soft shadow blob so the card reads as standing on the tile */}
+    </Billboard>
+  );
 }
 
 function Unit({ def }: { def: UnitDef }) {
@@ -257,7 +247,11 @@ function Unit({ def }: { def: UnitDef }) {
           }}
           onPointerOut={() => setHoverUnit(null)}
         >
-          <UnitMesh archetype={def.archetype} color={acted ? TEAM_DARK[def.team] : TEAM_COLOR[def.team]} />
+          <CardMesh def={def} dim={!!acted} />
+          <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <circleGeometry args={[0.34, 20]} />
+            <meshBasicMaterial color="#000" transparent opacity={0.35} />
+          </mesh>
           {selected && (
             <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
               <ringGeometry args={[0.36, 0.46, 24]} />
@@ -266,7 +260,7 @@ function Unit({ def }: { def: UnitDef }) {
           )}
         </group>
         {/* HP bar */}
-        <group position={[0, 0.95, 0]}>
+        <group position={[0, CARD_H3 + 0.18, 0]}>
           <mesh>
             <planeGeometry args={[0.7, 0.09]} />
             <meshBasicMaterial color="#111" side={THREE.DoubleSide} />
@@ -276,13 +270,13 @@ function Unit({ def }: { def: UnitDef }) {
             <meshBasicMaterial color={pct > 0.5 ? "#6cf58a" : pct > 0.25 ? "#ffd54f" : "#ff5c5c"} side={THREE.DoubleSide} />
           </mesh>
         </group>
-        <Html position={[0, 1.15, 0]} center distanceFactor={12} zIndexRange={[10, 0]} style={{ pointerEvents: "none" }}>
+        <Html position={[0, CARD_H3 + 0.36, 0]} center distanceFactor={12} zIndexRange={[1, 0]} style={{ pointerEvents: "none" }}>
           <div className="unit-label" style={{ color: TEAM_COLOR[def.team] }}>
             {def.name}
           </div>
         </Html>
         {myFloats.map((f) => (
-          <Html key={f.key} position={[0, 1.3, 0]} center distanceFactor={12} zIndexRange={[10, 0]} style={{ pointerEvents: "none" }}>
+          <Html key={f.key} position={[0, CARD_H3 + 0.5, 0]} center distanceFactor={12} zIndexRange={[1, 0]} style={{ pointerEvents: "none" }}>
             <div className="dmg-float" style={{ color: f.color }}>
               {f.text}
             </div>

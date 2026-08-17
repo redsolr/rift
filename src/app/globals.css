@@ -796,11 +796,15 @@ button.danger {
 .fc-head.blue .fc-diamond {
   border-color: #4a86e0;
 }
-.fc-glyph {
-  transform: rotate(-45deg);
-  font-size: 24px;
-  color: #f1e5c2;
-  text-shadow: 0 1px 2px #000;
+.fc-card {
+  width: 64px;
+  height: 88px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.6));
+}
+.fc-ovr {
+  color: #f2c96b;
+  font-size: 12px;
 }
 .fc-name {
   display: flex;
@@ -971,13 +975,9 @@ button.danger {
   .forecast.solo {
     display: none;
   }
-  .fc-diamond {
-    width: 30px;
-    height: 30px;
-    border-width: 1.5px;
-  }
-  .fc-glyph {
-    font-size: 15px;
+  .fc-card {
+    width: 40px;
+    height: 55px;
   }
   .fc-name {
     font-size: 12px;
