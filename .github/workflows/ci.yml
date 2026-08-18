@@ -1,0 +1,20 @@
+# CI gate for redsolr/rift — the repo's Definition of Done (`npm run verify` = lint → tsc → vitest → next build)
+# on every push to main and every PR. Deploys are Vercel's Git integration (project `rift`, team-scoped token
+# `VERCEL_TOKEN` is set as a repo secret for future CLI/REST use); this job is the visible red/green next to them.
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run verify
