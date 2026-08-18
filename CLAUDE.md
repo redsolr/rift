@@ -19,6 +19,10 @@ src/store/        game.ts = Zustand store (Battle instance, cursor, modes, camer
 src/components/   Board.tsx composes board/* (Tiles, Highlights, Units, Arcs, ActionMenu, CameraRig)
                   Panel.tsx composes panel/* (Squad, UnitSections, EditorPanel, BattleLog, SharePanel)
                   Forecast, UnitBadge, PhaseBanner, CameraWidget, Effects, Hud, Drawer, cards.ts
+                  perf/ = system profiler (store + PerfProbe inside any Canvas + PerfPanel; F3 / ⌗ Perf) — per-map load + fps table
+src/campaign/     the walkable campaign world: CampaignScene (zone-agnostic controller), store (zone / travel / dialogue),
+                  world/ = ZONES registry (kitchen.tsx, village.tsx + villageChunks.ts data; types.ts) — Persona-5 doors between
+                  zones, only one zone mounted; the village streams a 5×5 chunk ring around the player
 scripts/sim.ts    headless batch runner (npm run sim -- 1000)
 ```
 
@@ -59,7 +63,7 @@ Selectors must return stable references — never `useGame((s) => s.config.units
 
 ## What NOT to build yet
 
-Campaign, story, accounts, backend, multiplayer, items, skill trees, more than 5 archetypes, cosmetics. The only question that matters right now: **do people press Rematch?**
+Story beyond the prologue prototype, accounts, backend, multiplayer, items, skill trees, more than 5 archetypes, cosmetics. The only question that matters right now: **do people press Rematch?**
 
 <!-- BEGIN:nextjs-agent-rules -->
 

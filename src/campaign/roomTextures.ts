@@ -158,3 +158,77 @@ export const blobTexture = () =>
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, S, S);
   });
+
+/** night meadow grass — dark green with blade flecks (village ground) */
+export const grassTexture = (repeat: [number, number]) =>
+  make(
+    `grass${repeat.join("x")}`,
+    (ctx, rnd) => {
+      ctx.fillStyle = "#1d2a18";
+      ctx.fillRect(0, 0, S, S);
+      for (let i = 0; i < 2600; i++) {
+        ctx.strokeStyle = `hsla(${92 + rnd() * 30}, ${30 + rnd() * 20}%, ${16 + rnd() * 16}%, 0.8)`;
+        ctx.lineWidth = 1;
+        const x = rnd() * S;
+        const y = rnd() * S;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + (rnd() - 0.5) * 3, y - 2 - rnd() * 4);
+        ctx.stroke();
+      }
+      grain(ctx, rnd, 600, 0.12, false);
+    },
+    repeat,
+  );
+
+/** cobbled lane — rounded grey stones on dark mortar */
+export const cobbleTexture = (repeat: [number, number]) =>
+  make(
+    `cobble${repeat.join("x")}`,
+    (ctx, rnd) => {
+      ctx.fillStyle = "#1a1b20";
+      ctx.fillRect(0, 0, S, S);
+      const cell = S / 8;
+      for (let r = 0; r < 8; r++) {
+        const off = r % 2 ? cell / 2 : 0;
+        for (let x = -cell; x < S + cell; x += cell) {
+          const l = 26 + rnd() * 14;
+          ctx.fillStyle = `hsl(${215 + rnd() * 25}, ${5 + rnd() * 6}%, ${l}%)`;
+          const cx = x + off + cell / 2 + (rnd() - 0.5) * 3;
+          const cy = r * cell + cell / 2 + (rnd() - 0.5) * 3;
+          ctx.beginPath();
+          ctx.ellipse(cx, cy, cell / 2 - 2.5, cell / 2 - 3, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "rgba(255,255,255,0.06)";
+          ctx.beginPath();
+          ctx.ellipse(cx - 2, cy - 3, cell / 4, cell / 6, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      grain(ctx, rnd, 900, 0.18, false);
+    },
+    repeat,
+  );
+
+/** warm whitewashed cottage wall — pale, softly mottled, a little grime at the foot */
+export const whitewashTexture = (repeat: [number, number]) =>
+  make(
+    `whitewash${repeat.join("x")}`,
+    (ctx, rnd) => {
+      ctx.fillStyle = "#d9cfb8";
+      ctx.fillRect(0, 0, S, S);
+      for (let i = 0; i < 260; i++) {
+        ctx.fillStyle = `hsla(${34 + rnd() * 16}, ${18 + rnd() * 14}%, ${72 + rnd() * 16}%, 0.45)`;
+        ctx.beginPath();
+        ctx.ellipse(rnd() * S, rnd() * S, 10 + rnd() * 30, 8 + rnd() * 18, rnd() * Math.PI, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      const g = ctx.createLinearGradient(0, S, 0, S * 0.7);
+      g.addColorStop(0, "rgba(60,50,40,0.35)");
+      g.addColorStop(1, "rgba(60,50,40,0)");
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, S, S);
+      grain(ctx, rnd, 900, 0.1, false);
+    },
+    repeat,
+  );

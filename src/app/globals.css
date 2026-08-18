@@ -2475,3 +2475,155 @@ button.link {
     margin-right: 84px;
   }
 }
+
+/* ---------- system profiler (F3 / ⌗ Perf) ---------- */
+.perf {
+  position: fixed;
+  top: 56px;
+  right: 14px;
+  z-index: 10050;
+  width: 420px;
+  max-width: calc(100vw - 28px);
+  max-height: calc(100vh - 80px);
+  overflow: auto;
+  background: rgba(8, 10, 16, 0.9);
+  border: 1px solid #2a3142;
+  border-radius: 10px;
+  color: #e6e9f0;
+  font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  pointer-events: auto;
+}
+.perf-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-bottom: 1px solid #1f2532;
+}
+.perf-title {
+  color: #ffd54f;
+  letter-spacing: 0.14em;
+  font-weight: 700;
+}
+.perf-scene {
+  color: #9aa3b8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.perf-x {
+  margin-left: auto;
+  background: none;
+  border: 0;
+  color: #9aa3b8;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 4px;
+}
+.perf-x:hover {
+  color: #fff;
+}
+.perf-live {
+  display: flex;
+  gap: 12px;
+  padding: 10px;
+  align-items: flex-start;
+}
+.perf-big {
+  min-width: 64px;
+  text-align: center;
+  padding: 6px 4px;
+  border-radius: 8px;
+  background: rgba(70, 200, 120, 0.12);
+  color: #7ee2a3;
+}
+.perf-big.warn {
+  background: rgba(255, 213, 79, 0.12);
+  color: #ffd54f;
+}
+.perf-big.bad {
+  background: rgba(255, 90, 90, 0.14);
+  color: #ff7a7a;
+}
+.perf-big b {
+  display: block;
+  font-size: 26px;
+  line-height: 1;
+}
+.perf-big i {
+  font-style: normal;
+  font-size: 10px;
+  opacity: 0.8;
+}
+.perf-live dl {
+  flex: 1;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  margin: 0;
+}
+.perf-live dt {
+  color: #8a93a8;
+}
+.perf-live dd {
+  margin: 0;
+}
+.perf-live small {
+  color: #8a93a8;
+}
+.perf-empty {
+  padding: 8px 10px;
+  color: #8a93a8;
+}
+.perf-records {
+  border-top: 1px solid #1f2532;
+  padding: 8px 10px 10px;
+}
+.perf-sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #ffd54f;
+  margin-bottom: 6px;
+}
+.perf-sub small {
+  color: #8a93a8;
+}
+.perf-clear {
+  margin-left: auto;
+  background: none;
+  border: 1px solid #2a3142;
+  color: #9aa3b8;
+  border-radius: 5px;
+  font: inherit;
+  font-size: 11px;
+  padding: 1px 6px;
+  cursor: pointer;
+}
+.perf table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.perf th,
+.perf td {
+  text-align: right;
+  padding: 3px 4px;
+  border-bottom: 1px solid #161b26;
+  white-space: nowrap;
+}
+.perf th:first-child,
+.perf td:first-child {
+  text-align: left;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.perf th {
+  color: #8a93a8;
+  font-weight: 500;
+}
+.perf tr.cur td {
+  color: #ffd54f;
+}

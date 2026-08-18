@@ -1,8 +1,9 @@
 /**
- * Campaign prototype — the dialogue script for the one room. Pure data: the overlay walks it, the scene reacts to
- * `effects`. Speakers are the two characters in the room; `null` speaker = narration.
+ * Campaign prototype — the dialogue scripts (kitchen + village). Pure data: the overlay walks it, the scene reacts to
+ * `effects`. Speakers are the campaign cast; `null` speaker = narration. Which script an NPC speaks lives in the zone
+ * data (`world/`), not here.
  */
-export type SpeakerId = "rook" | "mina";
+export type SpeakerId = "rook" | "mina" | "bram";
 
 export interface Speaker {
   id: SpeakerId;
@@ -17,6 +18,7 @@ export interface Speaker {
 export const SPEAKERS: Record<SpeakerId, Speaker> = {
   rook: { id: "rook", name: "Rook", team: "blue", archetype: "knight", model: "Knight" },
   mina: { id: "mina", name: "Mina", team: "blue", archetype: "healer", model: "Mage" },
+  bram: { id: "bram", name: "Bram", team: "red", archetype: "fighter", model: "Knight" },
 };
 
 export interface Choice {
@@ -91,3 +93,30 @@ export const lineById = (script: Line[], id: string): Line => {
   if (!l) throw new Error(`campaign script: no line "${id}"`);
   return l;
 };
+
+/** The village square at night — Bram, the well-keeper, first time. */
+export const VILLAGE_TALK: Line[] = [
+  { id: "v1", speaker: "bram", text: "Evening, soldier. Odd hour to be pacing the square.", next: "v2" },
+  { id: "v2", speaker: "rook", text: "Odd hour to be drawing water.", next: "v3" },
+  { id: "v3", speaker: "bram", text: "The well doesn't sleep and neither do the horses. You're the ones holding the square at noon?", next: "v4" },
+  {
+    id: "v4",
+    speaker: "rook",
+    text: "We are. Anything I should know about it?",
+    choices: [
+      { label: "Where do they usually come from?", next: "v5" },
+      { label: "Which cottages have cellars?", next: "v6" },
+      { label: "Nothing. Good night.", next: "v7" },
+    ],
+  },
+  { id: "v5", speaker: "bram", text: "The east lane. Always the east lane — the planters slow them, but they come anyway. Put your archer where she can see it.", next: "vend" },
+  { id: "v6", speaker: "bram", text: "The baker's and mine. Doors bar from inside. If it goes wrong, that's where the children go.", next: "vend" },
+  { id: "v7", speaker: "bram", text: "Good night, then. Mind the well rope — it's slick.", next: "vend" },
+  { id: "vend", speaker: null, text: "Bram hauls the bucket up. Somewhere a shutter bangs in the wind." },
+];
+
+/** Bram again. */
+export const VILLAGE_AGAIN: Line[] = [
+  { id: "w1", speaker: "bram", text: "Still pacing? The kitchen's warmer than my square. Go on.", next: "w2" },
+  { id: "w2", speaker: "rook", text: "Soon." },
+];

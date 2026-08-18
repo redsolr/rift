@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { useAnimations, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
+import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { Speaker } from "./script";
 import { blobTexture } from "./roomTextures";
 
@@ -10,7 +11,7 @@ import { blobTexture } from "./roomTextures";
  * A character in the room as a real 3D model: KayKit "Adventurers" (CC0, `public/models/kaykit/`, licence alongside)
  * — rigged low-poly toon figures with baked animations. We use exactly three clips: `Idle`, `Walking_A`, `Running_A`,
  * crossfaded by the controller's live movement state; the model TURNS to face its heading (no billboard any more).
- * Auto-scaled so every model stands `height` world units tall. Blob shadow underneath. Placeholder art — swap the GLBs
+ * Auto-scaled so every model stands `height` world units tall. Each instance is a SkeletonUtils clone of the cached GLB. Blob shadow underneath. Placeholder art — swap the GLBs
  * for real characters later; any rig with those three clip names drops in.
  */
 export const CHARACTER_H = 1.62;
@@ -35,6 +36,9 @@ export default function Character({
 }) {
   const url = `/models/kaykit/${speaker.model}.glb`;
   const gltf = useGLTF(url);
+  // every character gets its OWN skinned clone — the same GLB can stand in a room twice (two Knights) and zones can
+  // mount / unmount NPCs freely without fighting over one shared scene graph
+  const body = useMemo(() => cloneSkinned(gltf.scene) as THREE.Group, [gltf.scene]);
   const root = useRef<THREE.Group>(null);
   const model = useRef<THREE.Group>(null);
   const { actions, mixer } = useAnimations(gltf.animations, model);
@@ -42,21 +46,21 @@ export default function Character({
   const blob = useMemo(() => blobTexture(), []);
   // normalise: stand on y=0, `height` tall, centred on x/z
   const fit = useMemo(() => {
-    const box = new THREE.Box3().setFromObject(gltf.scene);
+    const box = new THREE.Box3().setFromObject(body);
     const size = new THREE.Vector3();
     box.getSize(size);
     const s = height / Math.max(1e-3, size.y);
     return { s, y: -box.min.y * s, cx: -(box.min.x + box.max.x) / 2, cz: -(box.min.z + box.max.z) / 2 };
-  }, [gltf.scene, height]);
+  }, [body, height]);
   useEffect(() => {
-    gltf.scene.traverse((o) => {
+    body.traverse((o) => {
       if ((o as THREE.Mesh).isMesh) {
         o.castShadow = true;
         o.receiveShadow = false;
         o.frustumCulled = false;
       }
     });
-  }, [gltf.scene]);
+  }, [body]);
 
   const play = (g: Gait) => {
     if (cur.current === g) return;
@@ -97,7 +101,7 @@ export default function Character({
         <meshBasicMaterial map={blob} transparent depthWrite={false} opacity={0.85} />
       </mesh>
       <group ref={model}>
-        <primitive object={gltf.scene} scale={fit.s} position={[fit.cx * fit.s, fit.y, fit.cz * fit.s]} />
+        <primitive object={body} scale={fit.s} position={[fit.cx * fit.s, fit.y, fit.cz * fit.s]} />
       </group>
     </group>
   );

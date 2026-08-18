@@ -478,3 +478,95 @@
     font-size: 16px;
   }
 }
+
+/* --- HUD: profiler toggle --- */
+.campaign-perf {
+  margin-left: auto;
+  background: rgba(20, 24, 33, 0.7);
+  border: 1px solid #2a3142;
+  color: #c9d0e0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  cursor: pointer;
+}
+.campaign-perf:hover,
+.campaign-perf.on {
+  border-color: #ffd54f;
+  color: #ffd54f;
+}
+.campaign-hud .campaign-back {
+  margin-left: 8px;
+}
+
+/* --- Zone travel: fade + Persona-style area title --- */
+.campaign-fade {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  background: #000;
+  opacity: 0;
+  transition: opacity 0.38s ease-in;
+  pointer-events: auto;
+}
+.campaign-fade.dark {
+  opacity: 1;
+}
+.campaign-fade:not(.dark) {
+  transition-duration: 0.5s;
+  transition-timing-function: ease-out;
+}
+.campaign-fade.off {
+  pointer-events: none;
+}
+.campaign-title {
+  position: absolute;
+  inset: 0;
+  z-index: 41;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  pointer-events: none;
+  animation: ct-in 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes ct-in {
+  from {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+}
+/* the band: white slanted slab, torn ink edge, black serif caps — the P5 "YONGEN-JAYA" card in our ink language */
+.campaign-title-band {
+  position: relative;
+  padding: 14px 64px 16px 56px;
+}
+/* the paint layer carries the tear filter; the text above it stays crisp (same rule as the dialogue slab) */
+.campaign-title-band::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: #f4f1ea;
+  clip-path: polygon(3% 0, 100% 0, 97% 100%, 0 100%);
+  filter: url(#ct-tear) drop-shadow(0 12px 40px rgba(0, 0, 0, 0.7));
+  z-index: -1;
+}
+.campaign-title-name {
+  position: relative;
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 700;
+  font-size: clamp(30px, 5vw, 56px);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #0b0b10;
+  line-height: 1;
+}
+.campaign-title-sub {
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
+  font-size: clamp(13px, 1.6vw, 18px);
+  color: #e6e9f0;
+  letter-spacing: 0.08em;
+  opacity: 0.85;
+}

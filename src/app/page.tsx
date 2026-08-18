@@ -9,6 +9,7 @@ import CharacterPanel from "@/components/CharacterPanel";
 import TurnControls from "@/components/TurnControls";
 import SkillPanel from "@/components/SkillPanel";
 import HudTopRight from "@/components/HudTopRight";
+import PerfPanel from "@/components/perf/PerfPanel";
 import { UiLayoutBar, useUiLayout } from "@/components/ui/UiFrame";
 import PhaseBanner from "@/components/PhaseBanner";
 import { useGame } from "@/store/game";
@@ -71,6 +72,7 @@ export default function Home() {
   return (
     <main className="app">
       <Hud />
+      <PerfPanel />
       <div className={mobile ? "stage mobile" : "stage"}>
         <div className="board-wrap">
           <Board />
