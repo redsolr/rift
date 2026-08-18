@@ -4,7 +4,9 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Tactician",
   description: "Browser tactical manager — build a squad, write its doctrine, watch it fight, read why it lost.",
-  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Tactician" },
+  applicationName: "Rift",
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Rift" },
+  icons: { icon: [{ url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }], apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }] },
   formatDetection: { telephone: false },
 };
 
