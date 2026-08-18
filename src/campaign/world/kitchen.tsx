@@ -13,7 +13,7 @@ export const KITCHEN: Zone = {
   exits: [
     {
       id: "arch",
-      box: [2.4, 4.0, -ROOM.d / 2 - 1, -ROOM.d / 2 + 0.55],
+      box: [2.4, 4.0, -ROOM.d / 2 - 1, -ROOM.d / 2 + 1.1], // wraps the ring at +0.6
       to: { zone: "village", exit: "kitchen-door" },
       spawn: { x: 3.2, z: -ROOM.d / 2 + 1.3, heading: 0 },
       marker: { x: 3.2, z: -ROOM.d / 2 + 0.6, label: "Village" },

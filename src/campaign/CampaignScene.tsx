@@ -1,5 +1,5 @@
 "use client";
-import { RefObject, Suspense, useEffect, useMemo, useRef } from "react";
+import { RefObject, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, ThreeEvent, useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import PerfProbe from "@/components/perf/PerfProbe";
@@ -109,18 +109,44 @@ function Npc({ npc, playerPos, walkTo }: { npc: ZoneNpc; playerPos: RefObject<TH
   );
 }
 
-/** Persona-style exit marker: a gold ring on the floor with a bobbing arrow — walk in to travel */
-function ExitMarker({ x, z }: { x: number; z: number }) {
+/**
+ * Persona-style exit marker: a gold ring on the floor with a bobbing arrow — walk in OR click anywhere on the ring
+ * (a fat invisible disc + the arrow catch the pointer) and it fires right away, no walking over first.
+ */
+function ExitMarker({ x, z, onUse }: { x: number; z: number; onUse: () => void }) {
   const ring = useRef<THREE.Mesh>(null);
   const arrow = useRef<THREE.Mesh>(null);
+  const [hot, setHot] = useState(false);
+  const use = (e: ThreeEvent<MouseEvent>) => {
+    e.stopPropagation();
+    onUse();
+  };
+  const over = (e: ThreeEvent<PointerEvent>) => {
+    e.stopPropagation();
+    setHot(true);
+    document.body.style.cursor = "pointer";
+  };
+  const out = () => {
+    setHot(false);
+    document.body.style.cursor = "";
+  };
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime();
-    if (ring.current) (ring.current.material as THREE.MeshBasicMaterial).opacity = 0.45 + 0.25 * Math.sin(t * 3);
+    if (ring.current) (ring.current.material as THREE.MeshBasicMaterial).opacity = hot ? 1 : 0.45 + 0.25 * Math.sin(t * 3);
     if (arrow.current) arrow.current.position.y = 1.35 + 0.12 * Math.sin(t * 3);
   });
   return (
     <group position={[x, 0, z]}>
-      <mesh ref={ring} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.015, 0]}>
+      {/* pointer catcher: the whole disc inside + a margin around the ring, plus a column up to the arrow */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]} onClick={use} onPointerOver={over} onPointerOut={out} visible={false}>
+        <circleGeometry args={[0.95, 24]} />
+        <meshBasicMaterial />
+      </mesh>
+      <mesh position={[0, 0.8, 0]} onClick={use} onPointerOver={over} onPointerOut={out} visible={false}>
+        <cylinderGeometry args={[0.35, 0.35, 1.6, 8]} />
+        <meshBasicMaterial />
+      </mesh>
+      <mesh ref={ring} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.015, 0]} scale={hot ? 1.15 : 1}>
         <ringGeometry args={[0.45, 0.62, 32]} />
         <meshBasicMaterial color="#ffd54f" transparent opacity={0.6} depthWrite={false} />
       </mesh>
@@ -307,10 +333,10 @@ function World() {
         <meshBasicMaterial />
       </mesh>
       {zone.exits.map((ex) => (
-        <ExitMarker key={ex.id} x={ex.marker.x} z={ex.marker.z} />
+        <ExitMarker key={ex.id} x={ex.marker.x} z={ex.marker.z} onUse={() => travel(ex.id)} />
       ))}
       {(zone.triggers ?? []).map((t) => (
-        <ExitMarker key={t.id} x={t.marker.x} z={t.marker.z} />
+        <ExitMarker key={t.id} x={t.marker.x} z={t.marker.z} onUse={() => useCampaign.getState().openTower()} />
       ))}
       <Suspense fallback={null}>
         <Character model={SPEAKERS.rook.model} posRef={playerPos} gaitRef={gait} headingRef={heading} />

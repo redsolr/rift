@@ -56,7 +56,7 @@ export const VILLAGE: Zone = {
   exits: [
     {
       id: "kitchen-door",
-      box: [-1.1, 1.1, KITCHEN_Z + 0.55, HALF + 1],
+      box: [-1.1, 1.1, KITCHEN_Z - 1.2, HALF + 1], // wraps the ring at -0.55
       to: { zone: "kitchen", exit: "arch" },
       spawn: { x: 0, z: KITCHEN_Z - 4.5, heading: Math.PI },
       marker: { x: 0, z: KITCHEN_Z - 0.55, label: "Kitchen" },
@@ -65,7 +65,8 @@ export const VILLAGE: Zone = {
   triggers: [
     {
       id: "tower",
-      box: [-0.9, 0.9, TOWER_DOOR_Z - 0.6, TOWER_DOOR_Z + 0.9],
+      // the walk-in box wraps the ring (marker at door + 1.0) with margin on every side
+      box: [-1.1, 1.1, TOWER_DOOR_Z - 0.3, TOWER_DOOR_Z + 2.1],
       marker: { x: 0, z: TOWER_DOOR_Z + 1.0, label: "The Tower" },
       /** where `/campaign?at=tower` puts you */
       spawn: { x: 0, z: TOWER_DOOR_Z + 3.4, heading: Math.PI },
