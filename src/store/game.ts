@@ -562,16 +562,36 @@ export const useGame = create<GameState>((set, get) => {
         set({ selected: id, tool: { kind: "select" } });
         return;
       }
-      // manual: clicking a target while pending
-      if (s.pendingMove && s.targets.includes(id)) return get().commitTarget(id);
+      // manual: clicking a target while pending — from the command page it opens the fight menu (Attack / Heal picker,
+      // you choose the skill); from the picker / target step it commits (chosen attack, else the best usable one)
+      if (s.pendingMove && s.targets.includes(id)) {
+        if (s.menuPage === "command" && s.battle) return get().openAttacks(s.battle.unit(id).team === s.battle.unit(s.selected!).team ? "heal" : "attack");
+        return get().commitTarget(id);
+      }
       // manual: select own unit that can act
       const b = s.battle;
       if (s.mode === "manual" && b && !b.state.ended && b.state.activeTeam === s.playerTeam && s.cursor >= s.events.length) {
         const u = b.unit(id);
-        // clicking the unit that is ALREADY selected (and not yet placed) = open its command menu where it stands
-        if (s.selected === id && !s.pendingMove && u.team === s.playerTeam && u.alive && !u.acted) {
-          placeAndOpenMenu(id, { x: u.x, y: u.y });
+        // clicking the unit that is ALREADY selected (and not yet placed) = cancel the selection (Esc does the same)
+        if (s.selected === id && !s.pendingMove) {
+          set({ selected: null });
+          clearManual();
           return;
+        }
+        // with one of your actable units selected, LEFT-clicking an enemy it can reach (from where it stands or any
+        // reachable tile) = the fight menu: place it on a tile the enemy can be hit from (prefer staying put) and open
+        // the Attack picker — same as the right-click fast path; a wounded ally opens the Heal picker for healers
+        if (s.selected && s.selected !== id && u.alive) {
+          const me = b.unit(s.selected);
+          if (me.team === s.playerTeam && me.alive && !me.acted) {
+            const kind: AttackKind = u.team === me.team ? "heal" : "attack";
+            const from = [s.pendingMove, { x: me.x, y: me.y }, ...s.moveTiles].filter((t): t is Pos => !!t).find((t) => b.targetsFrom(me.id, t, undefined, kind).some((x) => x.id === id));
+            if (from) {
+              placeAndOpenMenu(me.id, from);
+              get().openAttacks(kind);
+              return;
+            }
+          }
         }
         if (u.team === s.playerTeam && u.alive && !u.acted) {
           set({ selected: id, moveTiles: b.standableFor(id), pendingMove: null, menuPage: null, menuKind: "attack", pendingAttack: null, hoverAttack: null, targets: [] });
