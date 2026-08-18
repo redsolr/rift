@@ -8,8 +8,14 @@ import { portraitCanvas, portraitFocus, portraitsKey } from "./portraits";
  * board and blitted into small canvases in HTML panels. Pure presentation — nothing here feeds the sim.
  */
 
-export const CARD_W = 256;
-export const CARD_H = 352;
+/** the card ART box (frame + everything inside) */
+export const ART_W = 256;
+export const ART_H = 352;
+/** transparent margin around the art so the class badge can straddle the top-right corner without being clipped */
+export const CARD_PAD = 30;
+/** the TEXTURE size (art + margin) — every consumer (board plane, thumbs) sizes by this */
+export const CARD_W = ART_W + CARD_PAD * 2;
+export const CARD_H = ART_H + CARD_PAD * 2;
 
 export const POSITION: Record<Archetype, string> = { knight: "KNT", fighter: "FTR", archer: "ARC", mage: "MAG", healer: "HLR" };
 export const WEAPON: Record<Archetype, string> = { knight: "Iron Lance", fighter: "Iron Axe", archer: "Iron Bow", mage: "Fire", healer: "Heal" };
@@ -72,48 +78,34 @@ function shieldPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: numb
  * ours sits on the TOP-RIGHT of the card. Vector strokes on a dark rounded plate, so it stays legible at card scale
  * where a glyph font would smear. `s` = plate size in px, drawn with its top-left at (x, y).
  */
-export function drawClassIcon(ctx: CanvasRenderingContext2D, archetype: Archetype, x: number, y: number, s: number, tier: { hi: string; trim: string; lo: string }) {
+export function drawClassIcon(ctx: CanvasRenderingContext2D, archetype: Archetype, cx: number, cy: number, radius: number, tier: { hi: string; trim: string; lo: string }) {
   ctx.save();
-  // plate — OUR card language, not FE's flat square: a bevelled plate in the card's tier trim (gold / steel gradient,
-  // like the frame), a dark inset well, the weapon glyph in white on top; the outer corner is cut to sit flush on the
-  // card's rounded frame corner
-  const plate = (inset: number) => {
-    const x0 = x + inset,
-      y0 = y + inset,
-      w = s - inset * 2;
-    const r = w * 0.18;
-    const cut = w * 0.36; // outer (top-right) corner cut — the plate is shaped to the card corner
-    ctx.beginPath();
-    ctx.moveTo(x0 + r, y0);
-    ctx.lineTo(x0 + w - cut, y0);
-    ctx.lineTo(x0 + w, y0 + cut);
-    ctx.lineTo(x0 + w, y0 + w - r);
-    ctx.arcTo(x0 + w, y0 + w, x0, y0 + w, r);
-    ctx.arcTo(x0, y0 + w, x0, y0, r);
-    ctx.arcTo(x0, y0, x0 + w, y0, r);
-    ctx.closePath();
-  };
-  plate(0);
-  const pg = ctx.createLinearGradient(x, y, x + s, y + s);
-  pg.addColorStop(0, tier.hi);
-  pg.addColorStop(0.45, tier.trim);
-  pg.addColorStop(1, tier.lo);
-  ctx.fillStyle = pg;
+  // ROUND badge, OUR card language: a bevelled ring in the card's tier trim (gold / steel gradient, like the frame),
+  // a dark inset disc, the weapon glyph in white. Centred ON the frame's top-right corner (half of it hangs off the card).
+  const rg = ctx.createLinearGradient(cx - radius, cy - radius, cx + radius, cy + radius);
+  rg.addColorStop(0, tier.hi);
+  rg.addColorStop(0.45, tier.trim);
+  rg.addColorStop(1, tier.lo);
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.fillStyle = rg;
   ctx.shadowColor = "rgba(0,0,0,0.65)";
-  ctx.shadowBlur = 8;
+  ctx.shadowBlur = 10;
   ctx.shadowOffsetY = 3;
   ctx.fill();
   ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 0;
-  plate(s * 0.09);
-  ctx.fillStyle = "rgba(10,10,16,0.9)";
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius * 0.82, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(10,10,16,0.92)";
   ctx.fill();
   ctx.lineWidth = 1;
   ctx.strokeStyle = "rgba(255,255,255,0.22)";
   ctx.stroke();
-  // icon strokes, in a unit box (0..1) mapped to the plate's inner 70%
-  ctx.translate(x + s * 0.15, y + s * 0.15);
-  ctx.scale(s * 0.7, s * 0.7);
+  // icon strokes, in a unit box (0..1) filling the inner disc
+  const s = radius * 2 * 0.62;
+  ctx.translate(cx - s / 2, cy - s / 2);
+  ctx.scale(s, s);
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
   ctx.strokeStyle = "#f6f2ea";
@@ -227,9 +219,11 @@ export function renderCard(u: UnitDef): HTMLCanvasElement {
   c.width = CARD_W;
   c.height = CARD_H;
   const ctx = c.getContext("2d")!;
+  // the art draws in the inner ART box; the margin is only for the corner badge
+  ctx.translate(CARD_PAD, CARD_PAD);
   const f = FRAME[u.team];
-  const W = CARD_W,
-    H = CARD_H;
+  const W = ART_W,
+    H = ART_H;
 
   // frame
   shieldPath(ctx, 6, 6, W - 12, H - 12, 22);
@@ -341,8 +335,8 @@ export function renderCard(u: UnitDef): HTMLCanvasElement {
     ctx.restore();
   }
 
-  // class icon badge, flush on the top-right corner (a touch bigger than FE's — it must read from the board camera)
-  drawClassIcon(ctx, u.archetype, W - 9 - 62, 9, 62, tier);
+  // class badge: a circle whose CENTRE sits on the frame's top-right corner (it hangs half off the card, into the margin)
+  drawClassIcon(ctx, u.archetype, W - 12, 12, 30, tier);
 
   // rating + position (top-left column)
   ctx.textAlign = "center";

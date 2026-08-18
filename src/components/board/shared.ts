@@ -4,8 +4,13 @@ import { Team } from "@/sim/types";
 export const TEAM_COLOR: Record<Team, string> = { red: "#e0554a", blue: "#4a86e0" };
 /** Saturated variants for additive ground FX (selection ring) — the reference RTS ring is a hot cyan, not the muted UI blue. */
 export const TEAM_GLOW: Record<Team, string> = { red: "#ff5a48", blue: "#19e3ff" };
-export const CARD_W3 = 0.92;
-export const CARD_H3 = CARD_W3 * (352 / 256);
+import { ART_W, CARD_H, CARD_PAD, CARD_W } from "../cards";
+/** visible card ART width in tiles; the plane is a little wider because the texture carries a transparent margin (badge room) */
+export const ART_W3 = 0.92;
+export const CARD_W3 = ART_W3 * (CARD_W / ART_W);
+export const CARD_H3 = CARD_W3 * (CARD_H / CARD_W);
+/** the margin in world units — the plane is lifted by this so the ART's bottom edge sits on the ground, not the margin's */
+export const CARD_PAD3 = CARD_H3 * (CARD_PAD / CARD_H);
 
 /** Right-button drag vs click: OrbitControls pans on right-drag, so a context-menu after a drag is not an order. */
 const rmb = { x: 0, y: 0, moved: false };

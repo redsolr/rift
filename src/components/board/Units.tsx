@@ -11,7 +11,7 @@ import { TIER, cardKey, renderCard, tierOf } from "../cards";
 import { usePortraitsVersion } from "../portraits";
 import { CardAura, CardFoil } from "./CardFoil";
 import SelectionRing, { HpArc } from "./SelectionRing";
-import { CARD_H3, CARD_W3, TEAM_GLOW, dragged } from "./shared";
+import { CARD_H3, CARD_PAD3, CARD_W3, TEAM_GLOW, dragged } from "./shared";
 
 /** Billboarded FUT-style card. Texture is a cached canvas from cards.ts; `dim` marks an acted unit. */
 const textureCache = new Map<string, THREE.CanvasTexture>();
@@ -61,7 +61,7 @@ export function CardMesh({ def, dim, selected, opacity = 1, tint, cutaway = fals
   const boost = selected ? 0.5 : 0;
   const ghost = opacity < 1;
   return (
-    <Billboard follow lockX={false} lockY={false} lockZ={false} position={[0, CARD_H3 / 2 + 0.05 + lift, 0]}>
+    <Billboard follow lockX={false} lockY={false} lockZ={false} position={[0, CARD_H3 / 2 + 0.05 + lift - CARD_PAD3, 0]}>
       {/* a cut-away card also stops catching the pointer, so clicks/right-clicks reach the unit behind it */}
       <mesh raycast={cutaway ? () => null : undefined}>
         <planeGeometry args={[CARD_W3, CARD_H3]} />
