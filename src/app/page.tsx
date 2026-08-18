@@ -14,6 +14,7 @@ import PerfPanel from "@/components/perf/PerfPanel";
 import PitResult from "@/components/PitResult";
 import { UiLayoutBar, useUiLayout } from "@/components/ui/UiFrame";
 import PhaseBanner from "@/components/PhaseBanner";
+import { CharacterScreenHost } from "@/party/CharacterScreen";
 import { useGame } from "@/store/game";
 
 const Board = dynamic(() => import("@/components/Board"), { ssr: false });
@@ -89,6 +90,7 @@ export default function Home() {
           <UiLayoutBar />
           <PhaseBanner />
           <PitResult />
+          <CharacterScreenHost canOpen={() => !useGame.getState().drag} />
           {mobile && <div className="mobile-hint">{selectedName ?? hint}</div>}
           {mobile && <MobileControls />}
         </div>

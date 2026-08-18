@@ -7,6 +7,7 @@ import { pitConfig } from "@/sim/pit";
 export type { Effect, EffectStyle, Float, View, ViewUnit } from "./playback";
 import { DEFAULT_DOCTRINE, decodeConfig, defaultConfig, emptyMap, encodeConfig, makeUnit } from "@/sim/presets";
 import { AttackKind } from "@/sim/attacks";
+import { Equipment, gearUnit } from "@/sim/items";
 import {
   Action,
   Archetype,
@@ -141,6 +142,8 @@ interface GameState {
   simStats: SimStats | null;
   simProgress: number | null;
   shareCode: string | null;
+  /** the party's paper-dolls (hero unit id → slot → item), pushed by the party store; every config the store loads or holds is regeared from it */
+  gear: Record<string, Equipment>;
 
   // lifecycle
   setMode: (m: Mode) => void;
@@ -231,6 +234,8 @@ interface GameState {
   loadDefault: () => void;
   /** The Tower: load floor N's ramped config (Manual mode, you = blue) and open the planning phase */
   startPit: (floor: number) => void;
+  /** party gear changed: remember it and regear the current config (and every saved map — idempotent, base stats are kept on the unit) */
+  setGear: (gear: Record<string, Equipment>) => void;
 }
 
 /** True when the renderer has replayed every engine event — the only moment input is accepted. */
@@ -363,6 +368,17 @@ export const useGame = create<GameState>((set, get) => {
   };
 
   /** Everything that resets when a battle starts, ends or the setup changes. */
+  /** apply the party's gear to every unit that is a hero (by id); pure + idempotent (gearUnit keeps `base`) */
+  const gearConfig = (cfg: BattleConfig, gear: Record<string, Equipment> = get().gear): BattleConfig => {
+    let changed = false;
+    const units = cfg.units.map((u) => {
+      const g = gearUnit(u, gear[u.id] ?? {});
+      if (g !== u) changed = true;
+      return g;
+    });
+    return changed ? { ...cfg, units } : cfg;
+  };
+
   const resetPlayback = (cfg: BattleConfig, battle: Battle | null) => ({
     battle,
     events: battle ? [...battle.log] : [],
@@ -432,6 +448,7 @@ export const useGame = create<GameState>((set, get) => {
     simStats: null,
     simProgress: null,
     shareCode: null,
+    gear: {},
 
     setMode: (mode) => {
       stopTimer();
@@ -804,7 +821,7 @@ export const useGame = create<GameState>((set, get) => {
       // (e.g. the pre-2026-08-18 river) must never resurrect terrain the code has since changed
       const lib = { ...stored, maps: stored.maps.map((m) => (m.id === "default" ? { ...m, config: defaultConfig() } : m)) };
       const active = lib.maps.find((m) => m.id === lib.activeMapId) ?? null;
-      const config = active?.config ?? get().config;
+      const config = gearConfig(active?.config ?? get().config);
       stopTimer();
       usePerf.getState().markLoad(`map · ${active?.name ?? "skirmish"}`);
       const bv =typeof localStorage !== "undefined" ? localStorage.getItem("tactician.boardView") : null;
@@ -817,7 +834,8 @@ export const useGame = create<GameState>((set, get) => {
       if (!m) return;
       stopTimer();
       usePerf.getState().markLoad(`map · ${m.name}`);
-      set({ config: m.config, activeMapId: id, pit: null, ...resetPlayback(m.config, null), simStats: null });
+      const config = gearConfig(m.config);
+      set({ config, activeMapId: id, pit: null, ...resetPlayback(config, null), simStats: null });
       clearManual();
       persistMaps(s.maps, id);
     },
@@ -930,7 +948,8 @@ export const useGame = create<GameState>((set, get) => {
     },
     setUnitStats: (id, patch) => {
       const s = get();
-      const units = s.config.units.map((u) => (u.id === id ? { ...u, stats: { ...u.stats, ...patch } } : u));
+      // the editor edits the UNGEARED numbers; gear is re-applied on top
+      const units = s.config.units.map((u) => (u.id === id ? gearUnit({ ...u, stats: { ...(u.base ?? u.stats), ...patch }, base: undefined }, u.equipment ?? {}) : u));
       const config = { ...s.config, units };
       set({ config, view: initialView(config) });
     },
@@ -1002,7 +1021,7 @@ export const useGame = create<GameState>((set, get) => {
     },
     loadShareCode: (code) => {
       try {
-        const config = decodeConfig(code.trim());
+        const config = gearConfig(decodeConfig(code.trim()));
         stopTimer();
         set({ config, activeMapId: null, ...resetPlayback(config, null), simStats: null });
         clearManual();
@@ -1013,15 +1032,31 @@ export const useGame = create<GameState>((set, get) => {
       }
     },
     startPit: (floor) => {
-      const config = pitConfig(floor);
+      const config = gearConfig(pitConfig(floor));
       stopTimer();
       usePerf.getState().markLoad(`tower · floor ${floor}`);
       set({ config, activeMapId: null, mode: "manual", playerTeam: "blue", pit: { floor }, ...resetPlayback(config, null), simStats: null });
       clearManual();
       get().startBattle();
     },
+    setGear: (gear) => {
+      const s = get();
+      const config = gearConfig(s.config, gear);
+      const maps = s.maps.map((m) => {
+        const c = gearConfig(m.config, gear);
+        return c === m.config ? m : { ...m, config: c };
+      });
+      const mapsChanged = maps.some((m, i) => m !== s.maps[i]);
+      if (config === s.config && !mapsChanged) {
+        set({ gear });
+        return;
+      }
+      // a running battle keeps the engine's own copy; the next battle picks the new numbers up
+      set({ gear, config, maps: mapsChanged ? maps : s.maps, ...(s.battle ? {} : { view: initialView(config) }) });
+      if (mapsChanged) persistMaps(maps, s.activeMapId);
+    },
     loadDefault: () => {
-      const config = defaultConfig();
+      const config = gearConfig(defaultConfig());
       stopTimer();
       set({ config, activeMapId: null, pit: null, ...resetPlayback(config, null), simStats: null });
       clearManual();

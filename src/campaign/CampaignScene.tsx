@@ -11,6 +11,7 @@ import { ZONES } from "./world";
 import { villageStats } from "./world/village";
 import type { AABB, Zone, ZoneNpc } from "./world/types";
 import { inBox } from "./world/types";
+import { useParty } from "@/party/store";
 
 /**
  * Campaign — the walkable world. FE Three Houses monastery feel: third-person camera behind the player at a fixed
@@ -170,7 +171,7 @@ function World() {
   // wheel = zoom (in / out along the same fixed pitch)
   useEffect(() => {
     const onWheel = (e: WheelEvent) => {
-      if (useCampaign.getState().dialogue) return;
+      if (useCampaign.getState().dialogue || useParty.getState().open) return;
       zoom.current = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoom.current * Math.exp(e.deltaY * 0.0012)));
       (window as unknown as { __campaignZoom?: number }).__campaignZoom = zoom.current;
     };
@@ -180,7 +181,7 @@ function World() {
   // E / Enter to talk when close
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.key === "e" || e.key === "E" || e.key === "Enter" || e.key === " ") && useCampaign.getState().nearNpc && !useCampaign.getState().dialogue) {
+      if ((e.key === "e" || e.key === "E" || e.key === "Enter" || e.key === " ") && useCampaign.getState().nearNpc && !useCampaign.getState().dialogue && !useParty.getState().open) {
         e.preventDefault();
         talk();
       }
@@ -193,7 +194,8 @@ function World() {
     const st = useCampaign.getState();
     const z = ZONES[st.zone];
     const p = playerPos.current;
-    const frozen = !!st.dialogue || !!st.transition || st.tower;
+    // the character screen (C) freezes the walk too — WASD belong to the bag while it is open
+    const frozen = !!st.dialogue || !!st.transition || st.tower || useParty.getState().open;
     // --- movement
     let vx = 0;
     let vz = 0;
@@ -285,7 +287,7 @@ function World() {
   };
   const onFloorClick = (e: ThreeEvent<MouseEvent>) => {
     const st = useCampaign.getState();
-    if (st.dialogue || st.transition || st.tower) return;
+    if (st.dialogue || st.transition || st.tower || useParty.getState().open) return;
     e.stopPropagation();
     setTarget(e.point.x, e.point.z);
   };

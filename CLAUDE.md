@@ -24,6 +24,8 @@ src/campaign/     the walkable campaign world: CampaignScene (zone-agnostic cont
                   world/ = ZONES registry (kitchen.tsx, village.tsx + villageChunks.ts data; types.ts) — Persona-5 doors between
                   zones, only one zone mounted; the village streams a 5×5 chunk ring around the player
                   TowerPanel = the tower floor picker → /?pit=N (sim/pit.ts builds the ramped floor config; PitResult closes the loop)
+src/party/        the PARTY: store (bag + paper-dolls, localStorage `tactician.party`, pushes gear into useGame.setGear),
+                  inventory.ts = PURE bag/equip ops (tested), CharacterScreen (C / I) + party.css; sim/items.ts = item table + resolvers
 scripts/sim.ts    headless batch runner (npm run sim -- 1000)
 ```
 
@@ -32,6 +34,7 @@ scripts/sim.ts    headless batch runner (npm run sim -- 1000)
 - **Shared geometry helpers live in `sim/grid.ts`** (`tileHeight`, `tilesInRange`, `posKey`/`parseKey`, `pathTo`) — never re-derive a range diamond or tile height inline. `selectCaughtUp` is the one definition of "input is allowed now".
 - **Every AI decision is explainable.** `scoreActions()` returns candidates with named `terms`; the sum IS the score. Personality/orders/doctrine only add or scale terms — no per-archetype hardcoded branches. The "Why did it do that?" panel is a first-class feature, not a debug view.
 - Orders are data (`Orders`, `Doctrine`), so the editor, explain panel, share codes and future PvP order-locking all consume one schema.
+- **Gear never reaches the engine as items.** `sim/items.ts#applyEquipment` is the one definition of what gear adds; the store writes the result into `UnitDef.stats` (keeping the ungeared numbers in `UnitDef.base`, the paper-doll in `UnitDef.equipment`) before a battle — engine, cards, forecast, AI all read geared stats without knowing items exist. `gearUnit` is idempotent; the editor edits base.
 
 ## Commands
 
@@ -64,7 +67,7 @@ Selectors must return stable references — never `useGame((s) => s.config.units
 
 ## What NOT to build yet
 
-Story beyond the prologue prototype, accounts, backend, multiplayer, items, skill trees, more than 5 archetypes, cosmetics. The only question that matters right now: **do people press Rematch?**
+Story beyond the prologue prototype, accounts, backend, multiplayer, skill trees, more than 5 archetypes, cosmetics. (Items/inventory shipped 2026-08-18 — founder call — because Tower loot gives the climb a reason; keep it a flat stat layer, no crafting/economy.) The only question that matters right now: **do people press Rematch?**
 
 <!-- BEGIN:nextjs-agent-rules -->
 

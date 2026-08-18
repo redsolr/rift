@@ -84,6 +84,9 @@ export interface UnitDef {
   orders: Orders;
   x: number;
   y: number;
+  /** items worn (slot → item id, see sim/items.ts) — `stats` already INCLUDES their modifiers; `base` = the ungeared stats */
+  equipment?: Partial<Record<string, string>>;
+  base?: Stats;
 }
 
 export interface UnitState extends UnitDef {

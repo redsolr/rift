@@ -7,6 +7,8 @@ import { usePerf } from "@/components/perf/store";
 import CampaignScene from "./CampaignScene";
 import Dialogue from "./Dialogue";
 import TowerPanel from "./TowerPanel";
+import { CharacterScreenHost } from "@/party/CharacterScreen";
+import { useParty } from "@/party/store";
 import Minimap from "./Minimap";
 import { SPEAKERS } from "./script";
 import { useCampaign } from "./store";
@@ -27,6 +29,8 @@ export default function CampaignPage() {
   const talk = useCampaign((s) => s.talk);
   const perfOpen = usePerf((s) => s.open);
   const togglePerf = usePerf((s) => s.toggle);
+  const charOpen = useParty((s) => s.open);
+  const toggleChar = useParty((s) => s.toggleScreen);
   const router = useRouter();
   const zone = ZONES[zoneId];
   // one-time setup BEFORE the Canvas mounts (lazy initialiser): a deep link (`?at=tower` — coming back from a Tower
@@ -59,6 +63,9 @@ export default function CampaignPage() {
         <span className="campaign-chapter">
           Prologue · {zone.name} · {zone.subtitle}
         </span>
+        <button className={`campaign-perf ${charOpen ? "on" : ""}`} onClick={toggleChar} title="Character screen: heroes, gear, bag (C / I)">
+          ⚔ Character
+        </button>
         <button className={`campaign-perf ${perfOpen ? "on" : ""}`} onClick={togglePerf} title="System profiler: fps, frame time, draw calls, triangles, heap + per-zone load/fps table (F3)">
           ⌗ Perf
         </button>
@@ -71,7 +78,7 @@ export default function CampaignPage() {
           <kbd>W</kbd>
           <kbd>A</kbd>
           <kbd>S</kbd>
-          <kbd>D</kbd> walk · <kbd>Shift</kbd> run · click the floor to walk there · wheel = zoom · <kbd>E</kbd> talk · walk into a gold ring to leave
+          <kbd>D</kbd> walk · <kbd>Shift</kbd> run · click the floor to walk there · wheel = zoom · <kbd>E</kbd> talk · <kbd>C</kbd> character · walk into a gold ring to leave
         </div>
       )}
       {nearNpc && !dialogue && !transition && (
@@ -82,6 +89,12 @@ export default function CampaignPage() {
       {!dialogue && <Minimap />}
       <Dialogue />
       <TowerPanel />
+      <CharacterScreenHost
+        canOpen={() => {
+          const s = useCampaign.getState();
+          return !s.dialogue && !s.tower && !s.transition;
+        }}
+      />
       {/* zone travel: black fade + area title card (Persona 5 area name read) */}
       <div className={`campaign-fade ${dark ? "dark" : ""} ${transition ? "" : "off"}`} aria-hidden />
       {transition?.phase === "title" && (

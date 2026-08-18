@@ -2,6 +2,7 @@
 import { Mode, useGame } from "@/store/game";
 import { useUiLayout } from "./ui/UiFrame";
 import { usePerf } from "./perf/store";
+import { useParty } from "@/party/store";
 
 const MODES: { id: Mode; label: string; hint: string }[] = [
   { id: "manual", label: "Manual", hint: "You move every unit" },
@@ -41,6 +42,8 @@ export default function Hud() {
   const showDanger = useGame((s) => s.showDanger);
   const toggleDanger = useGame((s) => s.toggleDanger);
   const perfOpen = usePerf((s) => s.open);
+  const charOpen = useParty((s) => s.open);
+  const toggleChar = useParty((s) => s.toggleScreen);
   const togglePerf = usePerf((s) => s.toggle);
   const uiEditing = useUiLayout((s) => s.editing);
   const toggleUiEdit = useUiLayout((s) => s.toggleEditing);
@@ -171,6 +174,9 @@ export default function Hud() {
           </button>
         )}
 
+        <button className={`ghost char-toggle ${charOpen ? "on" : ""}`} onClick={toggleChar} title="Character screen: your heroes, their gear and the bag (C / I)">
+          ⚔<span className="btn-text"> Character</span>
+        </button>
         <button className={`ghost view-toggle ${perfOpen ? "on" : ""}`} onClick={togglePerf} title="System profiler: fps, frame time, draw calls, triangles, heap + per-map load/fps table (F3)">
           ⌗<span className="btn-text"> Perf</span>
         </button>
