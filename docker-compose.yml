@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: rift-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: rift
+      POSTGRES_PASSWORD: rift
+      POSTGRES_DB: rift
+    ports:
+      - "5441:5432"
+    volumes:
+      - rift_pgdata:/var/lib/postgresql/data
+
+volumes:
+  rift_pgdata:

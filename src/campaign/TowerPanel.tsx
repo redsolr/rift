@@ -32,7 +32,7 @@ function TowerCard() {
   }, [close]);
   const maxOpen = Math.min(PIT_MAX, cleared + 1);
   const floors = useMemo(() => Array.from({ length: Math.min(PIT_MAX, maxOpen + 4) }, (_, i) => i + 1), [maxOpen]);
-  const go = () => router.push(`/?pit=${floor}`);
+  const go = () => router.push(`/skirmish?pit=${floor}`);
   const tag = (f: number) => {
     if ((f - 1) % PIT_STEP !== 0 || f === 1) return null;
     const prev = pitArchetypes(f - 1);

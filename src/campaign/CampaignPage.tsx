@@ -50,7 +50,7 @@ export default function CampaignPage() {
   }, []);
   // "to-battle" effect: after the last line closes, go to the skirmish
   useEffect(() => {
-    if (leaving && !dialogue) router.push("/");
+    if (leaving && !dialogue) router.push("/skirmish");
   }, [leaving, dialogue, router]);
 
   const titleZone = transition ? ZONES[transition.to] : zone;
@@ -70,7 +70,7 @@ export default function CampaignPage() {
           ⌗ Perf
         </button>
         <Link className="campaign-back" href="/">
-          ← Skirmish
+          ← Menu
         </Link>
       </div>
       {!dialogue && !transition && !tower && (

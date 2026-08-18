@@ -32,7 +32,7 @@ export default function PitResult() {
   }, [pit, won, floor, grantFloorLoot]);
   if (!pit || !ended) return null;
   const go = (f: number) => {
-    history.replaceState(null, "", `/?pit=${f}`);
+    history.replaceState(null, "", `/skirmish?pit=${f}`);
     startPit(f);
   };
   return (

@@ -42,3 +42,6 @@ next-env.d.ts
 
 # local dev-server log (npm run dev > .next-dev.log)
 .next-dev.log
+
+# the example env IS tracked (the real .env.local is not)
+!.env.example

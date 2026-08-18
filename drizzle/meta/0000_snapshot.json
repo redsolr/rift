@@ -1,0 +1,324 @@
+{
+  "id": "26856002-7079-4294-820b-5a30faab4083",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.arena_matches": {
+      "name": "arena_matches",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "sim_version": {
+          "name": "sim_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "seed": {
+          "name": "seed",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "player_a": {
+          "name": "player_a",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "player_b": {
+          "name": "player_b",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "lineup_a": {
+          "name": "lineup_a",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "lineup_b": {
+          "name": "lineup_b",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "legs": {
+          "name": "legs",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "winner": {
+          "name": "winner",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mmr_a_before": {
+          "name": "mmr_a_before",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mmr_a_after": {
+          "name": "mmr_a_after",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mmr_b_before": {
+          "name": "mmr_b_before",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mmr_b_after": {
+          "name": "mmr_b_after",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "arena_matches_a_idx": {
+          "name": "arena_matches_a_idx",
+          "columns": [
+            {
+              "expression": "player_a",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "arena_matches_b_idx": {
+          "name": "arena_matches_b_idx",
+          "columns": [
+            {
+              "expression": "player_b",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "arena_matches_player_a_arena_players_id_fk": {
+          "name": "arena_matches_player_a_arena_players_id_fk",
+          "tableFrom": "arena_matches",
+          "tableTo": "arena_players",
+          "columnsFrom": [
+            "player_a"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "arena_matches_player_b_arena_players_id_fk": {
+          "name": "arena_matches_player_b_arena_players_id_fk",
+          "tableFrom": "arena_matches",
+          "tableTo": "arena_players",
+          "columnsFrom": [
+            "player_b"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.arena_players": {
+      "name": "arena_players",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "token": {
+          "name": "token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "handle": {
+          "name": "handle",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bot": {
+          "name": "bot",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "bot_key": {
+          "name": "bot_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mmr": {
+          "name": "mmr",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1000
+        },
+        "wins": {
+          "name": "wins",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "losses": {
+          "name": "losses",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "draws": {
+          "name": "draws",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "lineup": {
+          "name": "lineup",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lineup_updated_at": {
+          "name": "lineup_updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_match_at": {
+          "name": "last_match_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "last_seen_at": {
+          "name": "last_seen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "arena_players_mmr_idx": {
+          "name": "arena_players_mmr_idx",
+          "columns": [
+            {
+              "expression": "mmr",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "arena_players_token_unique": {
+          "name": "arena_players_token_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "token"
+          ]
+        },
+        "arena_players_bot_key_unique": {
+          "name": "arena_players_bot_key_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "bot_key"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

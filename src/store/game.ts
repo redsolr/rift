@@ -4,6 +4,7 @@ import { Battle, SimStats, runMany } from "@/sim/battle";
 import { Effect, Float, View, applyEvent, initialPlayback, initialView } from "./playback";
 import { usePerf } from "@/components/perf/store";
 import { pitConfig } from "@/sim/pit";
+import { Leg, Lineup, buildLegConfig, teamOf } from "@/arena/lineup";
 export type { Effect, EffectStyle, Float, View, ViewUnit } from "./playback";
 import { DEFAULT_DOCTRINE, decodeConfig, defaultConfig, emptyMap, encodeConfig, makeUnit } from "@/sim/presets";
 import { AttackKind } from "@/sim/attacks";
@@ -23,9 +24,24 @@ import {
   TERRAIN,
   UnitDef,
 } from "@/sim/types";
-import { idx, inBounds, passable, terrainAt, unitAt } from "@/sim/grid";
+import { deployZone, idx, inBounds, passable, terrainAt, unitAt } from "@/sim/grid";
 
 export type Mode = "manual" | "manager" | "editor";
+/** A ladder match leg loaded for watching (see /play): both lineups + seed rebuild the exact battle the server scored. */
+export interface ArenaWatch {
+  matchId: string;
+  leg: Leg;
+  seed: number;
+  lineupA: Lineup;
+  lineupB: Lineup;
+  /** the viewer's side, if they played */
+  mySide: "a" | "b" | null;
+  handles: { a: string; b: string };
+  /** the ladder's verdict for the whole match */
+  winner: "a" | "b" | "draw";
+  /** the ladder's per-leg verdicts (engine winner team) — the replay must agree */
+  legWinners: [string, string];
+}
 /** Board dressing: "scene" = textured city map (grid only while a unit is selected); "tiles" = flat coloured blocks with gaps (debug). */
 export type BoardView = "scene" | "tiles";
 /** FE command flow after a unit is placed: command list → attack picker → target select. */
@@ -139,6 +155,8 @@ interface GameState {
   planning: boolean;
   /** a Tower climb in progress: which floor this battle is (null = ordinary skirmish) */
   pit: { floor: number } | null;
+  /** an arena replay being watched: which match / leg, who plays whom (null = not watching a ladder match) */
+  arena: ArenaWatch | null;
   simStats: SimStats | null;
   simProgress: number | null;
   shareCode: string | null;
@@ -234,6 +252,8 @@ interface GameState {
   loadDefault: () => void;
   /** The Tower: load floor N's ramped config (Manual mode, you = blue) and open the planning phase */
   startPit: (floor: number) => void;
+  /** Multiplayer: watch one leg of a ladder match — the config is rebuilt from the two lineups, run to the end and replayed */
+  watchArena: (w: ArenaWatch) => void;
   /** party gear changed: remember it and regear the current config (and every saved map — idempotent, base stats are kept on the unit) */
   setGear: (gear: Record<string, Equipment>) => void;
 }
@@ -246,20 +266,8 @@ export const selectCaughtUp = (s: Pick<GameState, "cursor" | "events">) => s.cur
  * pointer, and whether that drop is legal. Keyed off groundHover (the pointer vs the GROUND, ignoring cards).
  * null when nothing is being placed or the pointer is off the board.
  */
-/** Planning phase deploy zone: the DEPLOY_ROWS rows on `team`'s side of the map (the side its units start on), passable tiles only. */
-export const DEPLOY_ROWS = 4;
-export function deployZone(config: BattleConfig, team: Team): Pos[] {
-  const map = config.map;
-  const mine = config.units.filter((u) => u.team === team);
-  // which side is "ours": where our units' centre of mass sits (blue = the near/bottom rows on the default map)
-  const avgY = mine.length ? mine.reduce((a, u) => a + u.y, 0) / mine.length : map.height - 1;
-  const near = avgY >= (map.height - 1) / 2;
-  const rows = Math.min(DEPLOY_ROWS, map.height);
-  const y0 = near ? map.height - rows : 0;
-  const out: Pos[] = [];
-  for (let y = y0; y < y0 + rows; y++) for (let x = 0; x < map.width; x++) if (passable(map, { x, y })) out.push({ x, y });
-  return out;
-}
+// Planning phase deploy zone lives in sim/grid (pure — the arena's server code shares it); re-exported for the board.
+export { DEPLOY_ROWS, deployZone } from "@/sim/grid";
 
 export function selectDropTarget(s: Pick<GameState, "mode" | "drag" | "tool" | "groundHover" | "config" | "planning" | "playerTeam">): DropTarget | null {
   if (s.mode !== "editor" && !s.planning) return null;
@@ -466,6 +474,7 @@ export const useGame = create<GameState>((set, get) => {
     drag: null,
     planning: false,
     pit: null,
+    arena: null,
     simStats: null,
     simProgress: null,
     shareCode: null,
@@ -473,7 +482,7 @@ export const useGame = create<GameState>((set, get) => {
 
     setMode: (mode) => {
       stopTimer();
-      set({ mode, ...resetPlayback(get().config, null), tool: { kind: "select" }, drag: null, planning: false });
+      set({ mode, ...resetPlayback(get().config, null), tool: { kind: "select" }, drag: null, planning: false, arena: null });
       clearManual();
     },
 
@@ -841,7 +850,7 @@ export const useGame = create<GameState>((set, get) => {
       stopTimer();
       usePerf.getState().markLoad(`map · ${m.name}`);
       const config = gearConfig(m.config);
-      set({ config, activeMapId: id, pit: null, ...resetPlayback(config, null), simStats: null });
+      set({ config, activeMapId: id, pit: null, arena: null, ...resetPlayback(config, null), simStats: null });
       clearManual();
       persistMaps(s.maps, id);
     },
@@ -1020,7 +1029,7 @@ export const useGame = create<GameState>((set, get) => {
       try {
         const config = gearConfig(decodeConfig(code.trim()));
         stopTimer();
-        set({ config, activeMapId: null, ...resetPlayback(config, null), simStats: null });
+        set({ config, activeMapId: null, pit: null, arena: null, ...resetPlayback(config, null), simStats: null });
         clearManual();
         persistMaps(get().maps, null);
         return true;
@@ -1032,9 +1041,20 @@ export const useGame = create<GameState>((set, get) => {
       const config = gearConfig(pitConfig(floor));
       stopTimer();
       usePerf.getState().markLoad(`tower · floor ${floor}`);
-      set({ config, activeMapId: null, mode: "manual", playerTeam: "blue", pit: { floor }, ...resetPlayback(config, null), simStats: null });
+      set({ config, activeMapId: null, mode: "manual", playerTeam: "blue", pit: { floor }, arena: null, ...resetPlayback(config, null), simStats: null });
       clearManual();
       get().startBattle();
+    },
+    watchArena: (w) => {
+      const config = buildLegConfig(w.lineupA, w.lineupB, w.leg);
+      stopTimer();
+      usePerf.getState().markLoad(`arena · leg ${w.leg}`);
+      const battle = new Battle(config, w.seed);
+      battle.runToEnd();
+      const playerTeam: Team = w.mySide ? teamOf(w.mySide, w.leg) : "blue";
+      set({ config, activeMapId: null, mode: "manager", playerTeam, pit: null, arena: w, planning: false, drag: null, seed: w.seed, ...resetPlayback(config, battle), simStats: null });
+      clearManual();
+      startPlayback();
     },
     setGear: (gear) => {
       const s = get();
@@ -1055,7 +1075,7 @@ export const useGame = create<GameState>((set, get) => {
     loadDefault: () => {
       const config = gearConfig(defaultConfig());
       stopTimer();
-      set({ config, activeMapId: null, pit: null, ...resetPlayback(config, null), simStats: null });
+      set({ config, activeMapId: null, pit: null, arena: null, ...resetPlayback(config, null), simStats: null });
       clearManual();
       persistMaps(get().maps, null);
     },

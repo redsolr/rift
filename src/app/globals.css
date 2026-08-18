@@ -2953,3 +2953,49 @@ button.link {
 .mc-skill.el-holy {
   border-color: #c8ffd8;
 }
+
+/* ---- Multiplayer replay chrome (ArenaResult): the match strip under the HUD + the end-of-leg card ---- */
+a.brand {
+  text-decoration: none;
+}
+a.brand:hover {
+  color: #fff3c4;
+}
+.arena-strip {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  z-index: 55;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  border: 1px solid #2a3142;
+  border-radius: 999px;
+  background: rgba(8, 10, 16, 0.86);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.arena-strip .arena-kicker {
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: #9aa3b8;
+}
+.arena-strip .muted {
+  color: #8a93a8;
+}
+.arena-strip b.blue {
+  color: #7fb0ff;
+}
+.arena-strip b.red {
+  color: #ff8a80;
+}
+.arena-strip button.ghost {
+  padding: 3px 9px;
+  font-size: 11px;
+}
+.stage.mobile .arena-strip {
+  top: 4px;
+  gap: 8px;
+  font-size: 11px;
+}

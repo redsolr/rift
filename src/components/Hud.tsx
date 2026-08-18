@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { Mode, useGame } from "@/store/game";
 import { useUiLayout } from "./ui/UiFrame";
 import { usePerf } from "./perf/store";
@@ -39,6 +40,7 @@ export default function Hud() {
   const cancelPending = useGame((s) => s.cancelPending);
   const playerTeam = useGame((s) => s.playerTeam);
   const seed = useGame((s) => s.seed);
+  const arena = useGame((s) => s.arena);
   const showDanger = useGame((s) => s.showDanger);
   const toggleDanger = useGame((s) => s.toggleDanger);
   const perfOpen = usePerf((s) => s.open);
@@ -61,15 +63,20 @@ export default function Hud() {
   return (
     <div className="hud">
       <div className="hud-left">
-        <span className="brand">TACTICIAN</span>
+        <Link className="brand" href="/" title="Main menu">
+          RIFT
+        </Link>
         <nav className="mode-tabs">
           {MODES.map((m) => (
             <button key={m.id} className={m.id === mode ? "tab active" : "tab"} title={m.hint} onClick={() => setMode(m.id)}>
               {m.label}
             </button>
           ))}
-          <a className="tab" href="/campaign" title="Campaign prototype — walk the room, talk to Mina">
-            Campaign
+          <a className="tab" href="/campaign" title="Story — walk the village, climb the Tower">
+            Story
+          </a>
+          <a className="tab" href="/play" title="Multiplayer — ranked ladder">
+            Multiplayer
           </a>
         </nav>
       </div>
@@ -154,7 +161,7 @@ export default function Hud() {
             Start battle
           </button>
         )}
-        {mode === "manager" && commandPhase && !ended && (
+        {mode === "manager" && commandPhase && !ended && !arena && (
           <>
             <select value={phaseLen} onChange={(e) => setPhaseLen(Number(e.target.value))} title="Turns per execution phase">
               <option value={1}>1 turn</option>
@@ -194,12 +201,12 @@ export default function Hud() {
         <button className={`ghost view-toggle ${boardView === "tiles" ? "on" : ""}`} onClick={toggleBoardView} title="Debug: flat coloured terrain blocks instead of the dressed city map">
           ▤<span className="btn-text"> Tiles</span>
         </button>
-        {ended && (
+        {ended && !arena && (
           <button className="primary" onClick={rematch} title={`Next seed (${seed + 1})`}>
             Rematch
           </button>
         )}
-        {battle && (
+        {battle && !arena && (
           <button className="ghost" onClick={resetToSetup} title="Back to setup">
             ↺<span className="btn-text"> Reset</span>
           </button>

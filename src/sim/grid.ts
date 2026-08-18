@@ -1,5 +1,20 @@
-import { MapDef, Pos, TERRAIN, Terrain, UnitState } from "./types";
+import { BattleConfig, MapDef, Pos, TERRAIN, Team, Terrain, UnitState } from "./types";
 import { effectiveMov } from "./runes";
+
+/** Planning phase deploy zone: the DEPLOY_ROWS rows on `team`'s side of the map (the side its units start on), passable tiles only. */
+export const DEPLOY_ROWS = 4;
+export function deployZone(config: BattleConfig, team: Team): Pos[] {
+  const map = config.map;
+  const mine = config.units.filter((u) => u.team === team);
+  // which side is "ours": where our units' centre of mass sits (blue = the near/bottom rows on the default map)
+  const avgY = mine.length ? mine.reduce((a, u) => a + u.y, 0) / mine.length : map.height - 1;
+  const near = avgY >= (map.height - 1) / 2;
+  const rows = Math.min(DEPLOY_ROWS, map.height);
+  const y0 = near ? map.height - rows : 0;
+  const out: Pos[] = [];
+  for (let y = y0; y < y0 + rows; y++) for (let x = 0; x < map.width; x++) if (passable(map, { x, y })) out.push({ x, y });
+  return out;
+}
 
 export const idx = (map: MapDef, x: number, y: number) => y * map.width + x;
 export const inBounds = (map: MapDef, x: number, y: number) =>
