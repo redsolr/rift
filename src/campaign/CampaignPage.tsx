@@ -7,6 +7,7 @@ import { usePerf } from "@/components/perf/store";
 import CampaignScene from "./CampaignScene";
 import Dialogue from "./Dialogue";
 import TowerPanel from "./TowerPanel";
+import Minimap from "./Minimap";
 import { SPEAKERS } from "./script";
 import { useCampaign } from "./store";
 import { ZONES } from "./world";
@@ -78,6 +79,7 @@ export default function CampaignPage() {
           <kbd>E</kbd>Talk to {SPEAKERS[nearNpc].name}
         </button>
       )}
+      {!dialogue && <Minimap />}
       <Dialogue />
       <TowerPanel />
       {/* zone travel: black fade + area title card (Persona 5 area name read) */}

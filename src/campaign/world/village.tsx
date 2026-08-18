@@ -42,6 +42,8 @@ const AMBIENT: Ambient[] = [
   { id: "a-knight", model: "Knight", x: -2.6, z: 3.5, facing: -0.6, height: 1.66 },
   { id: "a-barb", model: "Barbarian", x: 3.2, z: -18.4, facing: -2.2, height: 1.72 },
 ];
+/** villager spots for the minimap */
+export const AMBIENT_SPOTS: { x: number; z: number }[] = AMBIENT.map((v) => ({ x: v.x, z: v.z }));
 const AMBIENT_OBSTACLES: AABB[] = AMBIENT.map((v) => [v.x - 0.35, v.x + 0.35, v.z - 0.35, v.z + 0.35]);
 
 export const VILLAGE: Zone = {

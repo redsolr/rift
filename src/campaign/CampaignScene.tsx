@@ -5,6 +5,7 @@ import * as THREE from "three";
 import PerfProbe from "@/components/perf/PerfProbe";
 import Character from "./Character";
 import { SPEAKERS, SpeakerId } from "./script";
+import { live } from "./live";
 import { useCampaign } from "./store";
 import { ZONES } from "./world";
 import { villageStats } from "./world/village";
@@ -240,6 +241,10 @@ function World() {
         useCampaign.getState().openTower();
       } else if (!inTrig) trigArmed.current = false;
     }
+    // --- publish for HTML overlays (minimap)
+    live.x = p.x;
+    live.z = p.z;
+    live.heading = heading.current;
     // --- proximity to NPCs
     let near: SpeakerId | null = null;
     let best = TALK_DIST;

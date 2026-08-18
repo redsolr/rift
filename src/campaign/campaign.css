@@ -764,3 +764,35 @@
 .tower-close:hover {
   color: #ffd54f;
 }
+
+/* --- minimap (top-right, under the HUD) --- */
+.campaign-minimap {
+  position: absolute;
+  top: 52px;
+  right: 14px;
+  z-index: 6;
+  padding: 4px;
+  background: rgba(8, 10, 16, 0.72);
+  border: 1px solid #2a3142;
+  border-radius: 10px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+.campaign-minimap canvas {
+  display: block;
+  border-radius: 6px;
+}
+.campaign-minimap-n {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  font: 700 10px ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0.1em;
+  color: #ffd54f;
+  text-shadow: 0 1px 2px #000;
+}
+/* the profiler slides under the minimap in the campaign */
+.campaign .perf {
+  top: 236px;
+}
