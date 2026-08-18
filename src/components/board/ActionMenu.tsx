@@ -7,7 +7,8 @@ import { CARD_H3 } from "./shared";
 
 /**
  * FE-style command menu at the unit's pending tile. Three pages, exactly the FE cadence:
- *   command  — Attack (or Heal) · Wait · Cancel, opens the moment the unit is placed
+ *   command  — Attack (or Heal) · Move · Wait · Cancel, opens the moment a tile is picked (the card has NOT moved yet:
+ *              the ghost marks the tile; Move = go there and end, Wait = end where it stands, Attack = go there and strike)
  *   attacks  — NOT here: components/SkillPanel (full-height framed panel on the right, FE-style)
  *   target   — NO menu: the centred AttackPrompt (components/AttackPrompt) + red tiles / battle bar carry it
  */
@@ -17,6 +18,8 @@ export default function ActionMenu() {
   const battle = useGame((s) => s.battle);
   const selected = useGame((s) => s.selected);
   const commitWait = useGame((s) => s.commitWait);
+  const commitMove = useGame((s) => s.commitMove);
+  const unitPos = useGame((s) => (s.selected ? s.view.units[s.selected] : null));
   const cancelPending = useGame((s) => s.cancelPending);
   const openAttacks = useGame((s) => s.openAttacks);
   const setHoverAttack = useGame((s) => s.setHoverAttack);
@@ -33,6 +36,7 @@ export default function ActionMenu() {
   const hasHeals = options.some((o) => o.attack.kind === "heal");
   const nAttack = new Set(options.filter((o) => o.attack.kind === "attack").flatMap((o) => o.targets)).size;
   const nHeal = new Set(options.filter((o) => o.attack.kind === "heal").flatMap((o) => o.targets)).size;
+  const moving = !!unitPos && (unitPos.x !== pendingMove.x || unitPos.y !== pendingMove.y);
 
   return (
     // FE: the menu hangs about two tiles to the RIGHT of the unit, level with its card, never over it
@@ -62,7 +66,12 @@ export default function ActionMenu() {
                 <span className="action-meta">{nHeal || "—"}</span>
               </button>
             )}
-            <button className="action-row" onClick={commitWait}>
+            {moving && (
+              <button className="action-row" onClick={commitMove} title={`Move to ${pendingMove.x},${pendingMove.y} and end`}>
+                <span className="action-cursor">◆</span>Move
+              </button>
+            )}
+            <button className="action-row" onClick={commitWait} title="End the action where the unit stands">
               <span className="action-cursor">◆</span>Wait
             </button>
             <button className="action-row back" onClick={cancelPending}>

@@ -130,7 +130,7 @@ export function applyEvent(prev: PlaybackState, e: BattleEvent, cfg: BattleConfi
     case "attack": {
       const a = v.units[e.attacker];
       const t = v.units[e.target];
-      focus = { x: (a.x + t.x) / 2, y: (a.y + t.y) / 2, zoom: "keep" };
+      // no camera pan on actions — the camera follows MOVEMENT only (2026-08-18)
       v.units[e.attacker] = { ...a, actionSeq: a.actionSeq + 1, acted: true };
       v.units[e.target] = { ...t, hp: e.targetHp, hitSeq: t.hitSeq + 1 };
       floats.push({ key: ++floatKey, unit: e.target, text: `-${e.damage}`, color: "#ff5c5c" });
@@ -148,7 +148,6 @@ export function applyEvent(prev: PlaybackState, e: BattleEvent, cfg: BattleConfi
     case "heal": {
       const h = v.units[e.healer];
       const t = v.units[e.target];
-      focus = { x: (h.x + t.x) / 2, y: (h.y + t.y) / 2, zoom: "keep" };
       v.units[e.healer] = { ...h, actionSeq: h.actionSeq + 1, acted: true };
       v.units[e.target] = { ...t, hp: e.targetHp };
       floats.push({ key: ++floatKey, unit: e.target, text: `+${e.amount}`, color: "#6cf58a" });
@@ -169,7 +168,6 @@ export function applyEvent(prev: PlaybackState, e: BattleEvent, cfg: BattleConfi
       v.units[e.unit] = { ...u, buff: { kind: e.rune, turns: e.turns } };
       floats.push({ key: ++floatKey, unit: e.unit, text: `${RUNES[e.rune].glyph} ${RUNES[e.rune].label}`, color: RUNES[e.rune].color });
       effects.push({ key: ++effectKey, kind: "burst", style: "rune", at: e.at, delay: 0, color: RUNES[e.rune].color });
-      focus = { x: e.at.x, y: e.at.y, zoom: "keep" };
       break;
     }
     case "rune_expire":
@@ -191,7 +189,6 @@ export function applyEvent(prev: PlaybackState, e: BattleEvent, cfg: BattleConfi
     case "wait": {
       const w = v.units[e.unit];
       v.units[e.unit] = { ...w, acted: true };
-      focus = { x: w.x, y: w.y, zoom: "keep" };
       break;
     }
   }

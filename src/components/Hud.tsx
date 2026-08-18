@@ -1,6 +1,7 @@
 "use client";
 import { Mode, useGame } from "@/store/game";
 import { useUiLayout } from "./ui/UiFrame";
+import { usePerf } from "./perf/store";
 
 const MODES: { id: Mode; label: string; hint: string }[] = [
   { id: "manual", label: "Manual", hint: "You move every unit" },
@@ -34,11 +35,14 @@ export default function Hud() {
   const selected = useGame((s) => s.selected);
   const moveTiles = useGame((s) => s.moveTiles);
   const commitWait = useGame((s) => s.commitWait);
+  const commitMove = useGame((s) => s.commitMove);
   const cancelPending = useGame((s) => s.cancelPending);
   const playerTeam = useGame((s) => s.playerTeam);
   const seed = useGame((s) => s.seed);
   const showDanger = useGame((s) => s.showDanger);
   const toggleDanger = useGame((s) => s.toggleDanger);
+  const perfOpen = usePerf((s) => s.open);
+  const togglePerf = usePerf((s) => s.toggle);
   const uiEditing = useUiLayout((s) => s.editing);
   const toggleUiEdit = useUiLayout((s) => s.toggleEditing);
   const boardView = useGame((s) => s.boardView);
@@ -132,8 +136,8 @@ export default function Hud() {
         )}
         {mode === "manual" && yourTurn && selected && moveTiles.length > 0 && (
           <>
-            <button className="primary" onClick={commitWait}>
-              {pendingMove ? "Wait here" : "Wait"}
+            <button className="primary" onClick={pendingMove ? commitMove : commitWait}>
+              {pendingMove ? "Move" : "Wait"}
             </button>
             {pendingMove && (
               <button className="ghost" onClick={cancelPending}>
@@ -168,6 +172,9 @@ export default function Hud() {
           </button>
         )}
 
+        <button className={`ghost view-toggle ${perfOpen ? "on" : ""}`} onClick={togglePerf} title="System profiler: fps, frame time, draw calls, triangles, heap + per-map load/fps table (F3)">
+          ⌗<span className="btn-text"> Perf</span>
+        </button>
         <button className={`ghost ui-toggle ${uiEditing ? "on" : ""}`} onClick={toggleUiEdit} title="UI layout: move and resize the HUD frames (WoW-addon style)">
           ⧉<span className="btn-text"> UI</span>
         </button>

@@ -2,6 +2,7 @@
 import { create } from "zustand";
 import { Battle, SimStats, runMany } from "@/sim/battle";
 import { Effect, Float, View, applyEvent, initialPlayback, initialView } from "./playback";
+import { usePerf } from "@/components/perf/store";
 export type { Effect, EffectStyle, Float, View, ViewUnit } from "./playback";
 import { DEFAULT_DOCTRINE, decodeConfig, defaultConfig, emptyMap, encodeConfig, makeUnit } from "@/sim/presets";
 import { AttackKind } from "@/sim/attacks";
@@ -172,7 +173,10 @@ interface GameState {
   openAttacks: (kind?: AttackKind) => void;
   chooseAttack: (id: string) => void;
   setHoverAttack: (id: string | null) => void;
+  /** WAIT = end the action where the unit STANDS (no move) */
   commitWait: () => void;
+  /** MOVE = go to the pending tile and end the action there */
+  commitMove: () => void;
   /** attack/heal `id` with the chosen attack, else the best usable one from the pending tile */
   commitTarget: (id: string) => void;
   endPhaseAI: () => void;
@@ -698,7 +702,12 @@ export const useGame = create<GameState>((set, get) => {
       const s = get();
       if (!s.battle || !s.selected) return;
       const u = s.battle.unit(s.selected);
-      commit({ kind: "wait", unit: u.id, moveTo: s.pendingMove ?? { x: u.x, y: u.y } });
+      commit({ kind: "wait", unit: u.id, moveTo: { x: u.x, y: u.y } });
+    },
+    commitMove: () => {
+      const s = get();
+      if (!s.battle || !s.selected || !s.pendingMove) return;
+      commit({ kind: "wait", unit: s.selected, moveTo: s.pendingMove });
     },
 
     commitTarget: (id) => {
@@ -778,7 +787,8 @@ export const useGame = create<GameState>((set, get) => {
       const active = lib.maps.find((m) => m.id === lib.activeMapId) ?? null;
       const config = active?.config ?? get().config;
       stopTimer();
-      const bv = typeof localStorage !== "undefined" ? localStorage.getItem("tactician.boardView") : null;
+      usePerf.getState().markLoad(`map · ${active?.name ?? "skirmish"}`);
+      const bv =typeof localStorage !== "undefined" ? localStorage.getItem("tactician.boardView") : null;
       set({ maps: lib.maps, activeMapId: active?.id ?? null, config, ...resetPlayback(config, null), ...(bv === "tiles" ? { boardView: "tiles" as BoardView } : {}) });
       clearManual();
     },
@@ -787,6 +797,7 @@ export const useGame = create<GameState>((set, get) => {
       const m = s.maps.find((x) => x.id === id);
       if (!m) return;
       stopTimer();
+      usePerf.getState().markLoad(`map · ${m.name}`);
       set({ config: m.config, activeMapId: id, ...resetPlayback(m.config, null), simStats: null });
       clearManual();
       persistMaps(s.maps, id);
