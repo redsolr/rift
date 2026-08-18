@@ -4,7 +4,7 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { deployZone, selectCaughtUp, selectDropTarget, useGame } from "@/store/game";
 import { parseKey, pathTo, reachable, standable, terrainAt, tileHeight, tilesInRange } from "@/sim/grid";
-import { attackById, attackRange, tilesInAnyRange } from "@/sim/attacks";
+import { attackById, attackRange } from "@/sim/attacks";
 import { Pos, TERRAIN, UnitDef, UnitState, otherTeam } from "@/sim/types";
 import { makeUnit } from "@/sim/presets";
 
@@ -142,8 +142,10 @@ export default function Highlights() {
   const pendingRange = useMemo(() => {
     if (!attackOrigin || !selDef) return [];
     if (focusAttack) return tilesInRange(config.map, attackOrigin, ...attackRange(selDef, attackById(selDef, focusAttack)));
-    return tilesInAnyRange(config.map, { ...selDef, hp: 0, alive: true, acted: false, buff: null }, attackOrigin, healing ? "heal" : "attack");
-  }, [attackOrigin, selDef, focusAttack, healing, config.map]);
+    // FE: the default diamond is the EQUIPPED WEAPON's range (stats.rangeMin..rangeMax), not the union of every attack —
+    // the union (Long Shot / Long Thrust reach) painted half the map. An attack's own range shows when it is hovered / picked.
+    return tilesInRange(config.map, attackOrigin, selDef.stats.rangeMin, selDef.stats.rangeMax);
+  }, [attackOrigin, selDef, focusAttack, config.map]);
   // movement path to the previewed tile
   const path = useMemo(() => {
     if (!previewFrom || !selected || !battle || !caughtUp) return null;
@@ -180,7 +182,7 @@ export default function Highlights() {
           allyAt(p) && !healing ? (
             <Highlight key={`q${p.x},${p.y}`} x={p.x} y={p.y} color={mine ? "#6f8fff" : "#ff7a7a"} opacity={mine ? 0.5 : 0.3} border={mine ? "#e8eeff" : undefined} borderOpacity={0.8} lift={0.03} />
           ) : (
-            <Highlight key={`q${p.x},${p.y}`} x={p.x} y={p.y} color={healing ? "#7ff29a" : "#ff6f8c"} opacity={0.36} border={healing ? "#b8ffc8" : "#ff3d5c"} borderOpacity={0.85} lift={0.03} />
+            <Highlight key={`q${p.x},${p.y}`} x={p.x} y={p.y} color={healing ? "#7ff29a" : "#ff6f8c"} opacity={0.24} border={healing ? "#b8ffc8" : "#ff3d5c"} borderOpacity={0.7} lift={0.03} />
           ),
         )}
       {targets.map((id) => {
