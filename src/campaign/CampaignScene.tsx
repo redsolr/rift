@@ -138,6 +138,8 @@ function World() {
   const gait = useRef<"idle" | "walk" | "run">("idle");
   const heading = useRef(zone.spawn.heading);
   const target = useRef<THREE.Vector3 | null>(null);
+  /** gait for the current click-to-walk trip, decided ONCE when the target is set (a far target = run all the way) */
+  const targetRun = useRef(false);
   const zoom = useRef(1);
   const camera = useThree((s) => s.camera);
   const camLook = useRef(new THREE.Vector3(zone.spawn.x, 1, zone.spawn.z));
@@ -210,7 +212,7 @@ function World() {
       }
     }
     const len = Math.hypot(vx, vz);
-    const running = keys.has("shift") || (!!target.current && target.current.distanceTo(p) > 3.5);
+    const running = keys.has("shift") || (!!target.current && targetRun.current);
     gait.current = len > 0 ? (running ? "run" : "walk") : "idle";
     if (len > 0) {
       const step = Math.min(dt, 0.05) * (running ? RUN : WALK);
@@ -263,15 +265,18 @@ function World() {
     camera.lookAt(look);
   });
 
+  const setTarget = (x: number, z: number) => {
+    const p = playerPos.current;
+    target.current = new THREE.Vector3(x, 0, z);
+    targetRun.current = Math.hypot(x - p.x, z - p.z) > 3.5; // decided once — no slowing down on approach
+  };
   const onFloorClick = (e: ThreeEvent<MouseEvent>) => {
     const st = useCampaign.getState();
     if (st.dialogue || st.transition) return;
     e.stopPropagation();
-    target.current = new THREE.Vector3(e.point.x, 0, e.point.z);
+    setTarget(e.point.x, e.point.z);
   };
-  const walkTo = (x: number, z: number) => {
-    target.current = new THREE.Vector3(x, 0, z);
-  };
+  const walkTo = (x: number, z: number) => setTarget(x, z);
   const b = zone.bounds;
   const Scene = zone.Scene;
   return (
