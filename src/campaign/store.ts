@@ -30,9 +30,13 @@ export interface CampaignState {
   dialogue: { script: Line[]; lineId: string; seq: number } | null;
   /** set by the "to-battle" effect: the page navigates to the skirmish */
   leaving: boolean;
+  /** the tower's floor picker is open (movement frozen) */
+  tower: boolean;
 
   setNearNpc: (id: SpeakerId | null) => void;
   travel: (exitId: string) => void;
+  openTower: () => void;
+  closeTower: () => void;
   talk: () => void;
   /** advance: pick the next line (or a choice by index); closes the conversation at the end */
   advance: (choice?: number) => void;
@@ -52,6 +56,7 @@ export const useCampaign = create<CampaignState>((set, get) => ({
   talks: {},
   dialogue: null,
   leaving: false,
+  tower: false,
 
   setNearNpc: (nearNpc) => {
     if (get().nearNpc !== nearNpc) set({ nearNpc });
@@ -69,9 +74,14 @@ export const useCampaign = create<CampaignState>((set, get) => ({
       }, TITLE_MS);
     }, OUT_MS);
   },
+  openTower: () => {
+    if (get().transition || get().dialogue) return;
+    set({ tower: true });
+  },
+  closeTower: () => set({ tower: false }),
   talk: () => {
     const id = get().nearNpc;
-    if (get().dialogue || !id || get().transition) return;
+    if (get().dialogue || !id || get().transition || get().tower) return;
     const npc = ZONES[get().zone].npcs.find((n) => n.id === id);
     if (!npc) return;
     const n = get().talks[id] ?? 0;

@@ -6,6 +6,7 @@ import PerfPanel from "@/components/perf/PerfPanel";
 import { usePerf } from "@/components/perf/store";
 import CampaignScene from "./CampaignScene";
 import Dialogue from "./Dialogue";
+import TowerPanel from "./TowerPanel";
 import { SPEAKERS } from "./script";
 import { useCampaign } from "./store";
 import { ZONES } from "./world";
@@ -20,14 +21,24 @@ export default function CampaignPage() {
   const nearNpc = useCampaign((s) => s.nearNpc);
   const dialogue = useCampaign((s) => s.dialogue);
   const transition = useCampaign((s) => s.transition);
+  const tower = useCampaign((s) => s.tower);
   const leaving = useCampaign((s) => s.leaving);
   const talk = useCampaign((s) => s.talk);
   const perfOpen = usePerf((s) => s.open);
   const togglePerf = usePerf((s) => s.toggle);
   const router = useRouter();
   const zone = ZONES[zoneId];
-  // the first zone's load is measured from the page's first render (lazy initialiser = runs once, before the Canvas mounts)
-  useState(() => usePerf.getState().markLoad(`zone · ${zone.name}`));
+  // one-time setup BEFORE the Canvas mounts (lazy initialiser): a deep link (`?at=tower` — coming back from a Tower
+  // floor) starts you in the village at that spot; then the first zone's load mark
+  useState(() => {
+    const at = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("at");
+    if (at === "tower") {
+      const t = ZONES.village.triggers?.find((x) => x.id === "tower");
+      if (t) useCampaign.setState({ zone: "village", arrival: t.spawn, arrivalSeq: useCampaign.getState().arrivalSeq + 1 });
+    }
+    usePerf.getState().markLoad(`zone · ${ZONES[useCampaign.getState().zone].name}`);
+    return 0;
+  });
 
   useEffect(() => {
     (window as unknown as { __campaign?: typeof useCampaign }).__campaign = useCampaign;
@@ -54,7 +65,7 @@ export default function CampaignPage() {
           ← Skirmish
         </Link>
       </div>
-      {!dialogue && !transition && (
+      {!dialogue && !transition && !tower && (
         <div className="campaign-controls">
           <kbd>W</kbd>
           <kbd>A</kbd>
@@ -68,6 +79,7 @@ export default function CampaignPage() {
         </button>
       )}
       <Dialogue />
+      <TowerPanel />
       {/* zone travel: black fade + area title card (Persona 5 area name read) */}
       <div className={`campaign-fade ${dark ? "dark" : ""} ${transition ? "" : "off"}`} aria-hidden />
       {transition?.phase === "title" && (

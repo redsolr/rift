@@ -4,8 +4,9 @@ import type { Occluder } from "./occlusion";
 
 /**
  * The village as DATA: a 7×7 grid of 8-unit chunks (56×56 world units), each generated deterministically from its
- * (cx, cz) seed — cottages, trees, lantern posts, the well plaza in the centre chunk, the monastery kitchen's facade
- * on the south edge (door gap x ∈ [-1.1, 1.1]). Two cobbled lanes cross at the well (x ≈ 0 and z ≈ 0). Chunk data is memoised: the collision
+ * (cx, cz) seed — cottages with yard fences and crates, trees, bushes, hay bales, lantern posts, the FOUNTAIN plaza
+ * with four market stalls in the centre chunk, the TOWER on the north edge (its door is the trigger for the floor
+ * picker), the monastery garden wall + gate on the south edge (door gap x ∈ [-1.1, 1.1]). Two cobbled lanes cross at the well (x ≈ 0 and z ≈ 0). Chunk data is memoised: the collision
  * routine and the renderer read the same objects, and only the 5×5 ring around the player is ever MOUNTED as meshes.
  */
 export const CHUNK = 8;
@@ -13,7 +14,10 @@ export const COLS = 7;
 export const ROWS = 7;
 export const HALF = (COLS * CHUNK) / 2; // 28 → world x, z ∈ [-28, 28]
 export const LANE = 2; // half-width of a lane
-export const KITCHEN_Z = HALF - 2.5; // the kitchen facade starts here (south edge), door at x ∈ [-1.1, 1.1]
+export const KITCHEN_Z = HALF - 2.5;
+export const TOWER = { x: 0, z: -HALF + 3.6, r: 2.4, h: 10 } as const; // the tower on the north edge, door faces south
+export const TOWER_DOOR_Z = TOWER.z + TOWER.r; // ≈ -22 — the trigger box sits just south of it
+export const FOUNTAIN_R = 1.7; // the kitchen facade starts here (south edge), door at x ∈ [-1.1, 1.1]
 
 export interface Cottage {
   x: number;
@@ -32,6 +36,29 @@ export interface Tree {
 export interface Lantern {
   x: number;
   z: number;
+}
+export interface Fence {
+  x0: number;
+  z0: number;
+  x1: number;
+  z1: number;
+}
+export interface Crate {
+  x: number;
+  z: number;
+  s: number;
+  yaw: number;
+}
+export interface Hay {
+  x: number;
+  z: number;
+  yaw: number;
+}
+export interface Stall {
+  x: number;
+  z: number;
+  yaw: number;
+  tone: number; // awning colour pick
 }
 export interface Bush {
   x: number;
@@ -53,6 +80,11 @@ export interface ChunkData {
   trees: Tree[];
   lanterns: Lantern[];
   bushes: Bush[];
+  fences: Fence[];
+  crates: Crate[];
+  hay: Hay[];
+  stalls: Stall[];
+  tower: boolean; // the north-centre chunk: the tower
   obstacles: AABB[];
 }
 
@@ -69,6 +101,7 @@ export const cottageHalf = (c: Cottage): [number, number] => (Math.abs(Math.sin(
 const onLane = (x: number, z: number, r: number) => Math.abs(x) < LANE + 0.6 + r || Math.abs(z) < LANE + 0.6 + r;
 const onPlaza = (x: number, z: number, r: number) => Math.abs(x) < CHUNK / 2 + 1.4 + r && Math.abs(z) < CHUNK / 2 + 1.4 + r;
 const onKitchen = (x: number, z: number, r: number) => z > KITCHEN_Z - 1.2 - r;
+const onTower = (x: number, z: number, r: number) => Math.hypot(x - TOWER.x, z - TOWER.z) < TOWER.r + 2.2 + r || (Math.abs(x) < 1.6 + r && z < TOWER_DOOR_Z + 3.5);
 
 export function chunkData(cx: number, cz: number): ChunkData {
   const key = chunkKey(cx, cz);
@@ -81,21 +114,51 @@ export function chunkData(cx: number, cz: number): ChunkData {
   const laneEW = cz === Math.floor(ROWS / 2);
   const plaza = laneNS && laneEW;
   const kitchen = laneNS && cz === ROWS - 1;
+  const tower = laneNS && cz === 0;
   const cottages: Cottage[] = [];
   const trees: Tree[] = [];
   const lanterns: Lantern[] = [];
   const bushes: Bush[] = [];
+  const fences: Fence[] = [];
+  const crates: Crate[] = [];
+  const hay: Hay[] = [];
+  const stalls: Stall[] = [];
   const obstacles: AABB[] = [];
 
   if (plaza) {
-    obstacles.push([-1.1, 1.1, -1.1, 1.1]); // the well
+    obstacles.push([-FOUNTAIN_R, FOUNTAIN_R, -FOUNTAIN_R, FOUNTAIN_R]); // the fountain
+    // four market stalls in the corners, facing the fountain; lanterns flank the lane mouths
     for (const [x, z] of [
-      [-3.2, -3.2],
-      [3.2, -3.2],
-      [-3.2, 3.2],
-      [3.2, 3.2],
+      [-3.0, -3.0],
+      [3.0, -3.0],
+      [-3.0, 3.0],
+      [3.0, 3.0],
+    ] as [number, number][]) {
+      stalls.push({ x, z, yaw: Math.atan2(-x, -z), tone: stalls.length });
+      obstacles.push([x - 1.1, x + 1.1, z - 0.9, z + 0.9]);
+    }
+    for (const [x, z] of [
+      [-3.5, -1.0],
+      [3.5, 1.0],
+      [-1.0, 3.5],
+      [1.0, -3.5],
     ])
       lanterns.push({ x, z });
+  } else if (tower) {
+    // the tower: a round keep on the north edge; the door faces the lane
+    obstacles.push([TOWER.x - TOWER.r - 0.2, TOWER.x + TOWER.r + 0.2, TOWER.z - TOWER.r - 0.2, TOWER.z + TOWER.r + 0.1]);
+    for (const [x, z] of [
+      [-2.7, TOWER_DOOR_Z + 1.2],
+      [2.7, TOWER_DOOR_Z + 1.2],
+    ])
+      lanterns.push({ x, z });
+    for (let i = 0; i < 4; i++) {
+      const x = ox + 0.8 + rng.next() * (CHUNK - 1.6);
+      const z = oz + 0.8 + rng.next() * (CHUNK - 1.6);
+      if (onLane(x, z, 0.5) || onTower(x, z, 0.5)) continue;
+      trees.push({ x, z, s: 0.8 + rng.next() * 0.5, hue: rng.next() });
+      obstacles.push([x - 0.32, x + 0.32, z - 0.32, z + 0.32]);
+    }
   } else {
     // one cottage, most chunks; its footprint stays off the lanes / plaza / kitchen strip and inside the chunk
     if (rng.next() < 0.78) {
@@ -107,10 +170,32 @@ export function chunkData(cx: number, cz: number): ChunkData {
         const yaw = Math.round(Math.atan2(-x, -z) / (Math.PI / 2)) * (Math.PI / 2);
         const c: Cottage = { x, z, yaw, w, d, tone: rng.next() };
         const [hx, hz] = cottageHalf(c);
-        const clear = !onLane(x, z, Math.max(hx, hz)) && !onPlaza(x, z, Math.max(hx, hz)) && !onKitchen(x, z, hz) && x - hx > ox + 0.4 && x + hx < ox + CHUNK - 0.4 && z - hz > oz + 0.4 && z + hz < oz + CHUNK - 0.4;
+        const clear = !onLane(x, z, Math.max(hx, hz)) && !onPlaza(x, z, Math.max(hx, hz)) && !onKitchen(x, z, hz) && !onTower(x, z, Math.max(hx, hz)) && x - hx > ox + 0.4 && x + hx < ox + CHUNK - 0.4 && z - hz > oz + 0.4 && z + hz < oz + CHUNK - 0.4;
         if (clear) {
           cottages.push(c);
           obstacles.push([x - hx, x + hx, z - hz, z + hz]);
+          // a yard fence along one side (short, so nobody gets boxed in) — never across a lane
+          const side = rng.int(4);
+          const off = 1.5;
+          const f: Fence = side === 0 ? { x0: x - hx - off, z0: z - hz - 0.4, x1: x - hx - off, z1: z + hz + 0.4 } : side === 1 ? { x0: x + hx + off, z0: z - hz - 0.4, x1: x + hx + off, z1: z + hz + 0.4 } : side === 2 ? { x0: x - hx - 0.4, z0: z - hz - off, x1: x + hx + 0.4, z1: z - hz - off } : { x0: x - hx - 0.4, z0: z + hz + off, x1: x + hx + 0.4, z1: z + hz + off };
+          const fx = (f.x0 + f.x1) / 2;
+          const fz = (f.z0 + f.z1) / 2;
+          if (!onLane(fx, fz, 0.6) && !onPlaza(fx, fz, 0.4) && !onKitchen(fx, fz, 0.4) && f.x0 > ox + 0.3 && f.x1 < ox + CHUNK - 0.3 && f.z0 > oz + 0.3 && f.z1 < oz + CHUNK - 0.3) {
+            fences.push(f);
+            obstacles.push([Math.min(f.x0, f.x1) - 0.12, Math.max(f.x0, f.x1) + 0.12, Math.min(f.z0, f.z1) - 0.12, Math.max(f.z0, f.z1) + 0.12]);
+          }
+          // crates by the door side (+z in the cottage's own frame)
+          const nCr = rng.int(3);
+          for (let k = 0; k < nCr; k++) {
+            const cs = 0.4 + rng.next() * 0.25;
+            const lx = (rng.next() - 0.5) * (c.w - 1.4);
+            const lz = c.d / 2 + 0.6 + rng.next() * 0.4;
+            const wx = x + lx * Math.cos(c.yaw) + lz * Math.sin(c.yaw);
+            const wz = z - lx * Math.sin(c.yaw) + lz * Math.cos(c.yaw);
+            if (onLane(wx, wz, cs) || onPlaza(wx, wz, cs) || onKitchen(wx, wz, cs)) continue;
+            crates.push({ x: wx, z: wz, s: cs, yaw: rng.next() * 0.6 });
+            obstacles.push([wx - cs / 2, wx + cs / 2, wz - cs / 2, wz + cs / 2]);
+          }
           break;
         }
       }
@@ -121,7 +206,7 @@ export function chunkData(cx: number, cz: number): ChunkData {
       for (let attempt = 0; attempt < 6; attempt++) {
         const x = ox + 0.8 + rng.next() * (CHUNK - 1.6);
         const z = oz + 0.8 + rng.next() * (CHUNK - 1.6);
-        if (onLane(x, z, 0.5) || onPlaza(x, z, 0.5) || onKitchen(x, z, 0.5)) continue;
+        if (onLane(x, z, 0.5) || onPlaza(x, z, 0.5) || onKitchen(x, z, 0.5) || onTower(x, z, 0.5)) continue;
         if (cottages.some((c) => Math.abs(x - c.x) < cottageHalf(c)[0] + 1.0 && Math.abs(z - c.z) < cottageHalf(c)[1] + 1.0)) continue;
         if (trees.some((t) => Math.hypot(x - t.x, z - t.z) < 1.6)) continue;
         trees.push({ x, z, s: 0.8 + rng.next() * 0.55, hue: rng.next() });
@@ -138,6 +223,15 @@ export function chunkData(cx: number, cz: number): ChunkData {
       if (cottages.some((c) => Math.abs(x - c.x) < cottageHalf(c)[0] + 0.6 && Math.abs(z - c.z) < cottageHalf(c)[1] + 0.6)) continue;
       bushes.push({ x, z, s: 0.35 + rng.next() * 0.35 });
     }
+    // hay bales (no collision)
+    const nHay = rng.int(3);
+    for (let i = 0; i < nHay; i++) {
+      const x = ox + 1.0 + rng.next() * (CHUNK - 2.0);
+      const z = oz + 1.0 + rng.next() * (CHUNK - 2.0);
+      if (onLane(x, z, 0.6) || onPlaza(x, z, 0.6) || onKitchen(x, z, 0.6)) continue;
+      if (cottages.some((c) => Math.abs(x - c.x) < cottageHalf(c)[0] + 1.2 && Math.abs(z - c.z) < cottageHalf(c)[1] + 1.2)) continue;
+      hay.push({ x, z, yaw: rng.next() * Math.PI });
+    }
     // lantern posts flank the lanes
     if (laneNS) for (const lz of [CHUNK * 0.25, CHUNK * 0.75]) for (const lx of [-LANE - 0.7, LANE + 0.7]) if (!onKitchen(lx, oz + lz, 0.3)) lanterns.push({ x: lx, z: oz + lz });
     if (laneEW) for (const lx of [CHUNK * 0.25, CHUNK * 0.75]) for (const lz of [-LANE - 0.7, LANE + 0.7]) lanterns.push({ x: ox + lx, z: lz });
@@ -147,7 +241,7 @@ export function chunkData(cx: number, cz: number): ChunkData {
     // the facade: solid except the door gap
     obstacles.push([-5.2, -1.1, KITCHEN_Z, HALF], [1.1, 5.2, KITCHEN_Z, HALF]);
   }
-  const data: ChunkData = { cx, cz, ox, oz, laneNS, laneEW, plaza, kitchen, cottages, trees, lanterns, bushes, obstacles };
+  const data: ChunkData = { cx, cz, ox, oz, laneNS, laneEW, plaza, kitchen, tower, cottages, trees, lanterns, bushes, fences, crates, hay, stalls, obstacles };
   cache.set(key, data);
   return data;
 }
@@ -166,10 +260,11 @@ export function obstaclesNear(x: number, z: number): AABB[] {
   return out;
 }
 
-/** the well: id + box shared by the occlusion test and the plaza renderer */
-export const WELL_ID = "well";
+/** the fountain centrepiece: id shared by the occlusion test and the plaza renderer */
+export const WELL_ID = "fountain";
 export const cottageId = (cx: number, cz: number, i: number) => `c:${cx},${cz}:${i}`;
 export const treeId = (cx: number, cz: number, i: number) => `t:${cx},${cz}:${i}`;
+export const stallId = (cx: number, cz: number, i: number) => `s:${cx},${cz}:${i}`;
 
 /** tall solids (cottages, trees, the well) in the 3×3 chunks around a position — Sims-style cutaway candidates */
 export function occludersNear(x: number, z: number): Occluder[] {
@@ -186,7 +281,8 @@ export function occludersNear(x: number, z: number): Occluder[] {
         out.push({ id: cottageId(a, b, i), box: [c.x - hx - 0.1, c.x + hx + 0.1, c.z - hz - 0.1, c.z + hz + 0.1, 4.1] });
       });
       d.trees.forEach((t, i) => out.push({ id: treeId(a, b, i), box: [t.x - 1.05 * t.s, t.x + 1.05 * t.s, t.z - 1.05 * t.s, t.z + 1.05 * t.s, 3.6 * t.s] }));
-      if (d.plaza) out.push({ id: WELL_ID, box: [-1.4, 1.4, -1.4, 1.4, 3.0] });
+      if (d.plaza) out.push({ id: WELL_ID, box: [-1.0, 1.0, -1.0, 1.0, 3.2] });
+      d.stalls.forEach((st, i) => out.push({ id: stallId(a, b, i), box: [st.x - 1.3, st.x + 1.3, st.z - 1.1, st.z + 1.1, 2.6] }));
     }
   return out;
 }

@@ -33,6 +33,15 @@ export interface Exit {
   marker: { x: number; z: number; label: string };
 }
 
+/** a spot that opens something (the tower door → floor picker) instead of leading somewhere */
+export interface Trigger {
+  id: "tower";
+  box: AABB;
+  marker: { x: number; z: number; label: string };
+  /** where a deep link (`?at=<id>`) puts you */
+  spawn: Spawn;
+}
+
 export interface ZoneNpc {
   id: SpeakerId;
   x: number;
@@ -66,6 +75,7 @@ export interface Zone {
   /** static colliders (whole-zone) */
   obstacles: AABB[];
   exits: Exit[];
+  triggers?: Trigger[];
   npcs: ZoneNpc[];
   /** where a fresh visit (no exit) starts */
   spawn: Spawn;

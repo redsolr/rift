@@ -186,13 +186,13 @@ export const cobbleTexture = (repeat: [number, number]) =>
   make(
     `cobble${repeat.join("x")}`,
     (ctx, rnd) => {
-      ctx.fillStyle = "#1a1b20";
+      ctx.fillStyle = "#4e4c48";
       ctx.fillRect(0, 0, S, S);
       const cell = S / 8;
       for (let r = 0; r < 8; r++) {
         const off = r % 2 ? cell / 2 : 0;
         for (let x = -cell; x < S + cell; x += cell) {
-          const l = 26 + rnd() * 14;
+          const l = 52 + rnd() * 16;
           ctx.fillStyle = `hsl(${215 + rnd() * 25}, ${5 + rnd() * 6}%, ${l}%)`;
           const cx = x + off + cell / 2 + (rnd() - 0.5) * 3;
           const cy = r * cell + cell / 2 + (rnd() - 0.5) * 3;

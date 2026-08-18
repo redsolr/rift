@@ -2627,3 +2627,68 @@ button.link {
 .perf tr.cur td {
   color: #ffd54f;
 }
+
+/* ---------- The Tower: end-of-floor card ---------- */
+.pit-result {
+  position: absolute;
+  left: 50%;
+  top: 18%;
+  transform: translateX(-50%);
+  z-index: 60;
+  min-width: 340px;
+  padding: 18px 26px 20px;
+  background: rgba(8, 10, 16, 0.92);
+  border: 1px solid #2a3142;
+  border-radius: 12px;
+  text-align: center;
+  color: #e6e9f0;
+  box-shadow: 0 16px 60px rgba(0, 0, 0, 0.6);
+  animation: pit-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes pit-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-14px);
+  }
+}
+.pit-result-kicker {
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  color: #9aa3b8;
+}
+.pit-result-title {
+  margin-top: 6px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 700;
+  font-size: 30px;
+  letter-spacing: 0.06em;
+  color: #ffd54f;
+}
+.pit-result.lost .pit-result-title {
+  color: #ff7a7a;
+}
+.pit-result-sub {
+  margin-top: 4px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
+  color: #c9d0e0;
+}
+.pit-result-actions {
+  margin-top: 14px;
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  align-items: center;
+}
+.pit-result-actions a.ghost {
+  color: #c9d0e0;
+  text-decoration: none;
+  border: 1px solid #2a3142;
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 13px;
+}
+.pit-result-actions a.ghost:hover {
+  border-color: #ffd54f;
+  color: #ffd54f;
+}

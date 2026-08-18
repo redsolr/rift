@@ -3,6 +3,7 @@ import { create } from "zustand";
 import { Battle, SimStats, runMany } from "@/sim/battle";
 import { Effect, Float, View, applyEvent, initialPlayback, initialView } from "./playback";
 import { usePerf } from "@/components/perf/store";
+import { pitConfig } from "@/sim/pit";
 export type { Effect, EffectStyle, Float, View, ViewUnit } from "./playback";
 import { DEFAULT_DOCTRINE, decodeConfig, defaultConfig, emptyMap, encodeConfig, makeUnit } from "@/sim/presets";
 import { AttackKind } from "@/sim/attacks";
@@ -135,6 +136,8 @@ interface GameState {
   /** FE deployment: Start battle opens a PLANNING phase (battle not yet built) where you rearrange your own units inside
    *  the deploy zone; Begin battle ends it. Rematch keeps the deployment and skips it. */
   planning: boolean;
+  /** a Tower climb in progress: which floor this battle is (null = ordinary skirmish) */
+  pit: { floor: number } | null;
   simStats: SimStats | null;
   simProgress: number | null;
   shareCode: string | null;
@@ -226,6 +229,8 @@ interface GameState {
   makeShareCode: () => string;
   loadShareCode: (code: string) => boolean;
   loadDefault: () => void;
+  /** The Tower: load floor N's ramped config (Manual mode, you = blue) and open the planning phase */
+  startPit: (floor: number) => void;
 }
 
 /** True when the renderer has replayed every engine event — the only moment input is accepted. */
@@ -423,6 +428,7 @@ export const useGame = create<GameState>((set, get) => {
     painting: false,
     drag: null,
     planning: false,
+    pit: null,
     simStats: null,
     simProgress: null,
     shareCode: null,
@@ -811,7 +817,7 @@ export const useGame = create<GameState>((set, get) => {
       if (!m) return;
       stopTimer();
       usePerf.getState().markLoad(`map · ${m.name}`);
-      set({ config: m.config, activeMapId: id, ...resetPlayback(m.config, null), simStats: null });
+      set({ config: m.config, activeMapId: id, pit: null, ...resetPlayback(m.config, null), simStats: null });
       clearManual();
       persistMaps(s.maps, id);
     },
@@ -1006,10 +1012,18 @@ export const useGame = create<GameState>((set, get) => {
         return false;
       }
     },
+    startPit: (floor) => {
+      const config = pitConfig(floor);
+      stopTimer();
+      usePerf.getState().markLoad(`tower · floor ${floor}`);
+      set({ config, activeMapId: null, mode: "manual", playerTeam: "blue", pit: { floor }, ...resetPlayback(config, null), simStats: null });
+      clearManual();
+      get().startBattle();
+    },
     loadDefault: () => {
       const config = defaultConfig();
       stopTimer();
-      set({ config, activeMapId: null, ...resetPlayback(config, null), simStats: null });
+      set({ config, activeMapId: null, pit: null, ...resetPlayback(config, null), simStats: null });
       clearManual();
       persistMaps(get().maps, null);
     },

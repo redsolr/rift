@@ -4,7 +4,7 @@ import { useFrame } from "@react-three/fiber";
 import { useAnimations, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
-import { Speaker } from "./script";
+import { MODELS, ModelName } from "./script";
 import { blobTexture } from "./roomTextures";
 
 /**
@@ -19,13 +19,13 @@ const CLIP = { idle: "Idle", walk: "Walking_A", run: "Running_A" } as const;
 type Gait = keyof typeof CLIP;
 
 export default function Character({
-  speaker,
+  model: modelName,
   posRef,
   gaitRef,
   headingRef,
   height = CHARACTER_H,
 }: {
-  speaker: Speaker;
+  model: ModelName;
   /** live world position — written by the controller every frame */
   posRef: React.RefObject<THREE.Vector3>;
   /** live gait — "idle" | "walk" | "run" */
@@ -34,7 +34,7 @@ export default function Character({
   headingRef?: React.RefObject<number>;
   height?: number;
 }) {
-  const url = `/models/kaykit/${speaker.model}.glb`;
+  const url = `/models/kaykit/${modelName}.glb`;
   const gltf = useGLTF(url);
   // every character gets its OWN skinned clone — the same GLB can stand in a room twice (two Knights) and zones can
   // mount / unmount NPCs freely without fighting over one shared scene graph
@@ -107,5 +107,4 @@ export default function Character({
   );
 }
 
-useGLTF.preload("/models/kaykit/Knight.glb");
-useGLTF.preload("/models/kaykit/Mage.glb");
+for (const m of MODELS) useGLTF.preload(`/models/kaykit/${m}.glb`);

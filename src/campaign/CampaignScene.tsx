@@ -102,7 +102,7 @@ function Npc({ npc, playerPos, walkTo }: { npc: ZoneNpc; playerPos: RefObject<TH
         else walkTo(npc.approach.x, npc.approach.z);
       }}
     >
-      <Character speaker={SPEAKERS[npc.id]} posRef={posRef} gaitRef={gait} headingRef={heading} height={npc.height} />
+      <Character model={SPEAKERS[npc.id].model} posRef={posRef} gaitRef={gait} headingRef={heading} height={npc.height} />
     </group>
   );
 }
@@ -140,6 +140,8 @@ function World() {
   const target = useRef<THREE.Vector3 | null>(null);
   /** gait for the current click-to-walk trip, decided ONCE when the target is set (a far target = run all the way) */
   const targetRun = useRef(false);
+  /** the player is standing in a trigger box (so it fires once per entry) */
+  const trigArmed = useRef(false);
   const zoom = useRef(1);
   const camera = useThree((s) => s.camera);
   const camLook = useRef(new THREE.Vector3(zone.spawn.x, 1, zone.spawn.z));
@@ -190,7 +192,7 @@ function World() {
     const st = useCampaign.getState();
     const z = ZONES[st.zone];
     const p = playerPos.current;
-    const frozen = !!st.dialogue || !!st.transition;
+    const frozen = !!st.dialogue || !!st.transition || st.tower;
     // --- movement
     let vx = 0;
     let vz = 0;
@@ -231,6 +233,12 @@ function World() {
           }
         }
       }
+      // --- triggers: step into the tower door → the floor picker (re-arms once you step out)
+      const inTrig = (z.triggers ?? []).find((t) => inBox(p.x, p.z, t.box));
+      if (inTrig && !trigArmed.current) {
+        trigArmed.current = true;
+        useCampaign.getState().openTower();
+      } else if (!inTrig) trigArmed.current = false;
     }
     // --- proximity to NPCs
     let near: SpeakerId | null = null;
@@ -272,7 +280,7 @@ function World() {
   };
   const onFloorClick = (e: ThreeEvent<MouseEvent>) => {
     const st = useCampaign.getState();
-    if (st.dialogue || st.transition) return;
+    if (st.dialogue || st.transition || st.tower) return;
     e.stopPropagation();
     setTarget(e.point.x, e.point.z);
   };
@@ -294,8 +302,11 @@ function World() {
       {zone.exits.map((ex) => (
         <ExitMarker key={ex.id} x={ex.marker.x} z={ex.marker.z} />
       ))}
+      {(zone.triggers ?? []).map((t) => (
+        <ExitMarker key={t.id} x={t.marker.x} z={t.marker.z} />
+      ))}
       <Suspense fallback={null}>
-        <Character speaker={SPEAKERS.rook} posRef={playerPos} gaitRef={gait} headingRef={heading} />
+        <Character model={SPEAKERS.rook.model} posRef={playerPos} gaitRef={gait} headingRef={heading} />
         {zone.npcs.map((n) => (
           <Npc key={`${zone.id}:${n.id}`} npc={n} playerPos={playerPos} walkTo={walkTo} />
         ))}

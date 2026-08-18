@@ -5,6 +5,10 @@
  */
 export type SpeakerId = "rook" | "mina" | "bram";
 
+/** KayKit Adventurers bodies on disk (`public/models/kaykit/<name>.glb`, CC0) */
+export type ModelName = "Knight" | "Mage" | "Barbarian" | "Rogue" | "Rogue_Hooded";
+export const MODELS: ModelName[] = ["Knight", "Mage", "Barbarian", "Rogue", "Rogue_Hooded"];
+
 export interface Speaker {
   id: SpeakerId;
   name: string;
@@ -12,13 +16,13 @@ export interface Speaker {
   team: "blue" | "red";
   archetype: "knight" | "fighter" | "archer" | "mage" | "healer";
   /** KayKit Adventurers model in `public/models/kaykit/<model>.glb` (CC0) — placeholder 3D body */
-  model: "Knight" | "Mage";
+  model: ModelName;
 }
 
 export const SPEAKERS: Record<SpeakerId, Speaker> = {
   rook: { id: "rook", name: "Rook", team: "blue", archetype: "knight", model: "Knight" },
   mina: { id: "mina", name: "Mina", team: "blue", archetype: "healer", model: "Mage" },
-  bram: { id: "bram", name: "Bram", team: "red", archetype: "fighter", model: "Knight" },
+  bram: { id: "bram", name: "Bram", team: "red", archetype: "fighter", model: "Barbarian" },
 };
 
 export interface Choice {

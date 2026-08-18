@@ -10,6 +10,7 @@ import TurnControls from "@/components/TurnControls";
 import SkillPanel from "@/components/SkillPanel";
 import HudTopRight from "@/components/HudTopRight";
 import PerfPanel from "@/components/perf/PerfPanel";
+import PitResult from "@/components/PitResult";
 import { UiLayoutBar, useUiLayout } from "@/components/ui/UiFrame";
 import PhaseBanner from "@/components/PhaseBanner";
 import { useGame } from "@/store/game";
@@ -62,6 +63,9 @@ export default function Home() {
   useEffect(() => {
     useGame.getState().hydrateMaps();
     useUiLayout.getState().hydrate();
+    // The Tower: /?pit=N opens floor N straight into its planning phase
+    const pit = Number(new URLSearchParams(location.search).get("pit"));
+    if (pit >= 1) useGame.getState().startPit(Math.floor(pit));
   }, []);
   useEffect(() => {
     const m = location.hash.match(/#c=([A-Za-z0-9_-]+)/);
@@ -83,6 +87,7 @@ export default function Home() {
           <SkillPanel />
           <UiLayoutBar />
           <PhaseBanner />
+          <PitResult />
           {mobile && <div className="mobile-hint">{selectedName ?? hint}</div>}
         </div>
         {mobile ? (

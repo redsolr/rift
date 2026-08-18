@@ -23,6 +23,7 @@ src/components/   Board.tsx composes board/* (Tiles, Highlights, Units, Arcs, Ac
 src/campaign/     the walkable campaign world: CampaignScene (zone-agnostic controller), store (zone / travel / dialogue),
                   world/ = ZONES registry (kitchen.tsx, village.tsx + villageChunks.ts data; types.ts) — Persona-5 doors between
                   zones, only one zone mounted; the village streams a 5×5 chunk ring around the player
+                  TowerPanel = the tower floor picker → /?pit=N (sim/pit.ts builds the ramped floor config; PitResult closes the loop)
 scripts/sim.ts    headless batch runner (npm run sim -- 1000)
 ```
 

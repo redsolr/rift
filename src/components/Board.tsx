@@ -36,7 +36,7 @@ function EditorHint() {
 
 export default function Board() {
   const map = useGame((s) => s.config.map);
-  const mapName = useGame((s) => s.maps.find((x) => x.id === s.activeMapId)?.name ?? "skirmish");
+  const mapName = useGame((s) => (s.pit ? `tower · floor ${s.pit.floor}` : `map · ${s.maps.find((x) => x.id === s.activeMapId)?.name ?? "skirmish"}`));
   const unitCount = useGame((s) => s.config.units.length);
   const setPainting = useGame((s) => s.setPainting);
   const endDrag = useGame((s) => s.endDrag);
@@ -68,7 +68,7 @@ export default function Board() {
         style={{ touchAction: "none" }}
       >
         <CameraRig cx={cx} cz={cz} w={map.width} h={map.height} />
-        <PerfProbe scene={`map · ${mapName}`} extra={() => ({ tiles: `${map.width}×${map.height}`, units: unitCount })} />
+        <PerfProbe scene={mapName} extra={() => ({ tiles: `${map.width}×${map.height}`, units: unitCount })} />
         <color attach="background" args={["#0d0f14"]} />
         <ambientLight intensity={0.6} />
         <directionalLight position={[cx - 6, 14, cz - 4]} intensity={1.4} castShadow shadow-mapSize={[1024, 1024]} />
