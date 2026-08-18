@@ -170,27 +170,38 @@ export function drawClassIcon(ctx: CanvasRenderingContext2D, archetype: Archetyp
       break;
     }
     case "mage": {
-      // tome: closed book with a spine and a spark above
-      ctx.lineWidth = lw * 0.9;
+      // magic crystal (the ref: a chunky faceted shard, jagged base bottom-left, point top-right, sparkle at the tip)
       ctx.beginPath();
-      ctx.rect(0.2, 0.3, 0.6, 0.62);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(0.34, 0.3);
-      ctx.lineTo(0.34, 0.92);
-      ctx.stroke();
-      // four-point spark
-      ctx.beginPath();
-      ctx.moveTo(0.5, 0.02);
-      ctx.lineTo(0.56, 0.14);
-      ctx.lineTo(0.68, 0.2);
-      ctx.lineTo(0.56, 0.26);
-      ctx.lineTo(0.5, 0.38);
-      ctx.lineTo(0.44, 0.26);
-      ctx.lineTo(0.32, 0.2);
-      ctx.lineTo(0.44, 0.14);
+      ctx.moveTo(0.04, 0.96); // base corner
+      ctx.lineTo(0.1, 0.66);
+      ctx.lineTo(0.24, 0.78);
+      ctx.lineTo(0.22, 0.52);
+      ctx.lineTo(0.4, 0.62);
+      ctx.lineTo(0.84, 0.14); // tip
+      ctx.lineTo(0.5, 0.36);
+      ctx.lineTo(0.56, 0.56);
+      ctx.lineTo(0.42, 0.7);
+      ctx.lineTo(0.38, 0.92);
       ctx.closePath();
       ctx.fill();
+      // facet lines (dark) so it reads as crystal, not a blob
+      ctx.strokeStyle = "rgba(10,10,16,0.9)";
+      ctx.lineWidth = lw * 0.45;
+      ctx.beginPath();
+      ctx.moveTo(0.16, 0.86);
+      ctx.lineTo(0.76, 0.22);
+      ctx.moveTo(0.3, 0.6);
+      ctx.lineTo(0.42, 0.66);
+      ctx.stroke();
+      // sparkle cross at the tip
+      ctx.strokeStyle = "#f6f2ea";
+      ctx.lineWidth = lw * 0.6;
+      ctx.beginPath();
+      ctx.moveTo(0.86, 0.0);
+      ctx.lineTo(0.86, 0.26);
+      ctx.moveTo(0.73, 0.13);
+      ctx.lineTo(0.99, 0.13);
+      ctx.stroke();
       break;
     }
     case "healer": {
