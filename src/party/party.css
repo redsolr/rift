@@ -250,8 +250,9 @@
 .cs-doll {
   position: relative;
   display: grid;
-  grid-template-columns: 168px 1fr 168px;
-  padding: 14px 10px;
+  grid-template-columns: 58px 1fr 58px;
+  grid-template-rows: 1fr auto;
+  padding: 14px 10px 12px;
   gap: 8px;
   border-right: 1px solid #222b3e;
   background: radial-gradient(ellipse at 50% 30%, rgba(111, 227, 255, 0.08), transparent 60%);
@@ -262,9 +263,21 @@
   z-index: 1;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end; /* slots sit low so the face above them stays clear */
+  justify-content: flex-start; /* WoW: the columns hang from the top edge */
   gap: 8px;
-  padding-bottom: 4px;
+  grid-row: 1;
+  grid-column: 1;
+}
+.cs-doll-col.right {
+  grid-column: 3;
+}
+.cs-doll-bottom {
+  grid-column: 1 / -1;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
 }
 /* the bust fills the whole doll area behind the slot columns (WoW: slots sit over the model) */
 .cs-bust {
@@ -275,19 +288,19 @@
 }
 .cs-bust-img {
   position: absolute;
-  inset: 0 14%;
+  inset: 0 10% 56px;
 }
 .cs-bust-img .portrait-img {
   background-size: cover;
   background-position: 50% 0% !important;
 }
 .cs-slot {
+  position: relative;
   display: grid;
-  grid-template-columns: 44px 1fr;
-  align-items: center;
-  gap: 8px;
-  height: 52px;
-  padding: 3px 8px 3px 3px;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  padding: 0;
   border-radius: 6px;
   border: 1px solid #2c3650;
   background: linear-gradient(180deg, rgba(23, 32, 50, 0.9), rgba(15, 21, 34, 0.92));
@@ -300,38 +313,59 @@
 .cs-slot-glyph {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   border-radius: 5px;
   background: #0b0f18;
   border: 1px solid #222b3e;
-  font-size: 22px;
+  font-size: 26px;
 }
 .cs-slot.empty .cs-slot-glyph {
   color: #3a4560;
-  font-size: 18px;
+  font-size: 20px;
 }
-.cs-slot-label {
+/* WoW: icons only; the name slides out beside the slot on hover (left column → to the right, right column → to the left) */
+.cs-slot-tag {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 8px);
+  transform: translateY(-50%);
+  white-space: nowrap;
   font-size: 12px;
-  line-height: 1.15;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(8, 11, 19, 0.9);
+  border: 1px solid #2c3650;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s;
+  z-index: 3;
 }
-.cs-slot.empty .cs-slot-label {
-  color: #58637c;
+.cs-doll-col.right .cs-slot-tag {
+  left: auto;
+  right: calc(100% + 8px);
+}
+.cs-doll-bottom .cs-slot-tag {
+  left: 50%;
+  top: auto;
+  bottom: calc(100% + 6px);
+  transform: translateX(-50%);
+}
+.cs-slot:hover .cs-slot-tag {
+  opacity: 1;
+}
+.cs-slot.empty .cs-slot-tag {
+  color: #8a93a8;
   font-style: italic;
 }
 .cs-slot.has.rar-common .cs-slot-glyph { border-color: var(--rar-common); }
 .cs-slot.has.rar-uncommon .cs-slot-glyph { border-color: var(--rar-uncommon); }
 .cs-slot.has.rar-rare .cs-slot-glyph { border-color: var(--rar-rare); }
 .cs-slot.has.rar-epic .cs-slot-glyph { border-color: var(--rar-epic); box-shadow: 0 0 10px rgba(196, 107, 255, 0.35); }
-.cs-slot.has.rar-common .cs-slot-label { color: var(--rar-common); }
-.cs-slot.has.rar-uncommon .cs-slot-label { color: var(--rar-uncommon); }
-.cs-slot.has.rar-rare .cs-slot-label { color: var(--rar-rare); }
-.cs-slot.has.rar-epic .cs-slot-label { color: var(--rar-epic); }
+.cs-slot.has.rar-common .cs-slot-tag { color: var(--rar-common); }
+.cs-slot.has.rar-uncommon .cs-slot-tag { color: var(--rar-uncommon); }
+.cs-slot.has.rar-rare .cs-slot-tag { color: var(--rar-rare); }
+.cs-slot.has.rar-epic .cs-slot-tag { color: var(--rar-epic); }
 .cs-slot:hover { border-color: var(--gold); }
 .cs-slot.legal { border-color: #4ee06a; box-shadow: 0 0 0 1px rgba(78, 224, 106, 0.4), 0 0 14px rgba(78, 224, 106, 0.25); animation: cs-breathe 1.2s ease-in-out infinite; }
 .cs-slot.illegal { opacity: 0.45; }
@@ -553,6 +587,6 @@
     grid-template-columns: 160px 200px 1fr 300px;
   }
   .cs-doll {
-    grid-template-columns: 140px 1fr 140px;
+    grid-template-columns: 58px 1fr 58px;
   }
 }

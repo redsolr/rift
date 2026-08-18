@@ -25,8 +25,10 @@ const STAT_ROWS: { k: keyof Pick<Stats, "hp" | "atk" | "def" | "spd" | "mov">; l
   { k: "spd", label: "Spd" },
   { k: "mov", label: "Mov" },
 ];
-const LEFT_SLOTS: Slot[] = ["head", "shoulders", "chest", "hands", "feet"];
-const RIGHT_SLOTS: Slot[] = ["weapon", "offhand", "ring1", "ring2", "trinket"];
+// WoW paper-doll: armour down the left edge, jewellery + boots down the right, weapons under the model
+const LEFT_SLOTS: Slot[] = ["head", "shoulders", "chest", "hands"];
+const RIGHT_SLOTS: Slot[] = ["feet", "ring1", "ring2", "trinket"];
+const BOTTOM_SLOTS: Slot[] = ["weapon", "offhand"];
 const SLOT_GLYPH: Record<Slot, string> = { head: "🪖", shoulders: "🧥", chest: "🥋", hands: "🧤", feet: "👢", weapon: "⚔", offhand: "🛡", ring1: "◯", ring2: "◯", trinket: "✧" };
 
 const sameCarry = (a: Carry | null, b: Carry | null) => !!a && !!b && ((a.kind === "bag" && b.kind === "bag" && a.cell === b.cell) || (a.kind === "slot" && b.kind === "slot" && a.slot === b.slot));
@@ -147,10 +149,10 @@ function Screen() {
         onPointerEnter={onEnter({ kind: "slot", slot: s })}
         onPointerMove={onTrack}
         onPointerLeave={onLeave}
-        title={item ? undefined : SLOT_LABEL[s]}
+        title={item ? undefined : s === "weapon" ? `${SLOT_LABEL[s]} · ${WEAPON[hero.archetype]} (default)` : SLOT_LABEL[s]}
       >
         <span className="cs-slot-glyph">{item ? item.glyph : SLOT_GLYPH[s]}</span>
-        <span className="cs-slot-label">{item ? item.name : s === "weapon" ? WEAPON[hero.archetype] : SLOT_LABEL[s]}</span>
+        <span className="cs-slot-tag">{item ? item.name : s === "weapon" ? WEAPON[hero.archetype] : SLOT_LABEL[s]}</span>
       </div>
     );
   };
@@ -224,7 +226,8 @@ function Screen() {
             <div className="cs-bust">
               <Portrait u={hero} className="cs-bust-img" />
             </div>
-            <div className="cs-doll-col">{RIGHT_SLOTS.map(renderSlot)}</div>
+            <div className="cs-doll-col right">{RIGHT_SLOTS.map(renderSlot)}</div>
+            <div className="cs-doll-bottom">{BOTTOM_SLOTS.map(renderSlot)}</div>
           </div>
 
           {/* ---- skills + bag ---- */}
