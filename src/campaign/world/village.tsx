@@ -5,7 +5,9 @@ import * as THREE from "three";
 import { blobTexture, cobbleTexture, grassTexture, stoneTexture, whitewashTexture } from "../roomTextures";
 import { VILLAGE_AGAIN, VILLAGE_TALK } from "../script";
 import type { Zone } from "./types";
-import { CHUNK, COLS, HALF, KITCHEN_Z, LANE, ROWS, ChunkData, chunkData, chunkKey, chunkOf, occludersNear, ringKeys } from "./villageChunks";
+import { useThree } from "@react-three/fiber";
+import { CHUNK, COLS, HALF, KITCHEN_Z, LANE, ROWS, ChunkData, WELL_ID, chunkData, chunkKey, chunkOf, cottageId, occludersNear, ringKeys, treeId } from "./villageChunks";
+import { occludedIds, sameIds } from "./occlusion";
 
 /**
  * Zone 2 — the village at night, STREAMED: only the 5×5 chunk ring around the player is mounted (`VillageScene` watches
@@ -13,7 +15,9 @@ import { CHUNK, COLS, HALF, KITCHEN_Z, LANE, ROWS, ChunkData, chunkData, chunkKe
  * appear and vanish out of sight. Every chunk draws from ONE set of shared geometries + materials (created once,
  * module-level, lazily) — cottages, roofs, trees (InstancedMesh per chunk), lantern posts, the well — so memory stays
  * flat no matter how many chunks the village grows to. A moon directional light follows the player so its shadow
- * frustum stays small.
+ * frustum stays small. **Sims-style cutaway**: each frame the eye→camera segment is tested against the nearby
+ * occluders (`occludersNear`); a cottage in the way renders as its walls-down footprint (0.5-unit stubs, no roof), a
+ * tree in the way loses its canopy, the well loses its roof — the camera angle NEVER changes for occlusion.
  */
 const RING = 2;
 
@@ -50,7 +54,6 @@ export const VILLAGE: Zone = {
   fog: { color: "#0b1020", near: 14, far: 24 },
   camera: { up: 6.5, back: 8 },
   chunks: { size: CHUNK, cols: COLS, rows: ROWS, ring: RING, obstacles: (cx, cz) => chunkData(cx, cz).obstacles },
-  occluders: occludersNear,
   Scene: VillageScene,
 };
 
@@ -127,8 +130,17 @@ function getAssets(): Assets {
 }
 
 /* ---------- pieces ---------- */
-function CottageMesh({ c, a }: { c: ChunkData["cottages"][number]; a: Assets }) {
+function CottageMesh({ c, a, cut }: { c: ChunkData["cottages"][number]; a: Assets; cut: boolean }) {
   const h = 2.5;
+  if (cut) {
+    // walls down (The Sims): knee-high stubs on the same footprint so the plan stays readable, nothing above
+    return (
+      <group position={[c.x, 0, c.z]} rotation={[0, c.yaw, 0]}>
+        <mesh geometry={a.unitBox} material={a.plaster[Math.floor(c.tone * 3) % 3]} position={[0, 0.25, 0]} scale={[c.w, 0.5, c.d]} receiveShadow />
+        <mesh geometry={a.unitBox} material={a.darkWood} position={[0, 0.26, c.d / 2 + 0.03]} scale={[0.9, 0.5, 0.08]} />
+      </group>
+    );
+  }
   return (
     <group position={[c.x, 0, c.z]} rotation={[0, c.yaw, 0]}>
       <mesh geometry={a.unitBox} material={a.plaster[Math.floor(c.tone * 3) % 3]} position={[0, h / 2, 0]} scale={[c.w, h, c.d]} castShadow receiveShadow />
@@ -143,7 +155,7 @@ function CottageMesh({ c, a }: { c: ChunkData["cottages"][number]; a: Assets }) 
   );
 }
 
-function Trees({ trees, a }: { trees: ChunkData["trees"]; a: Assets }) {
+function Trees({ trees, a, hidden }: { trees: ChunkData["trees"]; a: Assets; hidden: boolean[] }) {
   const trunkRef = useRef<THREE.InstancedMesh>(null);
   const canopyRef = useRef<THREE.InstancedMesh>(null);
   useEffect(() => {
@@ -153,7 +165,9 @@ function Trees({ trees, a }: { trees: ChunkData["trees"]; a: Assets }) {
     trees.forEach((t, i) => {
       m.compose(new THREE.Vector3(t.x, 0.65 * t.s, t.z), q, new THREE.Vector3(t.s, t.s, t.s));
       trunkRef.current?.setMatrixAt(i, m);
-      m.compose(new THREE.Vector3(t.x, (1.3 + 1.1) * t.s, t.z), q, new THREE.Vector3(t.s, t.s, t.s));
+      // a canopy in the camera's way collapses to nothing (scale 0) — the trunk stays as the marker
+      const cs = hidden[i] ? 0 : t.s;
+      m.compose(new THREE.Vector3(t.x, (1.3 + 1.1) * t.s, t.z), q, new THREE.Vector3(cs, cs, cs));
       canopyRef.current?.setMatrixAt(i, m);
       col.setHSL(0.3 + t.hue * 0.08, 0.35, 0.16 + t.hue * 0.08);
       canopyRef.current?.setColorAt(i, col);
@@ -163,7 +177,7 @@ function Trees({ trees, a }: { trees: ChunkData["trees"]; a: Assets }) {
       canopyRef.current.instanceMatrix.needsUpdate = true;
       if (canopyRef.current.instanceColor) canopyRef.current.instanceColor.needsUpdate = true;
     }
-  }, [trees]);
+  }, [trees, hidden]);
   if (trees.length === 0) return null;
   return (
     <>
@@ -183,15 +197,19 @@ function LanternMesh({ x, z, a }: { x: number; z: number; a: Assets }) {
   );
 }
 
-function Well({ a }: { a: Assets }) {
+function Well({ a, cut }: { a: Assets; cut: boolean }) {
   return (
     <group>
       <mesh geometry={a.wellRing} material={a.stone} position={[0, 0.4, 0]} castShadow receiveShadow />
-      <mesh geometry={a.unitBox} material={a.wood} position={[-0.9, 1.3, 0]} scale={[0.14, 1.9, 0.14]} castShadow />
-      <mesh geometry={a.unitBox} material={a.wood} position={[0.9, 1.3, 0]} scale={[0.14, 1.9, 0.14]} castShadow />
-      <mesh geometry={a.unitBox} material={a.wood} position={[0, 2.25, 0]} scale={[2.0, 0.1, 0.1]} />
-      <mesh geometry={a.wellRoof} material={a.roof} position={[0, 2.6, 0]} rotation={[0, Math.PI / 4, 0]} castShadow />
-      <mesh geometry={a.unitBox} material={a.iron} position={[0, 1.4, 0]} scale={[0.32, 0.36, 0.32]} />
+      {!cut && (
+        <>
+          <mesh geometry={a.unitBox} material={a.wood} position={[-0.9, 1.3, 0]} scale={[0.14, 1.9, 0.14]} castShadow />
+          <mesh geometry={a.unitBox} material={a.wood} position={[0.9, 1.3, 0]} scale={[0.14, 1.9, 0.14]} castShadow />
+          <mesh geometry={a.unitBox} material={a.wood} position={[0, 2.25, 0]} scale={[2.0, 0.1, 0.1]} />
+          <mesh geometry={a.wellRoof} material={a.roof} position={[0, 2.6, 0]} rotation={[0, Math.PI / 4, 0]} castShadow />
+          <mesh geometry={a.unitBox} material={a.iron} position={[0, 1.4, 0]} scale={[0.32, 0.36, 0.32]} />
+        </>
+      )}
     </group>
   );
 }
@@ -215,9 +233,10 @@ function KitchenFacade({ a }: { a: Assets }) {
   );
 }
 
-function Chunk({ cx, cz }: { cx: number; cz: number }) {
+function Chunk({ cx, cz, hidden }: { cx: number; cz: number; hidden: Set<string> }) {
   const a = getAssets();
   const d = useMemo(() => chunkData(cx, cz), [cx, cz]);
+  const treeHidden = useMemo(() => d.trees.map((_, i) => hidden.has(treeId(cx, cz, i))), [d, hidden, cx, cz]);
   const mx = d.ox + CHUNK / 2;
   const mz = d.oz + CHUNK / 2;
   return (
@@ -225,12 +244,12 @@ function Chunk({ cx, cz }: { cx: number; cz: number }) {
       <mesh geometry={a.ground} material={d.plaza ? a.cobble : a.grass} rotation={[-Math.PI / 2, 0, 0]} position={[mx, 0, mz]} receiveShadow />
       {!d.plaza && d.laneNS && <mesh geometry={a.laneNS} material={a.cobble} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.012, mz]} receiveShadow />}
       {!d.plaza && d.laneEW && <mesh geometry={a.laneEW} material={a.cobble} rotation={[-Math.PI / 2, 0, 0]} position={[mx, 0.012, 0]} receiveShadow />}
-      {d.plaza && <Well a={a} />}
+      {d.plaza && <Well a={a} cut={hidden.has(WELL_ID)} />}
       {d.kitchen && <KitchenFacade a={a} />}
       {d.cottages.map((c, i) => (
-        <CottageMesh key={i} c={c} a={a} />
+        <CottageMesh key={i} c={c} a={a} cut={hidden.has(cottageId(cx, cz, i))} />
       ))}
-      <Trees trees={d.trees} a={a} />
+      <Trees trees={d.trees} a={a} hidden={treeHidden} />
       {d.bushes.map((b, i) => (
         <mesh key={i} geometry={a.bush} material={a.bushMat} position={[b.x, b.s * 0.7, b.z]} scale={[b.s * 1.4, b.s, b.s * 1.4]} castShadow />
       ))}
@@ -263,11 +282,18 @@ function Moon({ playerPos }: { playerPos: RefObject<THREE.Vector3> }) {
 function VillageScene({ playerPos }: { playerPos: RefObject<THREE.Vector3> }) {
   const p0 = playerPos.current ?? new THREE.Vector3();
   const [centre, setCentre] = useState(() => chunkOf(p0.x, p0.z));
+  const [hidden, setHidden] = useState<Set<string>>(() => new Set());
+  const camera = useThree((st) => st.camera);
+  const eye = useMemo(() => new THREE.Vector3(), []);
   useFrame(() => {
     const p = playerPos.current;
     if (!p) return;
     const c = chunkOf(p.x, p.z);
     if (c.cx !== centre.cx || c.cz !== centre.cz) setCentre(c);
+    // cutaway: whatever stands between the player's head and the camera gets cut down / hidden
+    eye.set(p.x, 1.2, p.z);
+    const ids = occludedIds(eye, camera.position, occludersNear(p.x, p.z));
+    if (!sameIds(hidden, ids)) setHidden(new Set(ids));
   });
   const ring = useMemo(() => ringKeys(centre.cx, centre.cz, RING), [centre]);
   useEffect(() => {
@@ -282,7 +308,7 @@ function VillageScene({ playerPos }: { playerPos: RefObject<THREE.Vector3> }) {
       <hemisphereLight intensity={1.3} color="#3d4a78" groundColor="#1a1a12" />
       <Moon playerPos={playerPos} />
       {ring.map((k) => (
-        <Chunk key={chunkKey(k.cx, k.cz)} cx={k.cx} cz={k.cz} />
+        <Chunk key={chunkKey(k.cx, k.cz)} cx={k.cx} cz={k.cz} hidden={hidden} />
       ))}
     </>
   );

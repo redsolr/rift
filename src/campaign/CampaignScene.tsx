@@ -16,11 +16,15 @@ import { inBox } from "./world/types";
  * pitch, WASD / arrows to walk (Shift = run; click or tap the floor to walk there — runs when far), NPCs prompt "Talk"
  * when close, E / Enter / clicking one opens the dialogue; during a conversation the camera eases in on the pair.
  * Zone-agnostic: everything (bounds, colliders, exits, NPCs, fog, camera offset, the meshes) comes from `ZONES[zone]`.
+ * The camera pitch is FIXED; the wheel zooms along it (offset × zoom). Occlusion is the zone's job (Sims cutaway).
  * Walking into an exit box calls `travel` — the store fades, swaps the zone, and bumps `arrivalSeq`, on which the
  * player is re-placed at the arrival spawn. Player position is a ref updated per frame — never React state.
  */
-const WALK = 2.6;
-const RUN = 5.2;
+const WALK = 3.6;
+const RUN = 7.4;
+/** wheel zoom: scales the camera offset (up AND back together — the pitch never changes) */
+const ZOOM_MIN = 0.55;
+const ZOOM_MAX = 1.7;
 const TALK_DIST = 1.9;
 const RADIUS = 0.32;
 
@@ -78,39 +82,6 @@ function collide(p: THREE.Vector3, z: Zone): void {
   }
 }
 
-/** does the segment a→b pass through the box [x0,x1]×[0,h]×[z0,z1]? (slab test) */
-function segmentHitsBox(a: THREE.Vector3, b: THREE.Vector3, [x0, x1, z0, z1, h]: [number, number, number, number, number]): boolean {
-  let tmin = 0;
-  let tmax = 1;
-  const axes: [number, number, number, number][] = [
-    [a.x, b.x - a.x, x0, x1],
-    [a.y, b.y - a.y, 0, h],
-    [a.z, b.z - a.z, z0, z1],
-  ];
-  for (const [o, d, lo, hi] of axes) {
-    if (Math.abs(d) < 1e-9) {
-      if (o < lo || o > hi) return false;
-      continue;
-    }
-    let t1 = (lo - o) / d;
-    let t2 = (hi - o) / d;
-    if (t1 > t2) [t1, t2] = [t2, t1];
-    tmin = Math.max(tmin, t1);
-    tmax = Math.min(tmax, t2);
-    if (tmin > tmax) return false;
-  }
-  return true;
-}
-
-/** camera offsets tried in order until the line of sight to the player clears the zone occluders — steeper each step */
-const CAM_STEPS: [number, number][] = [
-  [1, 1],
-  [1.25, 0.72],
-  [1.5, 0.45],
-  [1.75, 0.2],
-  [2.0, 0.02],
-];
-
 /** an NPC standing in the zone: faces its idle heading, turns to the player only while talking to them */
 function Npc({ npc, playerPos, walkTo }: { npc: ZoneNpc; playerPos: RefObject<THREE.Vector3>; walkTo: (x: number, z: number) => void }) {
   const posRef = useRef(new THREE.Vector3(npc.x, 0, npc.z));
@@ -167,6 +138,7 @@ function World() {
   const gait = useRef<"idle" | "walk" | "run">("idle");
   const heading = useRef(zone.spawn.heading);
   const target = useRef<THREE.Vector3 | null>(null);
+  const zoom = useRef(1);
   const camera = useThree((s) => s.camera);
   const camLook = useRef(new THREE.Vector3(zone.spawn.x, 1, zone.spawn.z));
   const setNearNpc = useCampaign((s) => s.setNearNpc);
@@ -187,9 +159,19 @@ function World() {
     target.current = null;
     gait.current = "idle";
     camLook.current.set(a.x, 0.9, a.z);
-    camera.position.set(a.x, z.camera.up, a.z + z.camera.back);
+    camera.position.set(a.x, z.camera.up * zoom.current, a.z + z.camera.back * zoom.current);
     camera.lookAt(camLook.current);
   }, [arrivalSeq, camera]);
+  // wheel = zoom (in / out along the same fixed pitch)
+  useEffect(() => {
+    const onWheel = (e: WheelEvent) => {
+      if (useCampaign.getState().dialogue) return;
+      zoom.current = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoom.current * Math.exp(e.deltaY * 0.0012)));
+      (window as unknown as { __campaignZoom?: number }).__campaignZoom = zoom.current;
+    };
+    window.addEventListener("wheel", onWheel, { passive: true });
+    return () => window.removeEventListener("wheel", onWheel);
+  }, []);
   // E / Enter to talk when close
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -271,16 +253,9 @@ function World() {
       want = new THREE.Vector3(mx + 0.6, 1.9, mz + 3.6);
     } else {
       lookAt = new THREE.Vector3(p.x, 0.9, p.z);
-      want = new THREE.Vector3(p.x, z.camera.up, p.z + z.camera.back);
-      // occlusion: if a cottage / the well sits between the camera and the player, steepen the pitch until it clears
-      const occ = z.occluders?.(p.x, p.z);
-      if (occ && occ.length) {
-        const eye = new THREE.Vector3(p.x, 1.2, p.z);
-        for (const [ku, kb] of CAM_STEPS) {
-          want.set(p.x, z.camera.up * ku, p.z + z.camera.back * kb);
-          if (!occ.some((box) => segmentHitsBox(eye, want, box))) break;
-        }
-      }
+      // fixed pitch: zoom scales up and back together; anything in the way is cut down by the zone (Sims cutaway)
+      const zf = zoom.current;
+      want = new THREE.Vector3(p.x, z.camera.up * zf, p.z + z.camera.back * zf);
     }
     const k = 1 - Math.exp(-dt * (partner ? 3.5 : 6));
     camera.position.lerp(want, k);

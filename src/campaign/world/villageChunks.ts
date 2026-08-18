@@ -1,5 +1,6 @@
 import { Rng } from "@/sim/rng";
 import type { AABB } from "./types";
+import type { Occluder } from "./occlusion";
 
 /**
  * The village as DATA: a 7×7 grid of 8-unit chunks (56×56 world units), each generated deterministically from its
@@ -165,21 +166,27 @@ export function obstaclesNear(x: number, z: number): AABB[] {
   return out;
 }
 
-/** tall solids (cottages, the well) in the 3×3 chunks around a position — camera occlusion candidates */
-export function occludersNear(x: number, z: number): [number, number, number, number, number][] {
+/** the well: id + box shared by the occlusion test and the plaza renderer */
+export const WELL_ID = "well";
+export const cottageId = (cx: number, cz: number, i: number) => `c:${cx},${cz}:${i}`;
+export const treeId = (cx: number, cz: number, i: number) => `t:${cx},${cz}:${i}`;
+
+/** tall solids (cottages, trees, the well) in the 3×3 chunks around a position — Sims-style cutaway candidates */
+export function occludersNear(x: number, z: number): Occluder[] {
   const { cx, cz } = chunkOf(x, z);
-  const out: [number, number, number, number, number][] = [];
+  const out: Occluder[] = [];
   for (let dz = -1; dz <= 1; dz++)
     for (let dx = -1; dx <= 1; dx++) {
       const a = cx + dx;
       const b = cz + dz;
       if (a < 0 || b < 0 || a >= COLS || b >= ROWS) continue;
       const d = chunkData(a, b);
-      for (const c of d.cottages) {
+      d.cottages.forEach((c, i) => {
         const [hx, hz] = cottageHalf(c);
-        out.push([c.x - hx - 0.1, c.x + hx + 0.1, c.z - hz - 0.1, c.z + hz + 0.1, 4.1]);
-      }
-      if (d.plaza) out.push([-1.4, 1.4, -1.4, 1.4, 3.0]);
+        out.push({ id: cottageId(a, b, i), box: [c.x - hx - 0.1, c.x + hx + 0.1, c.z - hz - 0.1, c.z + hz + 0.1, 4.1] });
+      });
+      d.trees.forEach((t, i) => out.push({ id: treeId(a, b, i), box: [t.x - 1.05 * t.s, t.x + 1.05 * t.s, t.z - 1.05 * t.s, t.z + 1.05 * t.s, 3.6 * t.s] }));
+      if (d.plaza) out.push({ id: WELL_ID, box: [-1.4, 1.4, -1.4, 1.4, 3.0] });
     }
   return out;
 }

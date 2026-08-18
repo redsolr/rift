@@ -59,7 +59,7 @@ export default function CampaignPage() {
           <kbd>W</kbd>
           <kbd>A</kbd>
           <kbd>S</kbd>
-          <kbd>D</kbd> walk · click the floor to walk there · <kbd>E</kbd> talk · walk into a gold ring to leave
+          <kbd>D</kbd> walk · <kbd>Shift</kbd> run · click the floor to walk there · wheel = zoom · <kbd>E</kbd> talk · walk into a gold ring to leave
         </div>
       )}
       {nearNpc && !dialogue && !transition && (

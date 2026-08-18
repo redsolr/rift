@@ -75,9 +75,6 @@ export interface Zone {
   camera: { up: number; back: number };
   /** streamed outdoor zone: chunk grid (colliders come per chunk); undefined = one static room */
   chunks?: ChunkSpec;
-  /** tall solids near (x, z) that could sit between the camera and the player: [minX, maxX, minZ, maxZ, height] —
-   *  the camera rig steepens its pitch until the line of sight clears them */
-  occluders?: (x: number, z: number) => [number, number, number, number, number][];
   /** the meshes; gets the live player position (chunk streaming, moon shadow follow) */
   Scene: ComponentType<{ playerPos: RefObject<THREE.Vector3> }>;
 }
