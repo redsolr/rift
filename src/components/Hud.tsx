@@ -35,7 +35,6 @@ export default function Hud() {
   const selected = useGame((s) => s.selected);
   const moveTiles = useGame((s) => s.moveTiles);
   const commitWait = useGame((s) => s.commitWait);
-  const commitMove = useGame((s) => s.commitMove);
   const cancelPending = useGame((s) => s.cancelPending);
   const playerTeam = useGame((s) => s.playerTeam);
   const seed = useGame((s) => s.seed);
@@ -136,8 +135,8 @@ export default function Hud() {
         )}
         {mode === "manual" && yourTurn && selected && moveTiles.length > 0 && (
           <>
-            <button className="primary" onClick={pendingMove ? commitMove : commitWait}>
-              {pendingMove ? "Move" : "Wait"}
+            <button className="primary" onClick={commitWait}>
+              {pendingMove ? "Wait here" : "Wait"}
             </button>
             {pendingMove && (
               <button className="ghost" onClick={cancelPending}>

@@ -91,13 +91,14 @@ function Unit({ def }: { def: UnitDef }) {
   const shake = useRef(0);
   const target = useRef(new THREE.Vector3(def.x, 0, def.y));
 
-  // Manual: a pending move does NOT move the card — the real unit stays until Move / Attack / Wait is committed; the
-  // translucent MoveGhost marks the destination (2026-08-18). Editor drag: the carried card rides the pointer's ground tile.
+  // Manual: clicking a tile IS the move — the card previews on the pending tile (FE); the command menu decides what it does there.
+  const pending = useGame((s) => (s.selected === def.id ? s.pendingMove : null));
+  // editor drag: the carried card rides the pointer's ground tile (RTS pick-up), snapping tile to tile
   const dragging = useGame((s) => s.drag?.kind === "unit" && s.drag.id === def.id);
   const dragTo = useGame((s) => (s.drag?.kind === "unit" && s.drag.id === def.id ? s.groundHover : null));
   const dropOk = useGame((s) => (s.drag?.kind === "unit" && s.drag.id === def.id ? selectDropTarget(s)?.ok ?? null : null));
-  const vx = dragTo?.x ?? vu?.x ?? def.x;
-  const vy = dragTo?.y ?? vu?.y ?? def.y;
+  const vx = dragTo?.x ?? pending?.x ?? vu?.x ?? def.x;
+  const vy = dragTo?.y ?? pending?.y ?? vu?.y ?? def.y;
   // Sims-style cutaway, tile rule: whatever tile the pointer is over, the card standing on the tile directly IN FRONT
   // of it (y + 1, one step toward the camera) fades so the pointed-at tile/unit stays readable. Nothing else fades.
   // groundHover = the pointer measured against the ground, ignoring cards — so pointing at the upper part of a card
@@ -213,16 +214,16 @@ function Unit({ def }: { def: UnitDef }) {
 /**
  * Manual mode "potential" ghost (the editor's placement read carried into play): with one of your units selected,
  * hovering a reachable tile shows a translucent, team-tinted copy of its card standing THERE — next to the movement
- * arrow — and once a tile is clicked (pendingMove) the ghost STAYS on it while the command menu is open: the real
- * card does not move until Move / Attack / Wait commits. Never shows on the unit's own tile.
+ * arrow — so you see the unit on the spot before committing. Clicking places the real card (pendingMove) and the
+ * ghost is gone; it never shows on the unit's own tile.
  */
 function MoveGhost() {
   const map = useGame((s) => s.config.map);
   const at = useGame((s) => {
-    if (s.mode !== "manual" || !s.selected || !s.moveTiles.length) return null;
-    const p = s.pendingMove ?? s.hover;
+    if (s.mode !== "manual" || !s.selected || s.pendingMove || !s.moveTiles.length) return null;
+    const p = s.hover;
     if (!p) return null;
-    if (!s.pendingMove && !s.moveTiles.some((m) => m.x === p.x && m.y === p.y)) return null;
+    if (!s.moveTiles.some((m) => m.x === p.x && m.y === p.y)) return null;
     const v = s.view.units[s.selected];
     if (!v || (v.x === p.x && v.y === p.y)) return null;
     return `${p.x},${p.y}`;

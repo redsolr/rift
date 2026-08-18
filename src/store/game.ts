@@ -173,10 +173,8 @@ interface GameState {
   openAttacks: (kind?: AttackKind) => void;
   chooseAttack: (id: string) => void;
   setHoverAttack: (id: string | null) => void;
-  /** WAIT = end the action where the unit STANDS (no move) */
+  /** WAIT = end the action on the pending tile (clicking a tile IS the move), or where it stands if none is pending */
   commitWait: () => void;
-  /** MOVE = go to the pending tile and end the action there */
-  commitMove: () => void;
   /** attack/heal `id` with the chosen attack, else the best usable one from the pending tile */
   commitTarget: (id: string) => void;
   endPhaseAI: () => void;
@@ -702,12 +700,7 @@ export const useGame = create<GameState>((set, get) => {
       const s = get();
       if (!s.battle || !s.selected) return;
       const u = s.battle.unit(s.selected);
-      commit({ kind: "wait", unit: u.id, moveTo: { x: u.x, y: u.y } });
-    },
-    commitMove: () => {
-      const s = get();
-      if (!s.battle || !s.selected || !s.pendingMove) return;
-      commit({ kind: "wait", unit: s.selected, moveTo: s.pendingMove });
+      commit({ kind: "wait", unit: u.id, moveTo: s.pendingMove ?? { x: u.x, y: u.y } });
     },
 
     commitTarget: (id) => {
