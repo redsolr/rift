@@ -36,10 +36,11 @@ interface Ambient {
   height: number;
 }
 const AMBIENT: Ambient[] = [
-  { id: "a-rogue", model: "Rogue", x: -3.4, z: -2.0, facing: 1.4, height: 1.6 },
-  { id: "a-hood", model: "Rogue_Hooded", x: 3.6, z: 2.4, facing: -2.6, height: 1.62 },
-  { id: "a-mage", model: "Mage", x: 1.2, z: -3.4, facing: 2.6, height: 1.58 },
-  { id: "a-knight", model: "Knight", x: -2.6, z: 3.5, facing: -0.6, height: 1.66 },
+  // each stands in FRONT of a stall (fountain side), facing its counter — never inside a footprint
+  { id: "a-rogue", model: "Rogue", x: -3.0, z: -1.6, facing: Math.PI, height: 1.6 },
+  { id: "a-hood", model: "Rogue_Hooded", x: -3.0, z: 1.6, facing: 0, height: 1.62 },
+  { id: "a-mage", model: "Mage", x: 1.6, z: -3.0, facing: Math.PI / 2, height: 1.58 },
+  { id: "a-knight", model: "Knight", x: -1.6, z: 3.0, facing: -Math.PI / 2, height: 1.66 },
   { id: "a-barb", model: "Barbarian", x: 3.2, z: -18.4, facing: -2.2, height: 1.72 },
 ];
 /** villager spots for the minimap */
@@ -77,7 +78,7 @@ export const VILLAGE: Zone = {
       z: 1.6,
       facing: -2.2, // toward the fountain
       height: 1.74,
-      approach: { x: 3.4, z: 2.6 },
+      approach: { x: 2.8, z: 0.9 },
       scripts: { first: VILLAGE_TALK, again: VILLAGE_AGAIN },
     },
   ],
@@ -422,7 +423,10 @@ function VillageScene({ playerPos }: { playerPos: RefObject<THREE.Vector3> }) {
     // cutaway: whatever stands between the player's head and the camera gets cut down / hidden
     eye.set(p.x, 1.2, p.z);
     const ids = occludedIds(eye, camera.position, occludersNear(p.x, p.z));
-    if (!sameIds(hidden, ids)) setHidden(new Set(ids));
+    if (!sameIds(hidden, ids)) {
+      setHidden(new Set(ids));
+      (window as unknown as { __villageHidden?: string[] }).__villageHidden = ids; // probe handle
+    }
   });
   const ring = useMemo(() => ringKeys(centre.cx, centre.cz, RING), [centre]);
   useEffect(() => {

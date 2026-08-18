@@ -134,8 +134,9 @@ export function chunkData(cx: number, cz: number): ChunkData {
       [-3.0, 3.0],
       [3.0, 3.0],
     ] as [number, number][]) {
-      stalls.push({ x, z, yaw: Math.atan2(-x, -z), tone: stalls.length });
-      obstacles.push([x - 1.1, x + 1.1, z - 0.9, z + 0.9]);
+      // yaw snapped to the axis so the counter faces the fountain AND its collision box matches the mesh (AABB colliders)
+      stalls.push({ x, z, yaw: z < 0 ? 0 : Math.PI, tone: stalls.length });
+      obstacles.push([x - 1.05, x + 1.05, z - 0.65, z + 0.65]);
     }
     for (const [x, z] of [
       [-3.5, -1.0],

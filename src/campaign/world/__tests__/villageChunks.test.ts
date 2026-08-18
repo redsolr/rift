@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { AMBIENT_SPOTS } from "../village";
 import { CHUNK, COLS, HALF, KITCHEN_Z, LANE, ROWS, chunkData, chunkOf, cottageHalf, obstaclesNear, ringKeys } from "../villageChunks";
 
 describe("village chunks", () => {
@@ -42,6 +43,15 @@ describe("village chunks", () => {
     // the door gap at x = 0 is walkable at the facade line
     const atDoor = kitchen.obstacles.some(([x0, x1, z0, z1]) => x0 <= 0 && 0 <= x1 && z0 <= KITCHEN_Z + 0.3 && KITCHEN_Z + 0.3 <= z1);
     expect(atDoor).toBe(false);
+  });
+
+  it("stalls collide exactly where they stand (axis-aligned) and villagers stand clear of every plaza collider", () => {
+    const plaza = chunkData(Math.floor(COLS / 2), Math.floor(ROWS / 2));
+    expect(plaza.stalls).toHaveLength(4);
+    for (const st of plaza.stalls) expect(Math.abs(Math.sin(st.yaw))).toBeLessThan(1e-9); // yaw ∈ {0, π}
+    for (const v of AMBIENT_SPOTS) {
+      for (const [x0, x1, z0, z1] of plaza.obstacles) expect(v.x > x0 - 0.3 && v.x < x1 + 0.3 && v.z > z0 - 0.3 && v.z < z1 + 0.3).toBe(false);
+    }
   });
 
   it("streams a ring in the middle and clips it at the edges; colliders come from the 3×3 neighbourhood", () => {
