@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Hud from "@/components/Hud";
 import Panel from "@/components/Panel";
 import Drawer from "@/components/Drawer";
+import MobileControls from "@/components/MobileControls";
 import BattleBar, { useDuelPair } from "@/components/BattleBar";
 import CharacterPanel from "@/components/CharacterPanel";
 import TurnControls from "@/components/TurnControls";
@@ -89,6 +90,7 @@ export default function Home() {
           <PhaseBanner />
           <PitResult />
           {mobile && <div className="mobile-hint">{selectedName ?? hint}</div>}
+          {mobile && <MobileControls />}
         </div>
         {mobile ? (
           <Drawer title={selectedName ?? "Panel"}>

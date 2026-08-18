@@ -3,6 +3,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { useGame } from "@/store/game";
+import { stickPan } from "./shared";
 
 /** Frames the whole map for the current viewport (portrait phones need a much farther, steeper camera). */
 export default function CameraRig({ cx, cz, w, h }: { cx: number; cz: number; w: number; h: number }) {
@@ -112,14 +113,22 @@ export default function CameraRig({ cx, cz, w, h }: { cx: number; cz: number; w:
     if (!controls) return;
     // --- RTS edge scroll ---
     const p = pointer.current;
+    // pan vector: RTS edge-scroll (mouse) OR the phone camera stick (MobileControls) — same maths
+    let ex = 0,
+      ey = 0;
     if (edgeScroll && p.inside && p.mouse) {
       const EDGE = 28;
-      let ex = 0,
-        ey = 0;
       if (p.x < EDGE) ex = -(1 - p.x / EDGE);
       else if (p.x > size.width - EDGE) ex = 1 - (size.width - p.x) / EDGE;
       if (p.y < EDGE) ey = -(1 - p.y / EDGE);
       else if (p.y > size.height - EDGE) ey = 1 - (size.height - p.y) / EDGE;
+    }
+    if (stickPan.x || stickPan.y) {
+      // the stick is analogue: ease the deflection so small pushes creep and full pushes cruise (not the edge-scroll sprint)
+      ex = stickPan.x * Math.abs(stickPan.x) * 0.7;
+      ey = stickPan.y * Math.abs(stickPan.y) * 0.7;
+    }
+    {
       if (ex || ey) {
         goal.current = null;
         const dist = camera.position.distanceTo(controls.target);

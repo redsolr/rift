@@ -2692,3 +2692,264 @@ button.link {
   border-color: #ffd54f;
   color: #ffd54f;
 }
+
+/* ---- phone control layer (MobileControls): Genshin-shaped — squad column right, PS-style cluster bottom-right,
+        camera stick bottom-left. Only rendered in the phone layout; desktop chrome it replaces is hidden there. ---- */
+.stage.mobile .turn-controls,
+.stage.mobile .skill-panel,
+.stage.mobile .action-menu-wrap {
+  display: none !important;
+}
+.stage.mobile .hud-tr {
+  /* minimap + camera widget move to the TOP-LEFT (Genshin) — the right edge belongs to the squad column */
+  left: calc(8px + env(safe-area-inset-left));
+  right: auto;
+}
+.stage.mobile .mobile-hint {
+  left: 50%;
+}
+.mc-squad {
+  position: absolute;
+  right: calc(6px + env(safe-area-inset-right));
+  top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 6;
+}
+.mc-chip {
+  --chip-ring: #19e3ff;
+  position: relative;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  padding: 3px;
+  border: 0;
+  background-color: rgba(0, 0, 0, 0.35);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    opacity 0.15s ease;
+}
+.mc-chip .mc-chip-portrait {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #0f1f4a;
+}
+.mc-chip .portrait-img {
+  background-size: 150%;
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+.mc-chip-name {
+  position: absolute;
+  right: 50px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 2px #000;
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+  transition: opacity 0.15s ease;
+}
+.mc-chip.selected {
+  transform: scale(1.14) translateX(-4px);
+  box-shadow:
+    0 0 0 2px #fff,
+    0 0 16px rgba(25, 227, 255, 0.7);
+}
+.mc-chip.selected .mc-chip-name {
+  opacity: 1;
+}
+.mc-chip.acted {
+  opacity: 0.45;
+  filter: grayscale(0.7);
+}
+.mc-stick {
+  position: absolute;
+  left: calc(22px + env(safe-area-inset-left));
+  bottom: calc(22px + env(safe-area-inset-bottom));
+  width: 112px;
+  height: 112px;
+  border-radius: 50%;
+  z-index: 6;
+  touch-action: none;
+}
+.mc-stick-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.25));
+}
+.mc-stick-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 46px;
+  height: 46px;
+  margin: -23px 0 0 -23px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff, #b8c9ff 60%, #6f8fff);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+.mc-cluster {
+  position: absolute;
+  right: calc(104px + env(safe-area-inset-right));
+  bottom: calc(24px + env(safe-area-inset-bottom));
+  width: 0;
+  height: 0;
+  z-index: 6;
+}
+.mc-primary {
+  position: absolute;
+  right: -40px;
+  bottom: -40px;
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.25), rgba(0, 0, 0, 0.1) 60%), rgba(20, 24, 40, 0.86);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.55);
+  cursor: pointer;
+}
+.mc-primary-label {
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: 0.02em;
+}
+.mc-primary-sub {
+  margin-top: 3px;
+  font-size: 10px;
+  opacity: 0.8;
+  max-width: 80px;
+  text-align: center;
+}
+.mc-primary.gold {
+  background: radial-gradient(circle at 35% 30%, #fff1b8, #f2c96b 45%, #b8892a);
+  color: #1a1408;
+  border-color: #fff8e0;
+}
+.mc-primary.red {
+  background: radial-gradient(circle at 35% 30%, #ff9a8c, #e0184f 55%, #7a0c2a);
+  border-color: #ffd0d0;
+}
+.mc-primary.green {
+  background: radial-gradient(circle at 35% 30%, #c8ffd8, #3ddc84 55%, #157a45);
+  color: #06301a;
+}
+.mc-primary:disabled {
+  opacity: 0.4;
+}
+/* satellites: an arc up-left of the primary (i = 0 up, 1 up-left, 2 left) */
+.mc-sat {
+  position: absolute;
+  --a: calc(90deg + var(--i) * 45deg);
+  --r: 88px;
+  right: calc(-27px - cos(var(--a)) * var(--r));
+  bottom: calc(-27px + sin(var(--a)) * var(--r));
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.4);
+  background: rgba(20, 24, 40, 0.82);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+}
+.mc-sat.on {
+  background: #f2c96b;
+  color: #1a1408;
+}
+.mc-sat:disabled {
+  opacity: 0.4;
+}
+/* radial skills: n attacks fanned from straight up to straight left around the primary */
+.mc-skill {
+  position: absolute;
+  --a: calc(90deg + var(--i) * (90deg / max(1, var(--n) - 1)));
+  --r: 108px;
+  right: calc(-32px - cos(var(--a)) * var(--r));
+  bottom: calc(-32px + sin(var(--a)) * var(--r));
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  background: rgba(20, 24, 40, 0.88);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.55);
+  cursor: pointer;
+  animation: mc-pop 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes mc-pop {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+}
+.mc-skill-glyph {
+  font-size: 18px;
+}
+.mc-skill-name {
+  font-size: 8.5px;
+  font-weight: 700;
+  margin-top: 2px;
+  max-width: 58px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mc-skill-meta {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  background: #e0184f;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+  padding: 0 4px;
+}
+.mc-skill.off {
+  opacity: 0.45;
+}
+.mc-skill.off .mc-skill-meta {
+  background: #444;
+}
+.mc-skill.el-fire {
+  border-color: #ff8a5c;
+}
+.mc-skill.el-ice {
+  border-color: #8fd8ff;
+}
+.mc-skill.el-thunder {
+  border-color: #ffe27a;
+}
+.mc-skill.el-holy {
+  border-color: #c8ffd8;
+}

@@ -27,3 +27,6 @@ if (typeof window !== "undefined") {
   });
 }
 export const dragged = () => rmb.moved;
+
+/** Phone camera stick (MobileControls): −1..1 pan vector, read by CameraRig every frame. Module-level on purpose — per-frame, never React state. */
+export const stickPan = { x: 0, y: 0 };
