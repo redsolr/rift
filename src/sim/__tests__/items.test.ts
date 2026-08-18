@@ -35,7 +35,7 @@ describe("items — equipping", () => {
     expect(geared.atk).toBe(knight.stats.atk + 2 + 1);
     expect(geared.hp).toBe(knight.stats.hp + 3);
     expect(equipmentDelta({ weapon: "steel_lance", ring1: "ring_of_vigor", ring2: "ring_of_might" })).toEqual({ atk: 3, hp: 3 });
-    const floor = applyEquipment({ ...knight.stats, hp: 1, mov: 1 }, { trinket: "hourglass_shard" }); // −2 hp, +1 mov
+    const floor = applyEquipment({ ...knight.stats, hp: 1, mov: 1 }, { trinket1: "hourglass_shard" }); // −2 hp, +1 mov
     expect(floor.hp).toBe(1);
     expect(floor.mov).toBe(2);
   });

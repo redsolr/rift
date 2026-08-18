@@ -115,52 +115,123 @@
   flex-direction: column;
   gap: 4px;
 }
+/* FE Engage roster row: the bust bleeds across the row under a blue-black gradient, a coloured class badge on the
+   left, bold white name, OVR right, a ➤ cursor on the selected row */
 .cs-roster-row {
+  position: relative;
   display: grid;
-  grid-template-columns: 40px 1fr auto;
-  grid-template-rows: auto auto;
+  grid-template-columns: 34px 1fr auto;
   align-items: center;
   column-gap: 8px;
-  padding: 4px 8px 4px 4px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid #222b3e;
-  border-radius: 6px;
-  color: #e6e9f0;
+  height: 62px;
+  padding: 0 10px 0 8px;
+  overflow: hidden;
+  background: linear-gradient(90deg, #142238, #0e1626);
+  border: 1px solid #2a3a58;
+  border-radius: 7px;
+  color: #fff;
   text-align: left;
   cursor: pointer;
+  --arch: #6fe3ff;
+  transition: border-color 0.12s, transform 0.1s;
+}
+.cs-roster-row.arch-knight { --arch: #6fb7ff; }
+.cs-roster-row.arch-fighter { --arch: #ff8a5c; }
+.cs-roster-row.arch-archer { --arch: #7fe08a; }
+.cs-roster-row.arch-mage { --arch: #c98cff; }
+.cs-roster-row.arch-healer { --arch: #ffd36b; }
+.cs-roster-art {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 84%;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 40%);
+  mask-image: linear-gradient(90deg, transparent 0%, #000 40%);
+}
+.cs-roster-art .portrait-img {
+  background-size: 150%;
+  background-position: 62% 22% !important;
+  filter: none;
+}
+.cs-roster-art .portrait-glow {
+  display: none;
+}
+.cs-roster-shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(10, 16, 30, 0.92) 26%, rgba(10, 16, 30, 0.35) 55%, rgba(10, 16, 30, 0));
+  pointer-events: none;
 }
 .cs-roster-row:hover {
-  border-color: #3a4560;
+  border-color: var(--arch);
 }
 .cs-roster-row.on {
   border-color: var(--gold);
-  background: linear-gradient(90deg, rgba(242, 201, 107, 0.16), rgba(242, 201, 107, 0.03));
+  box-shadow: 0 0 0 1px rgba(242, 201, 107, 0.35), 0 0 18px rgba(111, 227, 255, 0.25), inset 0 0 24px rgba(111, 227, 255, 0.12);
+  transform: translateX(3px);
 }
-.cs-roster-face {
-  grid-row: 1 / 3;
-  width: 40px;
-  height: 44px;
-  border-radius: 5px;
-  background: #0b0f18;
+.cs-roster-row.on .cs-roster-shade {
+  background: linear-gradient(90deg, rgba(20, 60, 90, 0.9) 26%, rgba(20, 60, 90, 0.35) 55%, rgba(20, 60, 90, 0));
 }
-.cs-roster-face .portrait-img {
-  background-size: 200%;
+.cs-roster-badge {
+  position: relative;
+  z-index: 1;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 17px;
+  color: #fff;
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--arch) 70%, #fff), var(--arch) 55%, color-mix(in srgb, var(--arch) 55%, #000));
+  border: 2px solid rgba(255, 255, 255, 0.75);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--arch) 70%, transparent), 0 2px 4px rgba(0, 0, 0, 0.6);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+  font-family: "Segoe UI Symbol", "Apple Symbols", "Noto Sans Symbols 2", serif;
+}
+.cs-roster-text {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 .cs-roster-name {
   font-family: Georgia, serif;
-  font-size: 15px;
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: 0.02em;
+  text-shadow: 0 1px 0 #000, 0 0 8px rgba(0, 0, 0, 0.9);
+  white-space: nowrap;
 }
 .cs-roster-class {
-  grid-column: 2;
   font-size: 10px;
-  color: #8a93a8;
+  letter-spacing: 0.08em;
+  color: var(--arch);
+  text-shadow: 0 1px 2px #000;
+  white-space: nowrap;
 }
 .cs-roster-ovr {
-  grid-column: 3;
-  grid-row: 1 / 3;
+  position: relative;
+  z-index: 1;
   font-family: Georgia, serif;
-  font-size: 18px;
+  font-size: 20px;
   color: var(--gold);
+  text-shadow: 0 1px 0 #000, 0 0 8px rgba(0, 0, 0, 0.9);
+}
+.cs-roster-cursor {
+  position: absolute;
+  left: -14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--gold);
+  font-size: 12px;
+  opacity: 0;
+  transition: left 0.15s, opacity 0.15s;
+  z-index: 2;
+}
+.cs-roster-row.on .cs-roster-cursor {
+  left: -2px;
+  opacity: 1;
 }
 
 /* ---- stats ---- */
@@ -250,9 +321,9 @@
 .cs-doll {
   position: relative;
   display: grid;
-  grid-template-columns: 58px 1fr 58px;
+  grid-template-columns: 54px 1fr 54px;
   grid-template-rows: 1fr auto;
-  padding: 14px 10px 12px;
+  padding: 12px 10px 10px;
   gap: 8px;
   border-right: 1px solid #222b3e;
   background: radial-gradient(ellipse at 50% 30%, rgba(111, 227, 255, 0.08), transparent 60%);
@@ -263,8 +334,9 @@
   z-index: 1;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start; /* WoW: the columns hang from the top edge */
-  gap: 8px;
+  justify-content: space-between; /* WoW: 8 slots span the whole height of the model */
+  gap: 4px;
+  min-height: 0;
   grid-row: 1;
   grid-column: 1;
 }
@@ -288,7 +360,7 @@
 }
 .cs-bust-img {
   position: absolute;
-  inset: 0 10% 56px;
+  inset: 0 9% 52px;
 }
 .cs-bust-img .portrait-img {
   background-size: cover;
@@ -298,8 +370,8 @@
   position: relative;
   display: grid;
   place-items: center;
-  width: 58px;
-  height: 58px;
+  width: 54px;
+  height: 54px;
   padding: 0;
   border-radius: 6px;
   border: 1px solid #2c3650;
@@ -313,12 +385,12 @@
 .cs-slot-glyph {
   display: grid;
   place-items: center;
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   border-radius: 5px;
   background: #0b0f18;
   border: 1px solid #222b3e;
-  font-size: 26px;
+  font-size: 24px;
 }
 .cs-slot.empty .cs-slot-glyph {
   color: #3a4560;
@@ -587,6 +659,6 @@
     grid-template-columns: 160px 200px 1fr 300px;
   }
   .cs-doll {
-    grid-template-columns: 58px 1fr 58px;
+    grid-template-columns: 54px 1fr 54px;
   }
 }

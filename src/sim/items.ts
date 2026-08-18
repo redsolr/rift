@@ -8,13 +8,14 @@ import { Archetype, Stats, UnitDef } from "./types";
  * in `UnitDef.base`), so the engine, cards, forecast and AI all read geared stats without knowing items exist.
  * Loot is deterministic: `rollLoot(floor)` for a Tower floor is a function of the floor number only.
  */
-export type Slot = "head" | "shoulders" | "chest" | "hands" | "feet" | "weapon" | "offhand" | "ring1" | "ring2" | "trinket";
-/** which slot(s) an item may sit in — a "ring" fits either ring slot */
-export type SlotKind = "head" | "shoulders" | "chest" | "hands" | "feet" | "weapon" | "offhand" | "ring" | "trinket";
+/** WoW paper-doll: 8 down the left (armour), 8 down the right (legs / feet / jewellery / relic / banner), weapons under the model */
+export type Slot = "head" | "neck" | "shoulders" | "back" | "chest" | "wrist" | "hands" | "waist" | "legs" | "feet" | "ring1" | "ring2" | "trinket1" | "trinket2" | "relic" | "banner" | "weapon" | "offhand";
+/** which slot(s) an item may sit in — a "ring" fits either ring slot, a "trinket" either trinket slot */
+export type SlotKind = "head" | "neck" | "shoulders" | "back" | "chest" | "wrist" | "hands" | "waist" | "legs" | "feet" | "ring" | "trinket" | "relic" | "banner" | "weapon" | "offhand";
 export type Rarity = "common" | "uncommon" | "rare" | "epic";
 
-export const SLOTS: Slot[] = ["head", "shoulders", "chest", "hands", "feet", "weapon", "offhand", "ring1", "ring2", "trinket"];
-export const SLOT_LABEL: Record<Slot, string> = { head: "Head", shoulders: "Shoulders", chest: "Chest", hands: "Hands", feet: "Feet", weapon: "Weapon", offhand: "Off-hand", ring1: "Ring", ring2: "Ring", trinket: "Trinket" };
+export const SLOTS: Slot[] = ["head", "neck", "shoulders", "back", "chest", "wrist", "hands", "waist", "legs", "feet", "ring1", "ring2", "trinket1", "trinket2", "relic", "banner", "weapon", "offhand"];
+export const SLOT_LABEL: Record<Slot, string> = { head: "Head", neck: "Neck", shoulders: "Shoulders", back: "Back", chest: "Chest", wrist: "Wrist", hands: "Hands", waist: "Waist", legs: "Legs", feet: "Feet", ring1: "Ring", ring2: "Ring", trinket1: "Trinket", trinket2: "Trinket", relic: "Relic", banner: "Banner", weapon: "Weapon", offhand: "Off-hand" };
 export const RARITY_ORDER: Rarity[] = ["common", "uncommon", "rare", "epic"];
 export const RARITY_LABEL: Record<Rarity, string> = { common: "Common", uncommon: "Uncommon", rare: "Rare", epic: "Epic" };
 
@@ -36,8 +37,8 @@ export interface ItemDef {
 }
 
 /** slot kind ↔ paper-doll slot */
-export const slotKindOf = (s: Slot): SlotKind => (s === "ring1" || s === "ring2" ? "ring" : s);
-export const slotsForKind = (k: SlotKind): Slot[] => (k === "ring" ? ["ring1", "ring2"] : [k]);
+export const slotKindOf = (s: Slot): SlotKind => (s === "ring1" || s === "ring2" ? "ring" : s === "trinket1" || s === "trinket2" ? "trinket" : s);
+export const slotsForKind = (k: SlotKind): Slot[] => (k === "ring" ? ["ring1", "ring2"] : k === "trinket" ? ["trinket1", "trinket2"] : [k]);
 
 const I = (id: string, name: string, slot: SlotKind, rarity: Rarity, mods: ItemMods, glyph: string, flavour: string, tier = 0, classes?: Archetype[]): ItemDef => ({ id, name, slot, rarity, mods, glyph, flavour, tier, classes });
 
@@ -86,6 +87,43 @@ export const ITEMS: ItemDef[] = [
   I("swift_boots", "Swift Boots", "feet", "rare", { mov: 1 }, "👢", "One more tile. Every time.", 1),
   I("greaves", "Greaves", "feet", "uncommon", { def: 2 }, "👢", "Shins have enemies too.", 0, MELEE),
   I("boots_of_the_gale", "Boots of the Gale", "feet", "epic", { mov: 1, spd: 2 }, "👢", "The ground is a suggestion.", 3),
+  // ---- neck ----
+  I("cord_of_the_ford", "Cord of the Ford", "neck", "common", { hp: 2 }, "📿", "River-smooth beads.", 0),
+  I("amulet_of_focus", "Amulet of Focus", "neck", "uncommon", { atk: 1, spd: 1 }, "📿", "It quiets the hands.", 0),
+  I("gorget_of_iron", "Gorget of Iron", "neck", "rare", { def: 2, hp: 3 }, "📿", "The throat is where they aim.", 1, MELEE),
+  I("pendant_of_dawn", "Pendant of Dawn", "neck", "epic", { atk: 2, hp: 5 }, "📿", "It warms as the sun rises.", 3, CASTER),
+  // ---- back ----
+  I("travel_cloak", "Travel Cloak", "back", "common", { hp: 2 }, "🧣", "Rain rolls off it.", 0),
+  I("hunters_cape", "Hunter's Cape", "back", "uncommon", { spd: 1, atk: 1 }, "🧣", "Green as the underbrush.", 0, ["archer"]),
+  I("cloak_of_shadows", "Cloak of Shadows", "back", "rare", { spd: 2, def: 1 }, "🧣", "It arrives after you do.", 2),
+  I("mantle_of_the_wall", "Mantle of the Wall", "back", "rare", { def: 3 }, "🧣", "Woven with wire.", 1, MELEE),
+  // ---- wrist ----
+  I("leather_bracers", "Leather Bracers", "wrist", "common", { def: 1 }, "⌚", "The forearm's friend.", 0),
+  I("iron_vambraces", "Iron Vambraces", "wrist", "uncommon", { def: 1, atk: 1 }, "⌚", "They turn a blade.", 1, MELEE),
+  I("silk_bindings", "Silk Bindings", "wrist", "uncommon", { atk: 1, spd: 1 }, "⌚", "Light enough to forget.", 0, CASTER),
+  I("bracers_of_the_hawk", "Bracers of the Hawk", "wrist", "epic", { atk: 3, spd: 1 }, "⌚", "The string never slips.", 3, ["archer"]),
+  // ---- waist ----
+  I("rope_belt", "Rope Belt", "waist", "common", { hp: 1 }, "🪢", "Holds everything up.", 0),
+  I("studded_girdle", "Studded Girdle", "waist", "uncommon", { def: 1, hp: 2 }, "🪢", "Rivets like teeth.", 0, MELEE),
+  I("sash_of_embers", "Sash of Embers", "waist", "rare", { atk: 2 }, "🪢", "Never quite cool.", 2, CASTER),
+  I("belt_of_the_titan", "Belt of the Titan", "waist", "epic", { hp: 6, def: 2 }, "🪢", "Someone very large is missing this.", 3),
+  // ---- legs ----
+  I("cloth_leggings", "Cloth Leggings", "legs", "common", { spd: 1 }, "👖", "Patched at the knee.", 0),
+  I("leather_leggings", "Leather Leggings", "legs", "uncommon", { def: 1, spd: 1 }, "👖", "Creak when you kneel.", 0),
+  I("mail_chausses", "Mail Chausses", "legs", "rare", { def: 3, spd: -1 }, "👖", "Ten thousand small promises, lower.", 1, MELEE),
+  I("legplates_of_the_bastion", "Legplates of the Bastion", "legs", "epic", { def: 4, hp: 5, spd: -1 }, "👖", "The siege ended before they dented.", 3, ["knight"]),
+  // ---- relic (class-bound keepsakes) ----
+  I("knights_crest", "Knight's Crest", "relic", "rare", { def: 2, hp: 2 }, "🛡", "An oath in enamel.", 1, ["knight"]),
+  I("berserkers_totem", "Berserker's Totem", "relic", "rare", { atk: 3, def: -1 }, "🗿", "It hums before a charge.", 1, ["fighter"]),
+  I("hawks_feather", "Hawk's Feather", "relic", "rare", { spd: 2, atk: 1 }, "🪶", "It points at the wind.", 1, ["archer"]),
+  I("arcane_focus", "Arcane Focus", "relic", "rare", { atk: 3 }, "🔮", "A lens for the will.", 1, ["mage"]),
+  I("saints_relic", "Saint's Relic", "relic", "rare", { atk: 2, hp: 3 }, "📜", "A finger bone in silver.", 1, ["healer"]),
+  I("relic_of_the_tower", "Relic of the Tower", "relic", "epic", { atk: 2, def: 2, spd: 1 }, "🏛", "From a floor no one remembers.", 3),
+  // ---- banner (the standard you march under) ----
+  I("company_pennant", "Company Pennant", "banner", "common", { hp: 2 }, "🚩", "Faded, but yours.", 0),
+  I("banner_of_march", "Banner of March", "banner", "uncommon", { mov: 1, def: -1 }, "🚩", "Feet find the road.", 1),
+  I("standard_of_iron", "Standard of Iron", "banner", "rare", { def: 2, hp: 2 }, "🚩", "Held, never dropped.", 2),
+  I("banner_of_the_vanguard", "Banner of the Vanguard", "banner", "epic", { atk: 2, mov: 1 }, "🚩", "Where it goes, the line goes.", 3),
   // ---- rings ----
   I("ring_of_vigor", "Ring of Vigor", "ring", "common", { hp: 3 }, "💍", "A little more, every morning.", 0),
   I("ring_of_might", "Ring of Might", "ring", "uncommon", { atk: 1 }, "💍", "It tightens before a fight.", 0),
@@ -189,4 +227,4 @@ export function rollLoot(floor: number, bracket: number): ItemDef {
 }
 
 /** what a fresh party carries before the first climb — enough to learn the screen with */
-export const STARTER_KIT: string[] = ["leather_cap", "leather_jerkin", "worn_boots", "wooden_buckler", "ring_of_vigor", "lucky_coin", "cloth_gloves", "padded_shoulders"];
+export const STARTER_KIT: string[] = ["leather_cap", "leather_jerkin", "worn_boots", "wooden_buckler", "ring_of_vigor", "lucky_coin", "cloth_gloves", "padded_shoulders", "travel_cloak", "rope_belt", "cord_of_the_ford", "cloth_leggings", "leather_bracers", "company_pennant"];

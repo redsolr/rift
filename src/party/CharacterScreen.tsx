@@ -5,7 +5,7 @@ import { Equipment, ItemDef, RARITY_LABEL, SLOT_LABEL, Slot, applyEquipment, can
 import { ARCHETYPE_LABEL } from "@/sim/presets";
 import { Stats, UnitDef } from "@/sim/types";
 import Portrait from "@/components/Portrait";
-import { WEAPON, overall } from "@/components/cards";
+import { GLYPH, POSITION, WEAPON, overall } from "@/components/cards";
 import { Carry, PARTY, partyMember, useParty } from "./store";
 import "./party.css";
 
@@ -25,11 +25,11 @@ const STAT_ROWS: { k: keyof Pick<Stats, "hp" | "atk" | "def" | "spd" | "mov">; l
   { k: "spd", label: "Spd" },
   { k: "mov", label: "Mov" },
 ];
-// WoW paper-doll: armour down the left edge, jewellery + boots down the right, weapons under the model
-const LEFT_SLOTS: Slot[] = ["head", "shoulders", "chest", "hands"];
-const RIGHT_SLOTS: Slot[] = ["feet", "ring1", "ring2", "trinket"];
+// WoW paper-doll: 8 armour slots down the left edge, 8 down the right (legs / feet / jewellery / relic / banner), weapons under the model
+const LEFT_SLOTS: Slot[] = ["head", "neck", "shoulders", "back", "chest", "wrist", "hands", "waist"];
+const RIGHT_SLOTS: Slot[] = ["legs", "feet", "ring1", "ring2", "trinket1", "trinket2", "relic", "banner"];
 const BOTTOM_SLOTS: Slot[] = ["weapon", "offhand"];
-const SLOT_GLYPH: Record<Slot, string> = { head: "🪖", shoulders: "🧥", chest: "🥋", hands: "🧤", feet: "👢", weapon: "⚔", offhand: "🛡", ring1: "◯", ring2: "◯", trinket: "✧" };
+const SLOT_GLYPH: Record<Slot, string> = { head: "🪖", neck: "📿", shoulders: "🧥", back: "🧣", chest: "🥋", wrist: "⌚", hands: "🧤", waist: "🪢", legs: "👖", feet: "👢", ring1: "◯", ring2: "◯", trinket1: "✧", trinket2: "✧", relic: "☥", banner: "⚑", weapon: "⚔", offhand: "🛡" };
 
 const sameCarry = (a: Carry | null, b: Carry | null) => !!a && !!b && ((a.kind === "bag" && b.kind === "bag" && a.cell === b.cell) || (a.kind === "slot" && b.kind === "slot" && a.slot === b.slot));
 
@@ -176,11 +176,21 @@ function Screen() {
             {PARTY.map((u) => {
               const g = applyEquipment(u.stats, equipment[u.id] ?? {});
               return (
-                <button key={u.id} className={`cs-roster-row ${u.id === hero.id ? "on" : ""}`} onClick={() => setHero(u.id)}>
-                  <Portrait u={u} className="cs-roster-face" />
-                  <span className="cs-roster-name">{u.name}</span>
-                  <span className="cs-roster-class">{ARCHETYPE_LABEL[u.archetype]}</span>
+                <button key={u.id} className={`cs-roster-row arch-${u.archetype} ${u.id === hero.id ? "on" : ""}`} onClick={() => setHero(u.id)}>
+                  {/* FE Engage roster read: the bust bleeds across the row under a dark gradient, class badge on the left */}
+                  <Portrait u={u} className="cs-roster-art" />
+                  <span className="cs-roster-shade" />
+                  <span className="cs-roster-badge" title={ARCHETYPE_LABEL[u.archetype]}>
+                    {GLYPH[u.archetype]}
+                  </span>
+                  <span className="cs-roster-text">
+                    <span className="cs-roster-name">{u.name}</span>
+                    <span className="cs-roster-class">
+                      {POSITION[u.archetype]} · {ARCHETYPE_LABEL[u.archetype]}
+                    </span>
+                  </span>
                   <span className="cs-roster-ovr">{overall({ ...u, stats: g })}</span>
+                  <span className="cs-roster-cursor">➤</span>
                 </button>
               );
             })}
