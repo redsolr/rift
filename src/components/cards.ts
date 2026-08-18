@@ -67,6 +67,140 @@ function shieldPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: numb
   ctx.closePath();
 }
 
+/**
+ * FE-style class / weapon icon (Three Hopes: the small dark square with the lance / sword / bow beside the unit) —
+ * ours sits on the TOP-RIGHT of the card. Vector strokes on a dark rounded plate, so it stays legible at card scale
+ * where a glyph font would smear. `s` = plate size in px, drawn with its top-left at (x, y).
+ */
+export function drawClassIcon(ctx: CanvasRenderingContext2D, archetype: Archetype, x: number, y: number, s: number, trim: string) {
+  ctx.save();
+  // plate
+  const r = s * 0.2;
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + s, y, x + s, y + s, r);
+  ctx.arcTo(x + s, y + s, x, y + s, r);
+  ctx.arcTo(x, y + s, x, y, r);
+  ctx.arcTo(x, y, x + s, y, r);
+  ctx.closePath();
+  ctx.fillStyle = "rgba(10,10,16,0.88)";
+  ctx.shadowColor = "rgba(0,0,0,0.6)";
+  ctx.shadowBlur = 6;
+  ctx.shadowOffsetY = 2;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
+  ctx.lineWidth = Math.max(1.5, s * 0.05);
+  ctx.strokeStyle = trim;
+  ctx.stroke();
+  // icon strokes, in a unit box (0..1) mapped to the plate's inner 70%
+  ctx.translate(x + s * 0.15, y + s * 0.15);
+  ctx.scale(s * 0.7, s * 0.7);
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = "#f6f2ea";
+  ctx.fillStyle = "#f6f2ea";
+  const lw = 0.11;
+  ctx.lineWidth = lw;
+  switch (archetype) {
+    case "knight": {
+      // lance: diagonal shaft, leaf-shaped head top-right, small guard
+      ctx.beginPath();
+      ctx.moveTo(0.12, 0.88);
+      ctx.lineTo(0.66, 0.34);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0.92, 0.08);
+      ctx.lineTo(0.78, 0.4);
+      ctx.lineTo(0.6, 0.22);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(0.36, 0.5);
+      ctx.lineTo(0.5, 0.64);
+      ctx.stroke();
+      break;
+    }
+    case "fighter": {
+      // axe: haft + broad crescent blade
+      ctx.beginPath();
+      ctx.moveTo(0.16, 0.9);
+      ctx.lineTo(0.66, 0.4);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0.5, 0.24);
+      ctx.quadraticCurveTo(0.9, 0.1, 0.82, 0.56);
+      ctx.quadraticCurveTo(0.7, 0.42, 0.5, 0.24);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
+    case "archer": {
+      // bow: arc + string + nocked arrow
+      ctx.beginPath();
+      ctx.moveTo(0.28, 0.1);
+      ctx.quadraticCurveTo(0.9, 0.5, 0.28, 0.9);
+      ctx.stroke();
+      ctx.lineWidth = lw * 0.55;
+      ctx.beginPath();
+      ctx.moveTo(0.28, 0.1);
+      ctx.lineTo(0.28, 0.9);
+      ctx.stroke();
+      ctx.lineWidth = lw * 0.8;
+      ctx.beginPath();
+      ctx.moveTo(0.1, 0.5);
+      ctx.lineTo(0.8, 0.5);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0.92, 0.5);
+      ctx.lineTo(0.76, 0.42);
+      ctx.lineTo(0.76, 0.58);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
+    case "mage": {
+      // tome: closed book with a spine and a spark above
+      ctx.lineWidth = lw * 0.9;
+      ctx.beginPath();
+      ctx.rect(0.2, 0.3, 0.6, 0.62);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0.34, 0.3);
+      ctx.lineTo(0.34, 0.92);
+      ctx.stroke();
+      // four-point spark
+      ctx.beginPath();
+      ctx.moveTo(0.5, 0.02);
+      ctx.lineTo(0.56, 0.14);
+      ctx.lineTo(0.68, 0.2);
+      ctx.lineTo(0.56, 0.26);
+      ctx.lineTo(0.5, 0.38);
+      ctx.lineTo(0.44, 0.26);
+      ctx.lineTo(0.32, 0.2);
+      ctx.lineTo(0.44, 0.14);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
+    case "healer": {
+      // staff: rod with a cross head
+      ctx.beginPath();
+      ctx.moveTo(0.5, 0.36);
+      ctx.lineTo(0.5, 0.94);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0.5, 0.06);
+      ctx.lineTo(0.5, 0.42);
+      ctx.moveTo(0.32, 0.24);
+      ctx.lineTo(0.68, 0.24);
+      ctx.stroke();
+      break;
+    }
+  }
+  ctx.restore();
+}
+
 export function renderCard(u: UnitDef): HTMLCanvasElement {
   const key = cardKey(u);
   const hit = cache.get(key);
@@ -188,6 +322,9 @@ export function renderCard(u: UnitDef): HTMLCanvasElement {
     ctx.fillRect(0, 0, W, H);
     ctx.restore();
   }
+
+  // class icon, top-right (FE weapon-type badge)
+  drawClassIcon(ctx, u.archetype, W - 20 - 46, 22, 46, tier.trim);
 
   // rating + position (top-left column)
   ctx.textAlign = "center";
