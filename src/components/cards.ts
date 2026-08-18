@@ -72,26 +72,44 @@ function shieldPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: numb
  * ours sits on the TOP-RIGHT of the card. Vector strokes on a dark rounded plate, so it stays legible at card scale
  * where a glyph font would smear. `s` = plate size in px, drawn with its top-left at (x, y).
  */
-export function drawClassIcon(ctx: CanvasRenderingContext2D, archetype: Archetype, x: number, y: number, s: number, trim: string) {
+export function drawClassIcon(ctx: CanvasRenderingContext2D, archetype: Archetype, x: number, y: number, s: number, tier: { hi: string; trim: string; lo: string }) {
   ctx.save();
-  // plate
-  const r = s * 0.2;
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.arcTo(x + s, y, x + s, y + s, r);
-  ctx.arcTo(x + s, y + s, x, y + s, r);
-  ctx.arcTo(x, y + s, x, y, r);
-  ctx.arcTo(x, y, x + s, y, r);
-  ctx.closePath();
-  ctx.fillStyle = "rgba(10,10,16,0.88)";
-  ctx.shadowColor = "rgba(0,0,0,0.6)";
-  ctx.shadowBlur = 6;
-  ctx.shadowOffsetY = 2;
+  // plate — OUR card language, not FE's flat square: a bevelled plate in the card's tier trim (gold / steel gradient,
+  // like the frame), a dark inset well, the weapon glyph in white on top; the outer corner is cut to sit flush on the
+  // card's rounded frame corner
+  const plate = (inset: number) => {
+    const x0 = x + inset,
+      y0 = y + inset,
+      w = s - inset * 2;
+    const r = w * 0.18;
+    const cut = w * 0.36; // outer (top-right) corner cut — the plate is shaped to the card corner
+    ctx.beginPath();
+    ctx.moveTo(x0 + r, y0);
+    ctx.lineTo(x0 + w - cut, y0);
+    ctx.lineTo(x0 + w, y0 + cut);
+    ctx.lineTo(x0 + w, y0 + w - r);
+    ctx.arcTo(x0 + w, y0 + w, x0, y0 + w, r);
+    ctx.arcTo(x0, y0 + w, x0, y0, r);
+    ctx.arcTo(x0, y0, x0 + w, y0, r);
+    ctx.closePath();
+  };
+  plate(0);
+  const pg = ctx.createLinearGradient(x, y, x + s, y + s);
+  pg.addColorStop(0, tier.hi);
+  pg.addColorStop(0.45, tier.trim);
+  pg.addColorStop(1, tier.lo);
+  ctx.fillStyle = pg;
+  ctx.shadowColor = "rgba(0,0,0,0.65)";
+  ctx.shadowBlur = 8;
+  ctx.shadowOffsetY = 3;
   ctx.fill();
   ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 0;
-  ctx.lineWidth = Math.max(1.5, s * 0.05);
-  ctx.strokeStyle = trim;
+  plate(s * 0.09);
+  ctx.fillStyle = "rgba(10,10,16,0.9)";
+  ctx.fill();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = "rgba(255,255,255,0.22)";
   ctx.stroke();
   // icon strokes, in a unit box (0..1) mapped to the plate's inner 70%
   ctx.translate(x + s * 0.15, y + s * 0.15);
@@ -323,8 +341,8 @@ export function renderCard(u: UnitDef): HTMLCanvasElement {
     ctx.restore();
   }
 
-  // class icon, top-right (FE weapon-type badge)
-  drawClassIcon(ctx, u.archetype, W - 20 - 46, 22, 46, tier.trim);
+  // class icon badge, flush on the top-right corner (a touch bigger than FE's — it must read from the board camera)
+  drawClassIcon(ctx, u.archetype, W - 9 - 62, 9, 62, tier);
 
   // rating + position (top-left column)
   ctx.textAlign = "center";
