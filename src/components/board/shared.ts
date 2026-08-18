@@ -4,6 +4,11 @@ import { Team } from "@/sim/types";
 export const TEAM_COLOR: Record<Team, string> = { red: "#e0554a", blue: "#4a86e0" };
 /** Saturated variants for additive ground FX (selection ring) — the reference RTS ring is a hot cyan, not the muted UI blue. */
 export const TEAM_GLOW: Record<Team, string> = { red: "#ff5a48", blue: "#19e3ff" };
+/** FE Three Hopes tile paint: the move field of YOUR unit (periwinkle) vs an ENEMY's (red), fill + hairline edge — one place */
+export const MOVE_PAINT = {
+  mine: { color: "#6f8fff", opacity: 0.5, border: "#e8eeff" as string | undefined },
+  enemy: { color: "#ff7a7a", opacity: 0.3, border: undefined as string | undefined },
+};
 import { ART_W, CARD_H, CARD_PAD, CARD_W } from "../cards";
 /** visible card ART width in tiles; the plane is a little wider because the texture carries a transparent margin (badge room) */
 export const ART_W3 = 0.92;

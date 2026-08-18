@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ATTACKS, Element } from "@/sim/attacks";
+import { ATTACKS, ELEMENT_GLYPH } from "@/sim/attacks";
 import { Equipment, ItemDef, RARITY_LABEL, SLOT_LABEL, Slot, applyEquipment, canEquip, equipmentDelta, itemOrNull, slotsForKind } from "@/sim/items";
 import { ARCHETYPE_LABEL } from "@/sim/presets";
 import { Stats, UnitDef } from "@/sim/types";
@@ -17,7 +17,6 @@ import "./party.css";
  * click-pick-then-click-drop works too. Everything legal/illegal is decided by `party/inventory.ts`; this file only
  * draws and routes gestures.
  */
-const ELEMENT_GLYPH: Record<Element, string> = { physical: "⚔", fire: "🔥", ice: "❄", thunder: "⚡", holy: "✚" };
 const STAT_ROWS: { k: keyof Pick<Stats, "hp" | "atk" | "def" | "spd" | "mov">; label: string }[] = [
   { k: "hp", label: "HP" },
   { k: "atk", label: "Atk" },

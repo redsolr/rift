@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { selectCaughtUp, useGame } from "@/store/game";
-import { Element } from "@/sim/attacks";
+import { ELEMENT_GLYPH } from "@/sim/attacks";
+import { useCommandOptions } from "./useCommandOptions";
 import { UnitDef } from "@/sim/types";
 import Portrait from "./Portrait";
 import { stickPan } from "./board/shared";
@@ -16,8 +17,6 @@ import { stickPan } from "./board/shared";
  *   bottom-left  = CAMERA STICK: a virtual joystick that pans the camera (one finger stays free to tap the board)
  * Tapping units / tiles on the board keeps working exactly as before — this only adds thumb-zone shortcuts.
  */
-
-const ELEMENT_GLYPH: Record<Element, string> = { physical: "⚔", fire: "🔥", ice: "❄", thunder: "⚡", holy: "✚" };
 
 function SquadChip({ u }: { u: UnitDef }) {
   const vu = useGame((s) => s.view.units[u.id]);
@@ -71,6 +70,12 @@ function CameraStick() {
   const [knob, setKnob] = useState({ x: 0, y: 0 });
   const active = useRef(false);
   const origin = useRef({ x: 0, y: 0 });
+  const release = () => {
+    active.current = false;
+    setKnob({ x: 0, y: 0 });
+    stickPan.x = 0;
+    stickPan.y = 0;
+  };
   useEffect(
     () => () => {
       stickPan.x = 0;
@@ -102,24 +107,9 @@ function CameraStick() {
         move(e.clientX, e.clientY);
       }}
       onPointerMove={(e) => active.current && move(e.clientX, e.clientY)}
-      onPointerUp={() => {
-        active.current = false;
-        setKnob({ x: 0, y: 0 });
-        stickPan.x = 0;
-        stickPan.y = 0;
-      }}
-      onPointerCancel={() => {
-        active.current = false;
-        setKnob({ x: 0, y: 0 });
-        stickPan.x = 0;
-        stickPan.y = 0;
-      }}
-      onLostPointerCapture={() => {
-        active.current = false;
-        setKnob({ x: 0, y: 0 });
-        stickPan.x = 0;
-        stickPan.y = 0;
-      }}
+      onPointerUp={release}
+      onPointerCancel={release}
+      onLostPointerCapture={release}
       aria-label="Camera stick"
     >
       <div className="mc-stick-ring" />
@@ -157,10 +147,7 @@ function ActionCluster() {
   const selectedDef = useGame((s) => s.config.units.find((u) => u.id === s.selected) ?? null);
 
   const yourTurn = !!battle && caughtUp && battle.state.activeTeam === playerTeam && !battle.state.ended;
-  const options = useMemo(() => (battle && selected && pendingMove && menuPage ? battle.attackOptions(selected, pendingMove) : []), [battle, selected, pendingMove, menuPage]);
-  const nAttack = new Set(options.filter((o) => o.attack.kind === "attack").flatMap((o) => o.targets)).size;
-  const nHeal = new Set(options.filter((o) => o.attack.kind === "heal").flatMap((o) => o.targets)).size;
-  const hasHeals = options.some((o) => o.attack.kind === "heal");
+  const { options, nAttack, nHeal, hasHeals } = useCommandOptions();
   const radial = menuPage === "attacks" ? options.filter((o) => o.attack.kind === menuKind) : [];
 
   if (mode === "editor") return null;

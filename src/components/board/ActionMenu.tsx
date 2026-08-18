@@ -1,7 +1,7 @@
 "use client";
-import { useMemo } from "react";
 import { Html } from "@react-three/drei";
 import { useGame } from "@/store/game";
+import { useCommandOptions } from "../useCommandOptions";
 import { tileHeight } from "@/sim/grid";
 import { CARD_H3 } from "./shared";
 
@@ -14,8 +14,6 @@ import { CARD_H3 } from "./shared";
 export default function ActionMenu() {
   const pendingMove = useGame((s) => s.pendingMove);
   const menuPage = useGame((s) => s.menuPage);
-  const battle = useGame((s) => s.battle);
-  const selected = useGame((s) => s.selected);
   const commitWait = useGame((s) => s.commitWait);
   const cancelPending = useGame((s) => s.cancelPending);
   const openAttacks = useGame((s) => s.openAttacks);
@@ -23,16 +21,12 @@ export default function ActionMenu() {
   const map = useGame((s) => s.config.map);
   const selectedDef = useGame((s) => s.config.units.find((u) => u.id === s.selected) ?? null);
 
-  // all four (command page needs both kinds to enable/disable rows); the picker shows one kind
-  const options = useMemo(() => (battle && selected && pendingMove && menuPage ? battle.attackOptions(selected, pendingMove) : []), [battle, selected, pendingMove, menuPage]);
+  const { hasHeals, nAttack, nHeal } = useCommandOptions();
 
   // the target step has no menu — the centred AttackPrompt + the red tiles carry it (FE)
   // only the command page lives at the unit; the skill picker is the right-side SkillPanel, the target step is the AttackPrompt
   if (!pendingMove || !selectedDef || menuPage !== "command") return null;
   const th = tileHeight(map, pendingMove);
-  const hasHeals = options.some((o) => o.attack.kind === "heal");
-  const nAttack = new Set(options.filter((o) => o.attack.kind === "attack").flatMap((o) => o.targets)).size;
-  const nHeal = new Set(options.filter((o) => o.attack.kind === "heal").flatMap((o) => o.targets)).size;
 
   return (
     // FE: the menu hangs about two tiles to the RIGHT of the unit, level with its card, never over it

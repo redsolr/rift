@@ -3,10 +3,11 @@ import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { deployZone, selectCaughtUp, selectDropTarget, useGame } from "@/store/game";
-import { parseKey, pathTo, reachable, standable, terrainAt, tileHeight, tilesInRange } from "@/sim/grid";
+import { parseKey, passable, pathTo, reachable, standable, tileHeight, tilesInRange } from "@/sim/grid";
 import { attackById, attackRange } from "@/sim/attacks";
-import { Pos, TERRAIN, UnitDef, UnitState, otherTeam } from "@/sim/types";
+import { Pos, UnitDef, UnitState, otherTeam } from "@/sim/types";
 import { makeUnit } from "@/sim/presets";
+import { MOVE_PAINT } from "./shared";
 
 /** A config unit as a fresh battle-start state (full HP, unbuffed) — the editor previews reach from setup data. */
 const asState = (u: UnitDef): UnitState => ({ ...u, hp: u.stats.hp, alive: true, acted: false, buff: null });
@@ -117,7 +118,7 @@ export default function Highlights() {
   const editorOrigin = editorSubject?.origin ?? null;
   const editorMovable = useMemo(() => {
     if (!editorOrigin || !selDef) return [] as Pos[];
-    if (TERRAIN[terrainAt(config.map, editorOrigin.x, editorOrigin.y)].moveCost === null) return [] as Pos[];
+    if (!passable(config.map, editorOrigin)) return [] as Pos[];
     const me = { ...asState(selDef), x: editorOrigin.x, y: editorOrigin.y };
     const others = config.units.filter((u) => u.id !== selDef.id).map(asState);
     return standable(reachable(config.map, me, others), me, others);
@@ -158,6 +159,9 @@ export default function Highlights() {
   const unitAt = (x: number, y: number) => config.units.find((u) => view.units[u.id]?.alive !== false && view.units[u.id]?.x === x && view.units[u.id]?.y === y);
   // FE3H: the destination tile is the centre of the diamond — it carries only the white-edged destination marker, never
   // move-field or range paint underneath; a range tile that holds an ALLY reads blue (pass-through, not a target).
+  const movePaint = mine ? MOVE_PAINT.mine : MOVE_PAINT.enemy;
+  // the deploy zone is painted in the PLAYER's colour (it is always yours), a touch lighter than a live move field
+  const zonePaint = playerTeam === "blue" ? { ...MOVE_PAINT.mine, opacity: 0.45 } : { ...MOVE_PAINT.enemy, border: "#ffd0d0" };
   const isDest = (p: Pos) => !!previewFrom && p.x === previewFrom.x && p.y === previewFrom.y;
   const allyAt = (p: Pos) => {
     const u = unitAt(p.x, p.y);
@@ -169,18 +173,18 @@ export default function Highlights() {
         <Highlight key={`d${p.x},${p.y}`} x={p.x} y={p.y} color="#ff3b3b" opacity={0.2} />
       ))}
       {zone.map((p) => (
-        <Highlight key={`z${p.x},${p.y}`} x={p.x} y={p.y} color={playerTeam === "blue" ? "#6f8fff" : "#ff7a7a"} opacity={playerTeam === "blue" ? 0.45 : 0.3} border={playerTeam === "blue" ? "#e8eeff" : "#ffd0d0"} borderOpacity={0.8} lift={0.015} />
+        <Highlight key={`z${p.x},${p.y}`} x={p.x} y={p.y} color={zonePaint.color} opacity={zonePaint.opacity} border={zonePaint.border} borderOpacity={0.8} lift={0.015} />
       ))}
       {movable
         .filter((p) => !isDest(p))
         .map((p) => (
-          <Highlight key={`m${p.x},${p.y}`} x={p.x} y={p.y} color={mine ? "#6f8fff" : "#ff7a7a"} opacity={mine ? 0.5 : 0.3} border={mine ? "#e8eeff" : undefined} borderOpacity={0.8} />
+          <Highlight key={`m${p.x},${p.y}`} x={p.x} y={p.y} color={movePaint.color} opacity={movePaint.opacity} border={movePaint.border} borderOpacity={0.8} />
         ))}
       {pendingRange
         .filter((p) => !isDest(p))
         .map((p) =>
           allyAt(p) && !healing ? (
-            <Highlight key={`q${p.x},${p.y}`} x={p.x} y={p.y} color={mine ? "#6f8fff" : "#ff7a7a"} opacity={mine ? 0.5 : 0.3} border={mine ? "#e8eeff" : undefined} borderOpacity={0.8} lift={0.03} />
+            <Highlight key={`q${p.x},${p.y}`} x={p.x} y={p.y} color={movePaint.color} opacity={movePaint.opacity} border={movePaint.border} borderOpacity={0.8} lift={0.03} />
           ) : (
             <Highlight key={`q${p.x},${p.y}`} x={p.x} y={p.y} color={healing ? "#7ff29a" : "#ff6f8c"} opacity={0.24} border={healing ? "#b8ffc8" : "#ff3d5c"} borderOpacity={0.7} lift={0.03} />
           ),

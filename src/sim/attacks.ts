@@ -13,6 +13,9 @@ export type AttackCondition = "none" | "stationary" | "moved";
 /** what the attack does: damage an enemy or heal an ally */
 export type AttackKind = "attack" | "heal";
 /** flavour/element — display-only today (no resistances yet); the slot for weakness tables later */
+/** presentation glyph per element — one table for every panel / picker / badge */
+export const ELEMENT_GLYPH: Record<Element, string> = { physical: "⚔", fire: "🔥", ice: "❄", thunder: "⚡", holy: "✚" };
+export const ELEMENT_LABEL: Record<Element, string> = { physical: "Physical", fire: "Fire", ice: "Ice", thunder: "Thunder", holy: "Holy" };
 export type Element = "physical" | "fire" | "ice" | "thunder" | "holy";
 /** delivery: physical strikes are stopped by DEF like today; magic will get its own resist later */
 export type School = "physical" | "magic";

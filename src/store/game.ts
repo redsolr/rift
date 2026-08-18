@@ -23,7 +23,7 @@ import {
   TERRAIN,
   UnitDef,
 } from "@/sim/types";
-import { idx, inBounds, terrainAt } from "@/sim/grid";
+import { idx, inBounds, passable, terrainAt, unitAt } from "@/sim/grid";
 
 export type Mode = "manual" | "manager" | "editor";
 /** Board dressing: "scene" = textured city map (grid only while a unit is selected); "tiles" = flat coloured blocks with gaps (debug). */
@@ -257,7 +257,7 @@ export function deployZone(config: BattleConfig, team: Team): Pos[] {
   const rows = Math.min(DEPLOY_ROWS, map.height);
   const y0 = near ? map.height - rows : 0;
   const out: Pos[] = [];
-  for (let y = y0; y < y0 + rows; y++) for (let x = 0; x < map.width; x++) if (TERRAIN[terrainAt(map, x, y)].moveCost !== null) out.push({ x, y });
+  for (let y = y0; y < y0 + rows; y++) for (let x = 0; x < map.width; x++) if (passable(map, { x, y })) out.push({ x, y });
   return out;
 }
 
@@ -268,8 +268,8 @@ export function selectDropTarget(s: Pick<GameState, "mode" | "drag" | "tool" | "
   const map = s.config.map;
   if (!inBounds(map, pos.x, pos.y)) return null;
   const terrain = terrainAt(map, pos.x, pos.y);
-  const occupant = s.config.units.find((u) => u.x === pos.x && u.y === pos.y) ?? null;
-  const impassable = TERRAIN[terrain].moveCost === null;
+  const occupant = unitAt(s.config.units, pos) ?? null;
+  const impassable = !passable(map, pos);
   const d = s.drag;
   if (s.planning) {
     // deployment: your own units only, inside the deploy zone; dropping on an ally swaps the two
@@ -358,13 +358,34 @@ export const useGame = create<GameState>((set, get) => {
     schedule();
   };
 
-  const clearManual = () => set({ moveTiles: [], pendingMove: null, menuPage: null, menuKind: "attack", pendingAttack: null, hoverAttack: null, targets: [] });
+  /** the FE command-flow fields at rest (no tile picked, no menu, no attack, no targets) — spread this, never re-type it */
+  const MENU_IDLE = { pendingMove: null, menuPage: null, menuKind: "attack" as AttackKind, pendingAttack: null, hoverAttack: null, targets: [] as string[] };
+  const clearManual = () => set({ moveTiles: [], ...MENU_IDLE });
+  /** one config mutation = new config + a fresh setup view; every editor / planning edit goes through here */
+  const setConfig = (config: BattleConfig, extra: Partial<GameState> = {}) => set({ config, view: initialView(config), ...extra });
+  /**
+   * "Fight" fast path shared by left-click and right-click on a target: find a tile `unitId` can hit `targetId` from
+   * (the pending tile, else where it stands, else any reachable tile), place it there and open the right picker.
+   * Returns false when the target is out of reach from everywhere.
+   */
+  const engage = (unitId: string, targetId: string): boolean => {
+    const s = get();
+    const b = s.battle;
+    if (!b) return false;
+    const me = b.unit(unitId);
+    const kind: AttackKind = b.unit(targetId).team === me.team ? "heal" : "attack";
+    const from = [s.pendingMove, { x: me.x, y: me.y }, ...s.moveTiles].filter((t): t is Pos => !!t).find((t) => b.targetsFrom(me.id, t, undefined, kind).some((x) => x.id === targetId));
+    if (!from) return false;
+    placeAndOpenMenu(me.id, from);
+    get().openAttacks(kind);
+    return true;
+  };
 
   /** Place `id` on `p` (preview) and open the FE command menu there. */
   const placeAndOpenMenu = (id: string, p: Pos) => {
     const b = get().battle;
     if (!b) return;
-    set({ selected: id, pendingMove: p, menuPage: "command", menuKind: "attack", pendingAttack: null, hoverAttack: null, targets: b.targetsFrom(id, p).map((u) => u.id) });
+    set({ selected: id, ...MENU_IDLE, pendingMove: p, menuPage: "command", targets: b.targetsFrom(id, p).map((u) => u.id) });
   };
 
   /** Everything that resets when a battle starts, ends or the setup changes. */
@@ -484,9 +505,7 @@ export const useGame = create<GameState>((set, get) => {
       const ua = s.config.units.find((u) => u.id === a);
       const ub = s.config.units.find((u) => u.id === b);
       if (!ua || !ub) return;
-      const units = s.config.units.map((u) => (u.id === a ? { ...u, x: ub.x, y: ub.y } : u.id === b ? { ...u, x: ua.x, y: ua.y } : u));
-      const config = { ...s.config, units };
-      set({ config, view: initialView(config) });
+      setConfig({ ...s.config, units: s.config.units.map((u) => (u.id === a ? { ...u, x: ub.x, y: ub.y } : u.id === b ? { ...u, x: ua.x, y: ua.y } : u)) });
     },
 
     rematch: () => {
@@ -606,18 +625,10 @@ export const useGame = create<GameState>((set, get) => {
         // the Attack picker — same as the right-click fast path; a wounded ally opens the Heal picker for healers
         if (s.selected && s.selected !== id && u.alive) {
           const me = b.unit(s.selected);
-          if (me.team === s.playerTeam && me.alive && !me.acted) {
-            const kind: AttackKind = u.team === me.team ? "heal" : "attack";
-            const from = [s.pendingMove, { x: me.x, y: me.y }, ...s.moveTiles].filter((t): t is Pos => !!t).find((t) => b.targetsFrom(me.id, t, undefined, kind).some((x) => x.id === id));
-            if (from) {
-              placeAndOpenMenu(me.id, from);
-              get().openAttacks(kind);
-              return;
-            }
-          }
+          if (me.team === s.playerTeam && me.alive && !me.acted && engage(me.id, id)) return;
         }
         if (u.team === s.playerTeam && u.alive && !u.acted) {
-          set({ selected: id, moveTiles: b.standableFor(id), pendingMove: null, menuPage: null, menuKind: "attack", pendingAttack: null, hoverAttack: null, targets: [] });
+          set({ selected: id, moveTiles: b.standableFor(id), ...MENU_IDLE });
           return;
         }
       }
@@ -632,7 +643,7 @@ export const useGame = create<GameState>((set, get) => {
         if (t.kind === "terrain") return get().paintTile(p);
         if (t.kind === "unit") {
           // same legality as the placement ghost: free tile, passable terrain
-          if (s.config.units.some((u) => u.x === p.x && u.y === p.y) || TERRAIN[terrainAt(s.config.map, p.x, p.y)].moveCost === null) return;
+          if (unitAt(s.config.units, p) || !passable(s.config.map, p)) return;
           const cfg = s.config;
           const u = makeUnit(t.team, t.archetype, p.x, p.y);
           // unique even when several units land in the same millisecond
@@ -645,14 +656,14 @@ export const useGame = create<GameState>((set, get) => {
         }
         if (t.kind === "select" && s.selected) {
           // click-to-move (keyboard-free alternative to dragging the card): same legality as the ghost
-          if (!s.config.units.some((u) => u.x === p.x && u.y === p.y) && TERRAIN[terrainAt(s.config.map, p.x, p.y)].moveCost !== null) get().moveUnitTo(s.selected, p);
+          if (!unitAt(s.config.units, p) && passable(s.config.map, p)) get().moveUnitTo(s.selected, p);
           return;
         }
         return;
       }
       // planning: click-to-move your selected unit inside the deploy zone (the no-drag alternative)
       if (s.planning) {
-        const occupant = s.config.units.find((u) => u.x === p.x && u.y === p.y);
+        const occupant = unitAt(s.config.units, p);
         if (occupant) return get().clickUnit(occupant.id);
         const sel = s.selected ? s.config.units.find((u) => u.id === s.selected) : null;
         if (!sel || sel.team !== s.playerTeam) return;
@@ -662,7 +673,7 @@ export const useGame = create<GameState>((set, get) => {
       }
       // a tile with a living unit on it IS that unit (the ray may land on the tile beside a card's foot)
       if (s.mode === "manual" && s.battle) {
-        const occupant = s.battle.alive().find((u) => u.x === p.x && u.y === p.y);
+        const occupant = unitAt(s.battle.alive(), p);
         if (occupant && !(s.selected === occupant.id && s.moveTiles.some((m) => m.x === p.x && m.y === p.y))) return get().clickUnit(occupant.id);
       }
       if (s.mode === "manual" && s.battle && s.selected && s.moveTiles.length) {
@@ -683,7 +694,7 @@ export const useGame = create<GameState>((set, get) => {
       const s = get();
       if (s.mode !== "manual" || !s.battle) return;
       const b = s.battle;
-      const here = b.alive().find((u) => u.x === p.x && u.y === p.y);
+      const here = unitAt(b.alive(), p);
       // right-click on one of YOUR actable units (none / another selected, or itself): select it and open the
       // command menu at its own tile at once — no left-click first
       const yourTurn = !b.state.ended && b.state.activeTeam === s.playerTeam && s.cursor >= s.events.length;
@@ -702,12 +713,7 @@ export const useGame = create<GameState>((set, get) => {
         if (s.menuPage === "target" && s.pendingMove && s.targets.includes(enemy.id)) return get().commitTarget(enemy.id);
         // otherwise: move to a tile the enemy can be hit from (prefer staying put) and open the picker for
         // the right kind — the player still chooses the attack, FE-style
-        const u = s.battle.unit(s.selected);
-        const kind: AttackKind = enemy.team === u.team ? "heal" : "attack";
-        const from = [s.pendingMove, { x: u.x, y: u.y }, ...s.moveTiles].filter((t): t is Pos => !!t).find((t) => s.battle!.targetsFrom(u.id, t, undefined, kind).some((x) => x.id === enemy.id));
-        if (!from) return;
-        placeAndOpenMenu(u.id, from);
-        get().openAttacks(kind);
+        engage(s.selected, enemy.id);
         return;
       }
       if (s.moveTiles.some((m) => m.x === p.x && m.y === p.y)) get().clickTile(p);
@@ -723,7 +729,7 @@ export const useGame = create<GameState>((set, get) => {
         set({ menuPage: "command", menuKind: "attack", hoverAttack: null, targets: s.battle.targetsFrom(s.selected, s.pendingMove).map((u) => u.id) });
         return;
       }
-      set({ pendingMove: null, menuPage: null, menuKind: "attack", pendingAttack: null, hoverAttack: null, targets: [], moveTiles: s.battle.standableFor(s.selected) });
+      set({ ...MENU_IDLE, moveTiles: s.battle.standableFor(s.selected) });
     },
     openAttacks: (kind = "attack") => {
       const s = get();
@@ -919,7 +925,7 @@ export const useGame = create<GameState>((set, get) => {
       set({ drag: null });
       if (!t || !t.ok) return;
       if (d.kind === "unit") {
-        const occupant = s.config.units.find((u) => u.x === t.pos.x && u.y === t.pos.y);
+        const occupant = unitAt(s.config.units, t.pos);
         if (occupant && occupant.id !== d.id) get().swapUnits(d.id, occupant.id);
         else get().moveUnitTo(d.id, t.pos);
       } else get().moveFeature(d.from, t.pos);
@@ -949,27 +955,20 @@ export const useGame = create<GameState>((set, get) => {
     setUnitStats: (id, patch) => {
       const s = get();
       // the editor edits the UNGEARED numbers; gear is re-applied on top
-      const units = s.config.units.map((u) => (u.id === id ? gearUnit({ ...u, stats: { ...(u.base ?? u.stats), ...patch }, base: undefined }, u.equipment ?? {}) : u));
-      const config = { ...s.config, units };
-      set({ config, view: initialView(config) });
+      setConfig({ ...s.config, units: s.config.units.map((u) => (u.id === id ? gearUnit({ ...u, stats: { ...(u.base ?? u.stats), ...patch }, base: undefined }, u.equipment ?? {}) : u)) });
     },
     setUnitField: (id, patch) => {
       const s = get();
-      const units = s.config.units.map((u) => (u.id === id ? { ...u, ...patch } : u));
-      const config = { ...s.config, units };
-      set({ config, view: initialView(config) });
+      setConfig({ ...s.config, units: s.config.units.map((u) => (u.id === id ? { ...u, ...patch } : u)) });
     },
     moveUnitTo: (id, p) => {
       const s = get();
-      const units = s.config.units.map((u) => (u.id === id ? { ...u, x: p.x, y: p.y } : u));
-      const config = { ...s.config, units };
-      set({ config, view: initialView(config) });
+      setConfig({ ...s.config, units: s.config.units.map((u) => (u.id === id ? { ...u, x: p.x, y: p.y } : u)) });
     },
     removeUnit: (id) => {
       const s = get();
       const units = s.config.units.filter((u) => u.id !== id).map((u) => (u.orders.protect === id ? { ...u, orders: { ...u.orders, protect: null } } : u));
-      const config = { ...s.config, units };
-      set({ config, view: initialView(config), selected: s.selected === id ? null : s.selected });
+      setConfig({ ...s.config, units }, { selected: s.selected === id ? null : s.selected });
     },
     clearMap: () => {
       const s = get();
@@ -981,9 +980,7 @@ export const useGame = create<GameState>((set, get) => {
       const old = s.config.map;
       const tiles: Terrain[] = [];
       for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) tiles.push(x < old.width && y < old.height ? old.tiles[y * old.width + x] : "ground");
-      const units = s.config.units.filter((u) => u.x < w && u.y < h);
-      const config = { ...s.config, map: { width: w, height: h, tiles }, units };
-      set({ config, view: initialView(config) });
+      setConfig({ ...s.config, map: { width: w, height: h, tiles }, units: s.config.units.filter((u) => u.x < w && u.y < h) });
     },
     setMaxTurns: (maxTurns) => set({ config: { ...get().config, maxTurns } }),
 

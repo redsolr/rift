@@ -9,6 +9,10 @@ export const terrainAt = (map: MapDef, x: number, y: number): Terrain =>
 /** Visual height of the tile at p (0.1 for out-of-range lookups) — shared by every renderer piece. */
 export const tileHeight = (map: MapDef, p: Pos): number =>
   inBounds(map, p.x, p.y) ? TERRAIN[terrainAt(map, p.x, p.y)].height : 0.1;
+/** can anyone ever stand here? (water / wall = no) */
+export const passable = (map: MapDef, p: Pos): boolean => inBounds(map, p.x, p.y) && TERRAIN[terrainAt(map, p.x, p.y)].moveCost !== null;
+/** the unit standing on p, if any — works for UnitDef (setup) and UnitState (battle) lists alike */
+export const unitAt = <U extends Pos>(units: readonly U[], p: Pos): U | undefined => units.find((u) => u.x === p.x && u.y === p.y);
 export const dist = (a: Pos, b: Pos) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 export const posKey = (p: Pos) => `${p.x},${p.y}`;
 export const parseKey = (k: string): Pos => {

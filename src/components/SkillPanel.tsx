@@ -1,11 +1,9 @@
 "use client";
 import { useMemo } from "react";
 import { useGame } from "@/store/game";
-import { AttackDef, Element, attackRange } from "@/sim/attacks";
+import { AttackDef, ELEMENT_GLYPH, ELEMENT_LABEL, attackRange } from "@/sim/attacks";
 import { useUiFrame } from "./ui/UiFrame";
 
-const ELEMENT_GLYPH: Record<Element, string> = { physical: "⚔", fire: "🔥", ice: "❄", thunder: "⚡", holy: "✚" };
-const ELEMENT_LABEL: Record<Element, string> = { physical: "Physical", fire: "Fire", ice: "Ice", thunder: "Thunder", holy: "Holy" };
 
 /**
  * FE-style skill picker: a full-height framed panel on the RIGHT of the board.
